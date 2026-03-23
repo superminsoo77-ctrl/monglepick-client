@@ -1,0 +1,139 @@
+/**
+ * ReviewList 컴포넌트 스타일.
+ *
+ * 다크 테마 리뷰 리스트 — 별점 + 사용자 정보 표시.
+ */
+
+/* 리스트 컨테이너 */
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* ── 리뷰 아이템 ── */
+.review-list__item {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* 헤더 — 작성자 + 평점 */
+.review-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+/* 작성자 정보 */
+.review-list__author-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* 아바타 */
+.review-list__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-light);
+  color: var(--primary);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+/* 작성자 이름 */
+.review-list__author-name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+/* 작성 시간 */
+.review-list__time {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ── 평점 ── */
+.review-list__rating {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.review-list__stars {
+  color: var(--star-filled);
+  font-size: var(--text-sm);
+  letter-spacing: 1px;
+}
+
+.review-list__score {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+/* ── 리뷰 내용 ── */
+.review-list__content {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+/* ── 하단 (좋아요 등) ── */
+.review-list__footer {
+  display: flex;
+  align-items: center;
+}
+
+.review-list__like-btn {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.review-list__like-btn:hover {
+  color: var(--error);
+  background-color: var(--error-bg);
+}
+
+/* ── 빈 상태 ── */
+.review-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2xl);
+  gap: var(--space-sm);
+}
+
+.review-list__empty-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.review-list__empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0;
+}

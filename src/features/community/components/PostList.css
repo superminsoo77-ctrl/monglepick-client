@@ -1,0 +1,133 @@
+/**
+ * PostList 컴포넌트 스타일.
+ *
+ * 다크 테마 게시글 리스트 — 카드형 아이템.
+ */
+
+/* 리스트 컨테이너 */
+.post-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ── 게시글 아이템 ── */
+.post-list__item {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.post-list__item:hover {
+  border-color: var(--border-default);
+  background-color: var(--bg-elevated);
+}
+
+/* 링크 (전체 영역 클릭 가능) */
+.post-list__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 아이템 헤더 — 카테고리 + 시간 */
+.post-list__item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 카테고리 배지 */
+.post-list__category {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+/* 카테고리별 색상 */
+.post-list__category--review {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.post-list__category--question {
+  background-color: var(--info-bg);
+  color: var(--info);
+}
+
+/* 작성 시간 */
+.post-list__time {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* 제목 */
+.post-list__title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: var(--leading-tight);
+}
+
+/* 내용 미리보기 */
+.post-list__preview {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+/* 하단 메타 정보 */
+.post-list__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+}
+
+/* 작성자 */
+.post-list__author {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+}
+
+/* 통계 영역 */
+.post-list__stats {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.post-list__stat {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ── 빈 상태 ── */
+.post-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-3xl);
+  gap: var(--space-sm);
+}
+
+.post-list__empty-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.post-list__empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0;
+}

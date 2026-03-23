@@ -1,0 +1,285 @@
+/**
+ * 글로벌 스타일 정의.
+ *
+ * CSS 리셋, 기본 요소 스타일, 유틸리티 클래스를 포함한다.
+ * variables.css의 CSS 변수를 활용하여 다크 테마를 일관되게 적용한다.
+ */
+
+/* CSS 변수 파일 임포트 */
+@import './variables.css';
+
+/* ── CSS 리셋 ── */
+
+/* 모든 요소의 box-sizing을 border-box로 통일 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* HTML 기본 설정 */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+/* Body 기본 스타일 — 다크 테마 배경 */
+body {
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background-color: var(--bg-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── 기본 요소 스타일 ── */
+
+/* 제목 */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--font-bold);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+}
+
+h1 { font-size: var(--text-4xl); }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-2xl); }
+h4 { font-size: var(--text-xl); }
+h5 { font-size: var(--text-lg); }
+h6 { font-size: var(--text-base); }
+
+/* 단락 */
+p {
+  margin-bottom: var(--space-md);
+  color: var(--text-secondary);
+}
+
+/* 링크 */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+/* 이미지 — 반응형 기본 설정 */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 버튼 리셋 */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 입력 필드 리셋 */
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text-primary);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* 리스트 리셋 */
+ul, ol {
+  list-style: none;
+}
+
+/* 구분선 */
+hr {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: var(--space-lg) 0;
+}
+
+/* ── 유틸리티 클래스 ── */
+
+/* 숨김 (스크린 리더에서는 접근 가능) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 텍스트 정렬 */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* 텍스트 색상 */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-accent { color: var(--primary); }
+.text-error { color: var(--error); }
+.text-success { color: var(--success); }
+
+/* Flexbox 유틸리티 */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.flex-wrap { flex-wrap: wrap; }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }
+
+/* 간격 유틸리티 */
+.mt-sm { margin-top: var(--space-sm); }
+.mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+.mb-sm { margin-bottom: var(--space-sm); }
+.mb-md { margin-bottom: var(--space-md); }
+.mb-lg { margin-bottom: var(--space-lg); }
+
+/* 카드 기본 스타일 */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+/* 버튼 기본 스타일 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-medium);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+/* Primary 버튼 */
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--text-inverse);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Secondary 버튼 (아웃라인) */
+.btn-secondary {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--primary-light);
+}
+
+/* Ghost 버튼 (배경 없음) */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* 컨테이너 — 최대 너비 + 중앙 정렬 */
+.container {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
+}
+
+/* 좁은 컨테이너 (폼 등) */
+.container-narrow {
+  width: 100%;
+  max-width: var(--content-narrow);
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
+}
+
+/* 스크롤바 스타일 (Webkit) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* 선택 영역 스타일 */
+::selection {
+  background-color: var(--primary-light);
+  color: var(--text-primary);
+}

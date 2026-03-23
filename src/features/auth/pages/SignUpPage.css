@@ -1,0 +1,14 @@
+/**
+ * SignUpPage 스타일.
+ *
+ * 폼을 화면 중앙에 배치한다.
+ */
+
+.signup-page {
+  width: 100%;
+  min-height: calc(100vh - var(--header-height) - var(--footer-height));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-lg);
+}

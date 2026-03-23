@@ -1,0 +1,167 @@
+/**
+ * PostForm 컴포넌트 스타일.
+ *
+ * 다크 테마 게시글 작성 폼.
+ */
+
+/* 폼 컨테이너 */
+.post-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+}
+
+/* 필드 그룹 */
+.post-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 라벨 */
+.post-form__label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+/* ── 카테고리 선택 ── */
+.post-form__categories {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.post-form__category-btn {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.post-form__category-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.post-form__category-btn--active {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ── 입력 필드 ── */
+.post-form__input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast);
+}
+
+.post-form__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: none;
+}
+
+.post-form__input--error {
+  border-color: var(--error);
+}
+
+/* ── 텍스트 영역 ── */
+.post-form__textarea {
+  width: 100%;
+  padding: var(--space-md);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+  min-height: 200px;
+  transition: border-color var(--transition-fast);
+  font-family: var(--font-family);
+}
+
+.post-form__textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: none;
+}
+
+.post-form__textarea--error {
+  border-color: var(--error);
+}
+
+/* 글자 수 */
+.post-form__char-count {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.post-form__char-count span {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* 에러 메시지 */
+.post-form__error {
+  font-size: var(--text-xs);
+  color: var(--error);
+}
+
+/* ── 버튼 영역 ── */
+.post-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+
+.post-form__btn {
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.post-form__btn--cancel {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.post-form__btn--cancel:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.post-form__btn--submit {
+  background-color: var(--primary);
+  color: white;
+}
+
+.post-form__btn--submit:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.post-form__btn--submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

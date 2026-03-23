@@ -1,0 +1,157 @@
+/**
+ * MovieList 컴포넌트 스타일.
+ *
+ * 반응형 영화 카드 그리드 레이아웃.
+ * 화면 크기에 따라 열 수가 자동 조절된다.
+ */
+
+/* 섹션 컨테이너 */
+.movie-list {
+  width: 100%;
+}
+
+/* 섹션 제목 */
+.movie-list__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+/* 카드 그리드 — CSS Grid로 반응형 열 배치 */
+.movie-list__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-lg);
+}
+
+/* ── 영화 카드 ── */
+.movie-list__card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.movie-list__card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-default);
+}
+
+/* ── 포스터 영역 ── */
+.movie-list__poster {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background-color: var(--bg-elevated);
+}
+
+/* 포스터 이미지 */
+.movie-list__poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-slow);
+}
+
+.movie-list__card:hover .movie-list__poster-img {
+  transform: scale(1.05);
+}
+
+/* 포스터 플레이스홀더 */
+.movie-list__poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 평점 배지 — 포스터 우상단 */
+.movie-list__rating-badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  padding: 2px 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: var(--star-filled);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
+}
+
+/* ── 영화 정보 영역 ── */
+.movie-list__info {
+  padding: var(--space-sm) var(--space-md);
+  padding-bottom: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* 영화 제목 */
+.movie-list__name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: var(--leading-tight);
+  /* 2줄 넘으면 말줄임 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 장르 태그 영역 */
+.movie-list__genres {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+/* 장르 태그 */
+.movie-list__genre-tag {
+  font-size: var(--text-xs);
+  color: var(--primary);
+  background-color: var(--primary-light);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* 개봉 연도 */
+.movie-list__year {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ── 빈 상태 ── */
+.movie-list__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl);
+}
+
+.movie-list__empty-text {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── 반응형 ── */
+@media (max-width: 640px) {
+  .movie-list__grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-md);
+  }
+}

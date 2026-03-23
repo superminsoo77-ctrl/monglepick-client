@@ -1,0 +1,137 @@
+/**
+ * SignUpForm 컴포넌트 스타일.
+ *
+ * 다크 테마 회원가입 폼 — LoginForm과 동일한 디자인 체계.
+ */
+
+/* 폼 컨테이너 */
+.signup-form {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 제목 */
+.signup-form__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+
+/* 부제목 */
+.signup-form__subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+  margin-top: calc(-1 * var(--space-sm));
+}
+
+/* 서버 에러 배너 */
+.signup-form__error-banner {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--error-bg);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--error);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* 필드 그룹 */
+.signup-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* 라벨 */
+.signup-form__label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+/* 입력 필드 */
+.signup-form__input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.signup-form__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: none;
+}
+
+/* 에러 상태 */
+.signup-form__input--error {
+  border-color: var(--error);
+}
+
+.signup-form__input--error:focus {
+  box-shadow: 0 0 0 3px var(--error-bg);
+}
+
+/* 에러 메시지 */
+.signup-form__error {
+  font-size: var(--text-xs);
+  color: var(--error);
+}
+
+/* 제출 버튼 */
+.signup-form__submit {
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--primary);
+  color: white;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--space-sm);
+}
+
+.signup-form__submit:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.signup-form__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 하단 링크 */
+.signup-form__footer {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+.signup-form__link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: var(--font-medium);
+}
+
+.signup-form__link:hover {
+  text-decoration: underline;
+}

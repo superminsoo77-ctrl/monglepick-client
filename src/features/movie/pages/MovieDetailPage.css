@@ -1,0 +1,60 @@
+/**
+ * MovieDetailPage 스타일.
+ */
+
+/* 페이지 컨테이너 */
+.movie-detail-page {
+  width: 100%;
+  min-height: 60vh;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+/* 내부 컨테이너 */
+.movie-detail-page__inner {
+  max-width: var(--content-narrow);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+/* 리뷰 섹션 */
+.movie-detail-page__reviews {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 섹션 제목 */
+.movie-detail-page__section-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.movie-detail-page__section-title span {
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+  font-size: var(--text-base);
+}
+
+/* 에러 상태 */
+.movie-detail-page__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.movie-detail-page__error h2 {
+  color: var(--text-primary);
+  font-size: var(--text-xl);
+}
+
+.movie-detail-page__error p {
+  color: var(--text-secondary);
+}

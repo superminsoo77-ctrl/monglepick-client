@@ -1,0 +1,108 @@
+/**
+ * CommunityPage 스타일.
+ */
+
+/* 페이지 컨테이너 */
+.community-page {
+  width: 100%;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+/* 내부 컨테이너 */
+.community-page__inner {
+  max-width: var(--content-narrow);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 페이지 헤더 */
+.community-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.community-page__title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.community-page__desc {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── 탭 네비게이션 ── */
+.community-page__tabs {
+  display: flex;
+  gap: var(--space-xs);
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: 0;
+}
+
+.community-page__tab {
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: -1px;
+}
+
+.community-page__tab:hover {
+  color: var(--text-primary);
+}
+
+.community-page__tab--active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ── 탭 콘텐츠 ── */
+.community-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 새 글 작성 버튼 */
+.community-page__write-btn {
+  align-self: flex-end;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.community-page__write-btn:hover {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+/* 리뷰 안내 플레이스홀더 */
+.community-page__reviews-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl);
+}
+
+.community-page__placeholder-text {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin: 0;
+}

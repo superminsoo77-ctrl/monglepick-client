@@ -1,0 +1,137 @@
+/**
+ * LoginForm 컴포넌트 스타일.
+ *
+ * 다크 테마 로그인 폼 — 카드형 배경, 보라색 강조색.
+ */
+
+/* 폼 컨테이너 */
+.login-form {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 제목 */
+.login-form__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+
+/* 부제목 */
+.login-form__subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+  margin-top: calc(-1 * var(--space-sm));
+}
+
+/* 서버 에러 배너 */
+.login-form__error-banner {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--error-bg);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--error);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* 필드 그룹 */
+.login-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* 라벨 */
+.login-form__label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+/* 입력 필드 */
+.login-form__input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.login-form__input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: none;
+}
+
+/* 에러 상태 입력 필드 */
+.login-form__input--error {
+  border-color: var(--error);
+}
+
+.login-form__input--error:focus {
+  box-shadow: 0 0 0 3px var(--error-bg);
+}
+
+/* 필드 에러 메시지 */
+.login-form__error {
+  font-size: var(--text-xs);
+  color: var(--error);
+}
+
+/* 제출 버튼 */
+.login-form__submit {
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--primary);
+  color: white;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--space-sm);
+}
+
+.login-form__submit:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.login-form__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 하단 링크 */
+.login-form__footer {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}
+
+.login-form__link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: var(--font-medium);
+}
+
+.login-form__link:hover {
+  text-decoration: underline;
+}

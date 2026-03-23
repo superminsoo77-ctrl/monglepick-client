@@ -1,0 +1,14 @@
+/**
+ * ChatPage 스타일.
+ *
+ * ChatWindow 컴포넌트가 페이지 전체 높이를 차지하도록 설정한다.
+ * 헤더 높이를 고려하여 calc()로 높이를 계산한다.
+ */
+
+/* 채팅 페이지 컨테이너 — 남은 뷰포트 높이를 모두 사용 */
+.chat-page {
+  width: 100%;
+  height: calc(100vh - var(--header-height) - var(--footer-height));
+  display: flex;
+  flex-direction: column;
+}

@@ -1,0 +1,335 @@
+/**
+ * MovieDetailCard 컴포넌트 스타일.
+ *
+ * 영화 상세 정보 카드 — 포스터와 정보를 가로 배치.
+ */
+
+/* 카드 전체 컨테이너 */
+.movie-detail {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+/* ── 상단: 포스터 + 정보 가로 배치 ── */
+.movie-detail__top {
+  display: flex;
+  gap: var(--space-xl);
+}
+
+/* 포스터 영역 */
+.movie-detail__poster {
+  flex-shrink: 0;
+  width: 280px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--bg-elevated);
+}
+
+.movie-detail__poster-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.movie-detail__poster-placeholder {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 정보 영역 */
+.movie-detail__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* 제목 */
+.movie-detail__title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: var(--leading-tight);
+}
+
+/* 원제 */
+.movie-detail__original-title {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin: 0;
+  margin-top: calc(-1 * var(--space-sm));
+}
+
+/* ── 평점 ── */
+.movie-detail__rating {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.movie-detail__rating-stars {
+  color: var(--star-filled);
+  font-size: var(--text-lg);
+  letter-spacing: 2px;
+}
+
+.movie-detail__rating-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.movie-detail__rating-count {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ── 메타 정보 ── */
+.movie-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.movie-detail__meta-item {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.movie-detail__certification {
+  padding: 1px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-medium);
+}
+
+/* ── 장르 ── */
+.movie-detail__genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.movie-detail__genre-tag {
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+/* ── 감독 ── */
+.movie-detail__director {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.movie-detail__label {
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+}
+
+/* ── 액션 버튼 ── */
+.movie-detail__actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.movie-detail__btn {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  background-color: transparent;
+}
+
+.movie-detail__btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.movie-detail__btn--wishlisted {
+  background-color: var(--error-bg);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.movie-detail__btn--trailer {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.movie-detail__btn--trailer:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+/* ── 트레일러 ── */
+.movie-detail__trailer {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: #000;
+}
+
+.movie-detail__trailer-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ── 줄거리 ── */
+.movie-detail__section-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-md) 0;
+}
+
+.movie-detail__overview-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+.movie-detail__overview-text--collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-detail__overview-toggle {
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  margin-top: var(--space-sm);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.movie-detail__overview-toggle:hover {
+  text-decoration: underline;
+}
+
+/* ── 출연진 ── */
+.movie-detail__cast-list {
+  display: flex;
+  gap: var(--space-lg);
+  overflow-x: auto;
+  padding-bottom: var(--space-sm);
+}
+
+.movie-detail__cast-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 80px;
+}
+
+.movie-detail__cast-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background-color: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+}
+
+.movie-detail__cast-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.movie-detail__cast-name {
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  text-align: center;
+  font-weight: var(--font-medium);
+}
+
+.movie-detail__cast-character {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── OTT 플랫폼 ── */
+.movie-detail__ott-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.movie-detail__ott-tag {
+  padding: var(--space-xs) var(--space-md);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── 반응형 (768px 이하) ── */
+@media (max-width: 768px) {
+  .movie-detail__top {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .movie-detail__poster {
+    width: 200px;
+  }
+
+  .movie-detail__title {
+    font-size: var(--text-2xl);
+    text-align: center;
+  }
+
+  .movie-detail__rating {
+    justify-content: center;
+  }
+
+  .movie-detail__meta {
+    justify-content: center;
+  }
+
+  .movie-detail__genres {
+    justify-content: center;
+  }
+
+  .movie-detail__actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
