@@ -120,3 +120,20 @@ export async function logoutAPI(token) {
     },
   });
 }
+
+/**
+ * OAuth 소셜 로그인 API 호출.
+ * OAuth 제공자로부터 받은 인가 코드를 백엔드에 전달하여 토큰을 발급받는다.
+ *
+ * @param {Object} params - OAuth 로그인 정보
+ * @param {string} params.provider - 제공자 이름 (google, kakao, naver)
+ * @param {string} params.code - OAuth 인가 코드
+ * @param {string} params.redirectUri - 콜백 리다이렉트 URI
+ * @returns {Promise<Object>} 로그인 응답 (accessToken, refreshToken, user)
+ */
+export async function oauthLogin({ provider, code, redirectUri }) {
+  return fetchJSON(`${AUTH_ENDPOINTS.OAUTH(provider)}`, {
+    method: 'POST',
+    body: JSON.stringify({ code, redirectUri }),
+  });
+}

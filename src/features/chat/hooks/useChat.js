@@ -6,6 +6,8 @@
  * - status: 현재 처리 상태 메시지
  * - isLoading: 응답 대기 중 여부
  * - error: 에러 메시지
+ * - pointInfo: 포인트 차감/잔액 정보 ({balance, deducted, freeUsage})
+ * - quotaError: 쿼터/포인트 관련 에러 (INSUFFICIENT_POINT / INPUT_TOO_LONG / QUOTA_EXCEEDED)
  *
  * 메시지 타입:
  * - user: 사용자가 보낸 메시지
@@ -23,17 +25,22 @@ const SESSION_STORAGE_KEY = 'monglepick_session_id';
 /**
  * 채팅 상태 관리 훅.
  *
+ * @param {Object} [config={}] - 훅 설정 옵션
+ * @param {string} [config.userId=''] - 사용자 ID (인증된 사용자의 ID, 빈 문자열이면 익명)
  * @returns {Object} 채팅 상태 및 액션
  * @returns {Array} messages - 메시지 목록 [{role, content, movies?, timestamp}]
  * @returns {string} status - 현재 처리 상태 메시지 (빈 문자열이면 대기 중)
  * @returns {boolean} isLoading - 응답 대기 중 여부
  * @returns {string|null} error - 에러 메시지
  * @returns {Object|null} clarification - 후속 질문 힌트 데이터 ({question, hints, primary_field})
+ * @returns {Object|null} pointInfo - 포인트 정보 ({balance, deducted, freeUsage})
+ * @returns {Object|null} quotaError - 쿼터/포인트 에러 ({error_code, message, ...상세 필드})
  * @returns {function} sendMessage - 메시지 전송 함수
  * @returns {function} clearMessages - 대화 초기화 함수
  * @returns {function} cancelRequest - 진행 중인 요청 취소 함수
+ * @returns {function} dismissQuotaError - 쿼터 에러 배너 닫기 함수
  */
-export function useChat() {
+export function useChat({ userId = '' } = {}) {
   // 메시지 목록: [{role: 'user'|'bot'|'movie_cards', content: string, movies?: array, timestamp: number}]
   const [messages, setMessages] = useState([]);
   // 현재 처리 상태 메시지 (status 이벤트에서 수신)
@@ -44,6 +51,11 @@ export function useChat() {
   const [error, setError] = useState(null);
   // 후속 질문 힌트 데이터 ({question, hints: [{field, label, options}], primary_field})
   const [clarification, setClarification] = useState(null);
+  // 포인트 차감/잔액 정보 ({balance: 잔액, deducted: 차감액, freeUsage: 무료 이용 여부})
+  const [pointInfo, setPointInfo] = useState(null);
+  // 쿼터/포인트 관련 에러 ({error_code, message, ...상세 필드})
+  // error_code: "INSUFFICIENT_POINT" | "INPUT_TOO_LONG" | "QUOTA_EXCEEDED"
+  const [quotaError, setQuotaError] = useState(null);
 
   // 요청 취소용 AbortController ref
   const abortControllerRef = useRef(null);
@@ -77,6 +89,8 @@ export function useChat() {
     setError(null);
     setStatus('');
     setClarification(null);
+    setPointInfo(null);
+    setQuotaError(null);
     pendingResponseRef.current = '';
     pendingMoviesRef.current = [];
 
@@ -96,7 +110,7 @@ export function useChat() {
       await sendChatMessage(
         {
           message: messageText,
-          userId: '',
+          userId,
           sessionId: sessionIdRef.current,
           image: imageBase64,
         },
@@ -126,6 +140,16 @@ export function useChat() {
           // clarification 이벤트: 후속 질문 힌트 저장
           onClarification: (data) => {
             setClarification(data);
+          },
+
+          // point_update 이벤트: 포인트 차감 결과 저장
+          // 서버에서 추천 완료 후 전달 ({balance, deducted, free_usage})
+          onPointUpdate: (data) => {
+            setPointInfo({
+              balance: data.balance,
+              deducted: data.deducted,
+              freeUsage: data.free_usage || false,
+            });
           },
 
           // token 이벤트: 응답 텍스트 누적 (스트리밍)
@@ -188,8 +212,16 @@ export function useChat() {
           },
 
           // error 이벤트: 에러 처리
+          // error_code가 쿼터/포인트 관련이면 quotaError에 저장하고 일반 에러는 표시하지 않음
           onError: (data) => {
-            setError(data.message || '알 수 없는 에러가 발생했습니다.');
+            const quotaErrorCodes = ['INSUFFICIENT_POINT', 'INPUT_TOO_LONG', 'QUOTA_EXCEEDED'];
+            if (data.error_code && quotaErrorCodes.includes(data.error_code)) {
+              // 쿼터/포인트 에러: 전용 배너로 표시 (일반 에러 메시지 대신)
+              setQuotaError(data);
+            } else {
+              // 일반 에러: 기존 에러 메시지로 표시
+              setError(data.message || '알 수 없는 에러가 발생했습니다.');
+            }
             setClarification(null);
             setStatus('');
             setIsLoading(false);
@@ -236,7 +268,7 @@ export function useChat() {
       setStatus('');
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, userId]);
 
   /**
    * 대화 내용을 전부 초기화한다.
@@ -246,6 +278,8 @@ export function useChat() {
     setStatus('');
     setError(null);
     setClarification(null);
+    setPointInfo(null);
+    setQuotaError(null);
     // 세션 ID 초기화 + localStorage 삭제
     sessionIdRef.current = '';
     try {
@@ -265,14 +299,24 @@ export function useChat() {
     }
   }, []);
 
+  /**
+   * 쿼터/포인트 에러 배너를 닫는다.
+   */
+  const dismissQuotaError = useCallback(() => {
+    setQuotaError(null);
+  }, []);
+
   return {
     messages,
     status,
     isLoading,
     error,
     clarification,
+    pointInfo,
+    quotaError,
     sendMessage,
     clearMessages,
     cancelRequest,
+    dismissQuotaError,
   };
 }

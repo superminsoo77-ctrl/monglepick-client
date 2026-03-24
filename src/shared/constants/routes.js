@@ -33,6 +33,16 @@ export const ROUTES = {
 
   /** 회원가입 페이지 */
   SIGNUP: '/signup',
+
+  /** OAuth 콜백 페이지 (동적 파라미터 :provider) */
+  OAUTH_CALLBACK: '/auth/callback/:provider',
+
+  /** 포인트 관리 페이지 */
+  POINT: '/point',
+  /** 결제/구독 페이지 */
+  PAYMENT: '/payment',
+  /** 고객센터 페이지 */
+  SUPPORT: '/support',
 };
 
 /**

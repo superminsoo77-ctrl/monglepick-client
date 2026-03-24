@@ -4,14 +4,15 @@
  * 백엔드 POST /api/v1/chat 엔드포인트에 fetch 요청을 보내고,
  * ReadableStream으로 SSE 이벤트를 실시간 파싱하여 콜백으로 전달한다.
  *
- * SSE 이벤트 타입 (7종):
+ * SSE 이벤트 타입 (8종):
  * - session: 세션 ID 발행 ({session_id})
  * - status: 처리 단계 (phase, message)
  * - movie_card: 추천 영화 데이터 (RankedMovie)
  * - clarification: 후속 질문 힌트 ({question, hints, primary_field})
  * - token: 응답 텍스트 스트리밍 (delta)
+ * - point_update: 포인트 차감 결과 ({balance, deducted, free_usage})
  * - done: 완료 신호
- * - error: 에러 메시지
+ * - error: 에러 메시지 ({message, error_code?, balance?, cost?, ...})
  */
 
 /** API 베이스 경로 (Vite 프록시가 localhost:8000으로 전달) */
@@ -31,14 +32,15 @@ const API_BASE = '/api/v1';
  * @param {function} [callbacks.onMovieCard] - movie_card 이벤트 핸들러 (RankedMovie)
  * @param {function} [callbacks.onClarification] - clarification 이벤트 핸들러 ({question, hints, primary_field})
  * @param {function} [callbacks.onToken] - token 이벤트 핸들러 ({delta})
+ * @param {function} [callbacks.onPointUpdate] - point_update 이벤트 핸들러 ({balance, deducted, free_usage})
  * @param {function} [callbacks.onDone] - done 이벤트 핸들러
- * @param {function} [callbacks.onError] - error 이벤트 핸들러 ({message})
+ * @param {function} [callbacks.onError] - error 이벤트 핸들러 ({message, error_code?, ...})
  * @param {AbortSignal} [signal] - 요청 취소용 AbortSignal
  * @returns {Promise<void>}
  */
 export async function sendChatMessage(
   { message, userId = '', sessionId = '', image = null },
-  { onSession, onStatus, onMovieCard, onClarification, onToken, onDone, onError } = {},
+  { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError } = {},
   signal,
 ) {
   // POST 요청 전송
@@ -65,19 +67,26 @@ export async function sendChatMessage(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  console.log('[SSE] 스트림 시작, Content-Type:', response.headers.get('content-type'));
+  // 개발 환경에서만 SSE 디버그 로그 출력 (프로덕션에서 민감 데이터 노출 방지)
+  if (import.meta.env.DEV) {
+    console.log('[SSE] 스트림 시작, Content-Type:', response.headers.get('content-type'));
+  }
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
-      console.log('[SSE] 스트림 종료 (done=true)');
+      if (import.meta.env.DEV) {
+        console.log('[SSE] 스트림 종료 (done=true)');
+      }
       break;
     }
 
     // 수신된 청크를 버퍼에 추가 (CRLF → LF 정규화: sse_starlette는 \r\n 사용)
     const chunk = decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
     buffer += chunk;
-    console.log('[SSE] 청크 수신:', chunk.length, '바이트, 내용:', chunk.substring(0, 200));
+    if (import.meta.env.DEV) {
+      console.log('[SSE] 청크 수신:', chunk.length, '바이트, 내용:', chunk.substring(0, 200));
+    }
 
     // 완성된 SSE 이벤트 블록(\n\n으로 구분) 추출 및 처리
     const blocks = buffer.split('\n\n');
@@ -86,14 +95,16 @@ export async function sendChatMessage(
 
     for (const block of blocks) {
       if (!block.trim()) continue;
-      parseSSEBlock(block, { onSession, onStatus, onMovieCard, onClarification, onToken, onDone, onError });
+      parseSSEBlock(block, { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError });
     }
   }
 
   // 잔여 버퍼 처리
   if (buffer.trim()) {
-    console.log('[SSE] 잔여 버퍼 처리:', buffer.substring(0, 200));
-    parseSSEBlock(buffer, { onStatus, onMovieCard, onToken, onDone, onError });
+    if (import.meta.env.DEV) {
+      console.log('[SSE] 잔여 버퍼 처리:', buffer.substring(0, 200));
+    }
+    parseSSEBlock(buffer, { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError });
   }
 }
 
@@ -155,13 +166,15 @@ function parseSSEBlock(block, callbacks) {
 /**
  * 파싱된 SSE 이벤트를 적절한 콜백으로 디스패치한다.
  *
- * @param {string|null} eventType - 이벤트 타입 (session/status/movie_card/clarification/token/done/error)
+ * @param {string|null} eventType - 이벤트 타입 (session/status/movie_card/clarification/token/point_update/done/error)
  * @param {Object} data - 파싱된 JSON 데이터
  * @param {Object} callbacks - 콜백 함수 객체
  */
 function dispatchEvent(eventType, data, callbacks) {
-  console.log('[SSE] dispatchEvent:', eventType, data);
-  const { onSession, onStatus, onMovieCard, onClarification, onToken, onDone, onError } = callbacks;
+  if (import.meta.env.DEV) {
+    console.log('[SSE] dispatchEvent:', eventType, data);
+  }
+  const { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError } = callbacks;
 
   switch (eventType) {
     // 세션 ID 발행 (스트리밍 시작 직후)
@@ -180,6 +193,10 @@ function dispatchEvent(eventType, data, callbacks) {
       break;
     case 'token':
       onToken?.(data);
+      break;
+    // 포인트 차감 결과 (추천 완료 후 전달)
+    case 'point_update':
+      onPointUpdate?.(data);
       break;
     case 'done':
       onDone?.(data);

@@ -1,0 +1,71 @@
+/**
+ * OAuth 콜백 페이지 스타일.
+ * 로딩 스피너와 에러 메시지를 중앙 정렬하여 표시한다.
+ */
+
+.oauth-callback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #0a0a0f;
+  color: #e0e0e0;
+  gap: 1rem;
+}
+
+/* 로딩 스피너 */
+.oauth-callback__spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #6c63ff;
+  border-radius: 50%;
+  animation: oauth-spin 0.8s linear infinite;
+}
+
+/* 스피너 회전 애니메이션 */
+@keyframes oauth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 처리 중 메시지 */
+.oauth-callback__message {
+  font-size: 1.1rem;
+  color: #a0a0a0;
+}
+
+/* 에러 컨테이너 */
+.oauth-callback__error {
+  text-align: center;
+  padding: 2rem;
+}
+
+/* 에러 제목 */
+.oauth-callback__error h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #ff6b6b;
+}
+
+/* 에러 설명 */
+.oauth-callback__error p {
+  color: #a0a0a0;
+  margin-bottom: 1.5rem;
+}
+
+/* 로그인 페이지로 돌아가기 링크 */
+.oauth-callback__link {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: #6c63ff;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.oauth-callback__link:hover {
+  background-color: #5a52d5;
+}

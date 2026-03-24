@@ -16,6 +16,8 @@ import { login as loginAPI } from '../api/authApi';
 import { validateEmail, validatePassword } from '../../../shared/utils/validators';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
+/* OAuth URL 생성 유틸 — shared/constants에서 가져옴 */
+import { buildOAuthUrl } from '../../../shared/constants/oauth';
 import './LoginForm.css';
 
 export default function LoginForm() {
@@ -144,6 +146,39 @@ export default function LoginForm() {
       >
         {isSubmitting ? '로그인 중...' : '로그인'}
       </button>
+
+      {/* 소셜 로그인 구분선 */}
+      <div className="login-form__divider">
+        <span>또는</span>
+      </div>
+
+      {/* 소셜 로그인 버튼 */}
+      <div className="login-form__social">
+        <button
+          type="button"
+          className="login-form__social-btn login-form__social-btn--google"
+          onClick={() => { window.location.href = buildOAuthUrl('google'); }}
+          disabled={isSubmitting}
+        >
+          Google로 로그인
+        </button>
+        <button
+          type="button"
+          className="login-form__social-btn login-form__social-btn--kakao"
+          onClick={() => { window.location.href = buildOAuthUrl('kakao'); }}
+          disabled={isSubmitting}
+        >
+          카카오로 로그인
+        </button>
+        <button
+          type="button"
+          className="login-form__social-btn login-form__social-btn--naver"
+          onClick={() => { window.location.href = buildOAuthUrl('naver'); }}
+          disabled={isSubmitting}
+        >
+          네이버로 로그인
+        </button>
+      </div>
 
       {/* 회원가입 링크 */}
       <p className="login-form__footer">

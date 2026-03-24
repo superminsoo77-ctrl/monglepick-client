@@ -3,14 +3,18 @@
  *
  * 전체 채팅 UI를 구성한다:
  * - 헤더: 앱 제목 + 대화 초기화 버튼
+ * - 포인트 정보 바: 잔액 + 사용량 표시
  * - 메시지 영역: 사용자/봇 메시지 + 영화 카드 + 상태 표시
- * - 입력 영역: 텍스트 입력 + 전송 버튼
+ * - 입력 영역: 텍스트 입력 + 글자수 카운터 + 전송 버튼
+ * - 쿼터 에러 배너: 포인트 부족/글자수 초과/한도 초과 안내
  *
  * SSE 스트리밍으로 실시간 응답을 표시하며,
  * 처리 상태(status)를 타이핑 인디케이터로 보여준다.
  */
 
 import { useState, useRef, useEffect } from 'react';
+/* 인증 Context 훅 — app/providers에서 가져옴 (userId 전달용) */
+import { useAuth } from '../../../app/providers/AuthProvider';
 /* 채팅 상태 관리 훅 — 같은 feature 내의 hooks에서 가져옴 */
 import { useChat } from '../hooks/useChat';
 import MovieCard from './MovieCard';
@@ -20,19 +24,44 @@ import './ChatWindow.css';
 const IMAGE_MAX_SIZE_MB = 10;
 /** 허용 이미지 MIME 타입 */
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+/** 기본 최대 입력 글자수 (BRONZE 등급 기본값, 서버 쿼터 정보 수신 전 사용) */
+const DEFAULT_MAX_INPUT_LENGTH = 200;
+
+/**
+ * 글자수 비율에 따른 CSS 수정자 클래스를 반환한다.
+ * - 70% 미만: 기본 (녹색)
+ * - 70~90%: --warning (노란색)
+ * - 90% 초과: --error (빨간색)
+ *
+ * @param {number} current - 현재 글자수
+ * @param {number} max - 최대 글자수
+ * @returns {string} CSS 수정자 문자열 (빈 문자열 / ' chat-input__char-count--warning' / ' chat-input__char-count--error')
+ */
+function getCharCountModifier(current, max) {
+  const ratio = current / max;
+  if (ratio > 0.9) return ' chat-input__char-count--error';
+  if (ratio >= 0.7) return ' chat-input__char-count--warning';
+  return '';
+}
 
 export default function ChatWindow() {
-  // 채팅 상태 훅
+  // 인증 상태에서 사용자 ID를 가져와 포인트 시스템 연동에 사용
+  const { user } = useAuth();
+
+  // 채팅 상태 훅 — userId를 전달하여 포인트 차감/쿼터 검증이 동작하도록 한다
   const {
     messages,
     status,
     isLoading,
     error,
     clarification,
+    pointInfo,
+    quotaError,
     sendMessage,
     clearMessages,
     cancelRequest,
-  } = useChat();
+    dismissQuotaError,
+  } = useChat({ userId: user?.id || '' });
 
   // 입력 필드 상태
   const [inputText, setInputText] = useState('');
@@ -227,6 +256,86 @@ export default function ChatWindow() {
         </button>
       </header>
 
+      {/* ── 포인트 정보 바 (포인트 차감 결과 수신 시 표시) ── */}
+      {pointInfo && (
+        <div className="chat-point-bar">
+          <span className="chat-point-bar__balance">
+            {/* 보석 이모지 + 잔액 표시 */}
+            <span className="chat-point-bar__icon">&#x1F48E;</span>
+            {pointInfo.balance.toLocaleString()}P
+          </span>
+          <span className="chat-point-bar__divider">|</span>
+          <span className="chat-point-bar__usage">
+            {/* 차감된 포인트가 0이 아닌 경우에만 사용량 표시 */}
+            {pointInfo.deducted > 0
+              ? `오늘 ${pointInfo.deducted.toLocaleString()}P 사용`
+              : '오늘 사용 없음'
+            }
+          </span>
+          {/* 무료 이용 배지 (free_usage=true일 때 표시) */}
+          {pointInfo.freeUsage && (
+            <span className="chat-point-bar__free-badge">무료 이용</span>
+          )}
+        </div>
+      )}
+
+      {/* ── 쿼터/포인트 에러 배너 (에러 코드별 안내) ── */}
+      {quotaError && (
+        <div className="chat-quota-error">
+          {/* 닫기 버튼 */}
+          <button
+            className="chat-quota-error__close"
+            onClick={dismissQuotaError}
+            title="닫기"
+          >
+            &#x2715;
+          </button>
+
+          {/* INSUFFICIENT_POINT: 포인트 부족 */}
+          {quotaError.error_code === 'INSUFFICIENT_POINT' && (
+            <div className="chat-quota-error__content">
+              <span className="chat-quota-error__title">포인트가 부족합니다</span>
+              <p className="chat-quota-error__desc">
+                현재 잔액: {quotaError.balance?.toLocaleString() ?? 0}P / 필요: {quotaError.cost?.toLocaleString() ?? 0}P
+              </p>
+              <a href="/point" className="chat-quota-error__link">
+                포인트 충전하기 &rarr;
+              </a>
+            </div>
+          )}
+
+          {/* INPUT_TOO_LONG: 입력 글자수 초과 */}
+          {quotaError.error_code === 'INPUT_TOO_LONG' && (
+            <div className="chat-quota-error__content">
+              <span className="chat-quota-error__title">입력 글자수를 초과했습니다</span>
+              <p className="chat-quota-error__desc">
+                최대 {quotaError.max_input_length?.toLocaleString() ?? DEFAULT_MAX_INPUT_LENGTH}자까지 입력 가능합니다.
+                (현재 {quotaError.current_length?.toLocaleString() ?? '?'}자)
+              </p>
+            </div>
+          )}
+
+          {/* QUOTA_EXCEEDED: 일일/월간 이용 한도 초과 */}
+          {quotaError.error_code === 'QUOTA_EXCEEDED' && (
+            <div className="chat-quota-error__content">
+              <span className="chat-quota-error__title">이용 한도를 초과했습니다</span>
+              <p className="chat-quota-error__desc">
+                {quotaError.daily_limit != null && (
+                  <>일일: {quotaError.daily_used ?? 0}/{quotaError.daily_limit}회</>
+                )}
+                {quotaError.daily_limit != null && quotaError.monthly_limit != null && ' · '}
+                {quotaError.monthly_limit != null && (
+                  <>월간: {quotaError.monthly_used ?? 0}/{quotaError.monthly_limit}회</>
+                )}
+              </p>
+              <a href="/point" className="chat-quota-error__link">
+                등급 업그레이드 알아보기 &rarr;
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── 메시지 영역 ── */}
       <main className="chat-messages">
         {/* 초기 안내 메시지 (메시지가 없을 때) */}
@@ -413,17 +522,31 @@ export default function ChatWindow() {
               <polyline points="21 15 16 10 5 21"/>
             </svg>
           </button>
-          <textarea
-            ref={inputRef}
-            className="chat-input__textarea"
-            value={inputText}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder="영화에 대해 물어보세요..."
-            rows={1}
-            disabled={isLoading}
-          />
+          {/* textarea 래퍼 (글자수 카운터를 우하단에 배치하기 위한 relative 컨테이너) */}
+          <div className="chat-input__textarea-wrapper">
+            <textarea
+              ref={inputRef}
+              className="chat-input__textarea"
+              value={inputText}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder="영화에 대해 물어보세요..."
+              rows={1}
+              disabled={isLoading}
+            />
+            {/* 글자수 카운터 (입력 중일 때 표시, 비율에 따라 색상 변경) */}
+            {inputText.length > 0 && (
+              <span
+                className={`chat-input__char-count${getCharCountModifier(
+                  inputText.length,
+                  quotaError?.max_input_length ?? DEFAULT_MAX_INPUT_LENGTH,
+                )}`}
+              >
+                {inputText.length}/{quotaError?.max_input_length ?? DEFAULT_MAX_INPUT_LENGTH}
+              </span>
+            )}
+          </div>
           {isLoading ? (
             <button
               className="chat-input__btn chat-input__btn--cancel"

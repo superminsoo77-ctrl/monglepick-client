@@ -16,6 +16,8 @@ import { signup as signupAPI } from '../api/authApi';
 import { validateEmail, validatePassword, validatePasswordConfirm, validateNickname } from '../../../shared/utils/validators';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
+/* OAuth URL 생성 유틸 — shared/constants에서 가져옴 */
+import { buildOAuthUrl } from '../../../shared/constants/oauth';
 import './SignUpForm.css';
 
 export default function SignUpForm() {
@@ -180,6 +182,39 @@ export default function SignUpForm() {
       >
         {isSubmitting ? '가입 중...' : '가입하기'}
       </button>
+
+      {/* 소셜 로그인 구분선 */}
+      <div className="signup-form__divider">
+        <span>또는</span>
+      </div>
+
+      {/* 소셜 로그인 버튼 */}
+      <div className="signup-form__social">
+        <button
+          type="button"
+          className="signup-form__social-btn signup-form__social-btn--google"
+          onClick={() => { window.location.href = buildOAuthUrl('google'); }}
+          disabled={isSubmitting}
+        >
+          Google로 시작하기
+        </button>
+        <button
+          type="button"
+          className="signup-form__social-btn signup-form__social-btn--kakao"
+          onClick={() => { window.location.href = buildOAuthUrl('kakao'); }}
+          disabled={isSubmitting}
+        >
+          카카오로 시작하기
+        </button>
+        <button
+          type="button"
+          className="signup-form__social-btn signup-form__social-btn--naver"
+          onClick={() => { window.location.href = buildOAuthUrl('naver'); }}
+          disabled={isSubmitting}
+        >
+          네이버로 시작하기
+        </button>
+      </div>
 
       {/* 로그인 페이지 링크 */}
       <p className="signup-form__footer">

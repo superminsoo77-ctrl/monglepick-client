@@ -1,0 +1,589 @@
+/**
+ * PaymentPage 스타일.
+ *
+ * 결제/구독 관리 페이지의 4개 섹션 레이아웃:
+ *   1. 구독 상품 (2x2 카드 그리드)
+ *   2. 포인트 팩 (가로 카드 그리드)
+ *   3. 내 구독 상태 (정보 카드 + 취소 버튼)
+ *   4. 결제 내역 (테이블 + 페이지네이션)
+ *
+ * BEM 네이밍: .payment-page__*
+ * 모든 색상은 CSS 변수(variables.css) 참조.
+ */
+
+/* ═══════════════════════════════════
+   페이지 컨테이너
+   ═══════════════════════════════════ */
+
+.payment-page {
+  width: 100%;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+/* 내부 컨테이너 — 최대 폭 제한 */
+.payment-page__inner {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+/* 페이지 제목 */
+.payment-page__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* 에러 메시지 */
+.payment-page__error {
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--error-bg);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  color: var(--error);
+  font-size: var(--text-sm);
+  animation: payment-page-fade-in 0.3s ease;
+}
+
+/* 성공 메시지 */
+.payment-page__success {
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--success-bg);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-md);
+  color: var(--success);
+  font-size: var(--text-sm);
+  animation: payment-page-fade-in 0.3s ease;
+}
+
+/* ═══════════════════════════════════
+   공통 섹션 스타일
+   ═══════════════════════════════════ */
+
+.payment-page__section {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+}
+
+.payment-page__section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-sm) 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.payment-page__section-desc {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-lg) 0;
+}
+
+/* ═══════════════════════════════════
+   섹션 1: 구독 상품
+   ═══════════════════════════════════ */
+
+/* 2x2 그리드 */
+.payment-page__plans-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+/* 구독 상품 카드 */
+.payment-page__plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-lg);
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.payment-page__plan-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 최고 혜택 카드 — 보라색 테두리 + 글로우 */
+.payment-page__plan-card--best {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* BEST 배지 */
+.payment-page__plan-badge {
+  position: absolute;
+  top: -10px;
+  right: var(--space-md);
+  padding: 2px var(--space-md);
+  background-color: var(--primary);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.05em;
+}
+
+/* 상품명 */
+.payment-page__plan-name {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* 가격 */
+.payment-page__plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.payment-page__plan-price-amount {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.payment-page__plan-price-unit {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* 포인트 지급량 */
+.payment-page__plan-points {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--primary);
+  margin: 0;
+}
+
+/* 가성비 표시 */
+.payment-page__plan-value {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* 설명 */
+.payment-page__plan-desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+/* 구독 버튼 */
+.payment-page__plan-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  background: none;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--space-sm);
+}
+
+.payment-page__plan-btn:hover:not(:disabled) {
+  background-color: var(--primary);
+  color: white;
+}
+
+/* BEST 카드의 구독 버튼 — 채워진 스타일 */
+.payment-page__plan-btn--best {
+  background-color: var(--primary);
+  color: white;
+}
+
+.payment-page__plan-btn--best:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.payment-page__plan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════
+   섹션 2: 포인트 팩
+   ═══════════════════════════════════ */
+
+/* 가로 4열 그리드 */
+.payment-page__packs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+/* 포인트 팩 카드 */
+.payment-page__pack-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.payment-page__pack-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 최고 혜택 팩 */
+.payment-page__pack-card--best {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* BEST 배지 */
+.payment-page__pack-badge {
+  position: absolute;
+  top: -10px;
+  right: var(--space-md);
+  padding: 2px var(--space-md);
+  background-color: var(--primary);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.05em;
+}
+
+/* 포인트 수량 */
+.payment-page__pack-points {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--primary);
+}
+
+/* 보너스 태그 */
+.payment-page__pack-bonus {
+  display: inline-block;
+  padding: 2px var(--space-sm);
+  background-color: var(--success-bg);
+  color: var(--success);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+/* 가격 */
+.payment-page__pack-price {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+/* 구매 버튼 */
+.payment-page__pack-btn {
+  width: 100%;
+  padding: var(--space-sm);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--space-xs);
+}
+
+.payment-page__pack-btn:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.payment-page__pack-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════
+   섹션 3: 내 구독 상태
+   ═══════════════════════════════════ */
+
+/* 구독 없음 안내 */
+.payment-page__no-subscription {
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.payment-page__no-subscription-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.payment-page__no-subscription-hint {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* 구독 정보 카드 */
+.payment-page__subscription-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.payment-page__subscription-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.payment-page__subscription-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.payment-page__subscription-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+  min-width: 80px;
+}
+
+.payment-page__subscription-value {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
+
+/* 구독 취소 버튼 */
+.payment-page__cancel-btn {
+  align-self: flex-start;
+  padding: var(--space-sm) var(--space-xl);
+  background: none;
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  color: var(--error);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.payment-page__cancel-btn:hover:not(:disabled) {
+  background-color: var(--error-bg);
+}
+
+.payment-page__cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════
+   섹션 4: 결제 내역
+   ═══════════════════════════════════ */
+
+/* 건수 표시 */
+.payment-page__orders-count {
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+}
+
+/* 빈 내역 */
+.payment-page__orders-empty {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 테이블 래퍼 — 가로 스크롤 */
+.payment-page__orders-table-wrapper {
+  overflow-x: auto;
+}
+
+/* 결제 내역 테이블 */
+.payment-page__orders-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payment-page__orders-table thead th {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.payment-page__orders-table tbody td {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.payment-page__orders-table tbody tr:hover {
+  background-color: var(--bg-elevated);
+}
+
+/* 주문번호 — 고정폭 폰트 */
+.payment-page__order-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* 금액 */
+.payment-page__order-amount {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* 상태 배지 */
+.payment-page__order-status {
+  font-weight: var(--font-medium);
+}
+
+/* 일시 */
+.payment-page__order-date {
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* 페이지네이션 */
+.payment-page__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.payment-page__pagination-btn {
+  padding: var(--space-sm) var(--space-lg);
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.payment-page__pagination-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.payment-page__pagination-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.payment-page__pagination-info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════
+   애니메이션 키프레임
+   ═══════════════════════════════════ */
+
+@keyframes payment-page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════
+   반응형
+   ═══════════════════════════════════ */
+
+/* 태블릿 (768px 이하) */
+@media (max-width: 768px) {
+  .payment-page {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .payment-page__section {
+    padding: var(--space-lg);
+  }
+
+  /* 구독 상품 — 1열 */
+  .payment-page__plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 포인트 팩 — 2열 */
+  .payment-page__packs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 결제 내역 테이블 — 최소 폭 */
+  .payment-page__orders-table {
+    min-width: 500px;
+  }
+
+  /* 구독 정보 필드 — 세로 배치 */
+  .payment-page__subscription-field {
+    flex-direction: column;
+    gap: var(--space-xs);
+    align-items: flex-start;
+  }
+}
+
+/* 모바일 (480px 이하) */
+@media (max-width: 480px) {
+  .payment-page__title {
+    font-size: var(--text-xl);
+  }
+
+  /* 포인트 팩 — 1열 */
+  .payment-page__packs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 구독 카드 패딩 축소 */
+  .payment-page__plan-card {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .payment-page__plan-price-amount {
+    font-size: var(--text-xl);
+  }
+}

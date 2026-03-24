@@ -29,6 +29,8 @@ export const AUTH_ENDPOINTS = {
   REFRESH: `${API_VERSION}/auth/refresh`,
   /** 로그아웃 - POST */
   LOGOUT: `${API_VERSION}/auth/logout`,
+  /** OAuth 소셜 로그인 - POST (provider 파라미터 필요) */
+  OAUTH: (provider) => `${API_VERSION}/auth/oauth/${provider}`,
 };
 
 /**
@@ -105,4 +107,71 @@ export const SEARCH_ENDPOINTS = {
   SEARCH: `${API_VERSION}/search`,
   /** 자동완성 - GET (query 파라미터 필요) */
   AUTOCOMPLETE: `${API_VERSION}/search/autocomplete`,
+};
+
+/**
+ * 포인트(Point) 관련 엔드포인트.
+ * 포인트 잔액, 이력, 출석 체크, 아이템 교환을 처리한다.
+ */
+export const POINT_ENDPOINTS = {
+  /** 포인트 잔액+쿼터 사전 확인 - POST (Agent 내부용) */
+  CHECK: `${API_VERSION}/point/check`,
+  /** 포인트 차감 - POST (Agent 내부용) */
+  DEDUCT: `${API_VERSION}/point/deduct`,
+  /** 포인트 획득 - POST */
+  EARN: `${API_VERSION}/point/earn`,
+  /** 포인트 잔액 조회 - GET (query: userId) */
+  BALANCE: `${API_VERSION}/point/balance`,
+  /** 포인트 변동 이력 - GET (query: userId, page, size) */
+  HISTORY: `${API_VERSION}/point/history`,
+  /** 출석 체크 - POST (query: userId) */
+  ATTENDANCE: `${API_VERSION}/point/attendance`,
+  /** 출석 현황 조회 - GET (query: userId) */
+  ATTENDANCE_STATUS: `${API_VERSION}/point/attendance/status`,
+  /** 교환 아이템 목록 - GET (query: category?) */
+  ITEMS: `${API_VERSION}/point/items`,
+  /** 아이템 교환 - POST (path: itemId, query: userId) */
+  EXCHANGE: (itemId) => `${API_VERSION}/point/items/${itemId}/exchange`,
+};
+
+/**
+ * 결제(Payment) 관련 엔드포인트.
+ * Toss Payments 연동 결제를 처리한다.
+ */
+export const PAYMENT_ENDPOINTS = {
+  /** 주문 생성 - POST */
+  CREATE_ORDER: `${API_VERSION}/payment/orders`,
+  /** 결제 승인 - POST */
+  CONFIRM: `${API_VERSION}/payment/confirm`,
+  /** 결제 내역 - GET (query: userId, page, size) */
+  ORDERS: `${API_VERSION}/payment/orders`,
+};
+
+/**
+ * 구독(Subscription) 관련 엔드포인트.
+ */
+export const SUBSCRIPTION_ENDPOINTS = {
+  /** 구독 상품 목록 - GET */
+  PLANS: `${API_VERSION}/subscription/plans`,
+  /** 내 구독 상태 - GET (query: userId) */
+  STATUS: `${API_VERSION}/subscription/status`,
+  /** 구독 취소 - POST (query: userId) */
+  CANCEL: `${API_VERSION}/subscription/cancel`,
+};
+
+/**
+ * 고객센터(Support) 관련 엔드포인트.
+ * FAQ, 도움말, 상담 티켓을 처리한다.
+ */
+export const SUPPORT_ENDPOINTS = {
+  /** FAQ 목록 조회 - GET (query: category?) */
+  FAQ: `${API_VERSION}/support/faq`,
+  /** FAQ 피드백 - POST (path: faqId) */
+  FAQ_FEEDBACK: (faqId) => `${API_VERSION}/support/faq/${faqId}/feedback`,
+  /** 도움말 문서 목록 - GET (query: category?) */
+  HELP: `${API_VERSION}/support/help`,
+  /** 상담 티켓 생성 - POST */
+  CREATE_TICKET: `${API_VERSION}/support/tickets`,
+  /** 내 티켓 목록 - GET (query: page, size) */
+  MY_TICKETS: `${API_VERSION}/support/tickets`,
 };
