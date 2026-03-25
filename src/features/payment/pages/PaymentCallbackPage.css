@@ -1,0 +1,215 @@
+/**
+ * 결제 성공/실패 콜백 페이지 공통 스타일.
+ *
+ * 결제 결과를 카드 형태로 중앙에 표시한다.
+ * BEM 네이밍: .payment-callback__*
+ */
+
+/* ═══════════════════════════════════
+   컨테이너 — 화면 중앙 정렬
+   ═══════════════════════════════════ */
+
+.payment-callback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-xl);
+  background: var(--bg-body);
+}
+
+/* 결과 카드 — glass-card */
+.payment-callback__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  max-width: 480px;
+  width: 100%;
+  padding: var(--space-2xl);
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+/* ═══════════════════════════════════
+   아이콘
+   ═══════════════════════════════════ */
+
+.payment-callback__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  font-size: 32px;
+  font-weight: var(--font-bold);
+}
+
+/* 성공 아이콘 — 초록 그라데이션 */
+.payment-callback__icon--success {
+  background: linear-gradient(135deg, #06d6a0, #1b9aaa);
+  color: white;
+  box-shadow: 0 0 24px rgba(6, 214, 160, 0.3);
+}
+
+/* 실패 아이콘 — 빨간 그라데이션 */
+.payment-callback__icon--fail {
+  background: linear-gradient(135deg, #ef476f, #e63946);
+  color: white;
+  box-shadow: 0 0 24px rgba(239, 71, 111, 0.3);
+}
+
+/* ═══════════════════════════════════
+   텍스트
+   ═══════════════════════════════════ */
+
+.payment-callback__title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.payment-callback__message {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+/* ═══════════════════════════════════
+   결제 결과 상세 정보
+   ═══════════════════════════════════ */
+
+.payment-callback__details {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: rgba(124, 108, 240, 0.05);
+  border-radius: var(--radius-md);
+}
+
+.payment-callback__detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+}
+
+.payment-callback__detail-label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.payment-callback__detail-value {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+/* 포인트 지급 강조 */
+.payment-callback__detail-value--highlight {
+  color: var(--primary);
+  font-size: var(--text-lg);
+}
+
+/* ═══════════════════════════════════
+   디버그 정보 (에러 코드)
+   ═══════════════════════════════════ */
+
+.payment-callback__debug {
+  width: 100%;
+  padding: var(--space-md);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.payment-callback__debug-item {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.payment-callback__debug-item + .payment-callback__debug-item {
+  margin-top: var(--space-xs);
+}
+
+.payment-callback__debug-item span {
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════
+   버튼 영역
+   ═══════════════════════════════════ */
+
+.payment-callback__actions {
+  display: flex;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.payment-callback__btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+/* Primary 버튼 — gradient */
+.payment-callback__btn--primary {
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+}
+
+.payment-callback__btn--primary:hover {
+  box-shadow: var(--glow-primary);
+  transform: translateY(-1px);
+}
+
+/* Secondary 버튼 — outline */
+.payment-callback__btn--secondary {
+  background: none;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.payment-callback__btn--secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ═══════════════════════════════════
+   반응형
+   ═══════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .payment-callback {
+    padding: var(--space-md);
+  }
+
+  .payment-callback__card {
+    padding: var(--space-xl);
+  }
+
+  .payment-callback__actions {
+    flex-direction: column;
+  }
+
+  .payment-callback__title {
+    font-size: var(--text-lg);
+  }
+}

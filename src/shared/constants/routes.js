@@ -47,6 +47,10 @@ export const ROUTES = {
   POINT: '/point',
   /** 결제/구독 페이지 */
   PAYMENT: '/payment',
+  /** 결제 성공 콜백 (Toss SDK redirect) */
+  PAYMENT_SUCCESS: '/payment/success',
+  /** 결제 실패 콜백 (Toss SDK redirect) */
+  PAYMENT_FAIL: '/payment/fail',
   /** 고객센터 페이지 */
   SUPPORT: '/support',
 };

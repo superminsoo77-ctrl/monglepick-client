@@ -8,15 +8,18 @@
  *   3. 내 구독 상태 — 현재 구독 정보 + 취소 버튼
  *   4. 결제 내역 — 과거 주문 테이블 (페이징)
  *
- * Toss Payments 연동 흐름:
- *   1) createOrder → orderId + clientKey 반환
- *   2) Toss SDK로 결제 위젯 오픈
- *   3) 성공 시 confirmPayment (paymentKey + orderId + amount)
+ * Toss Payments SDK v2 연동 흐름:
+ *   1) createOrder → orderId + amount + clientKey 반환
+ *   2) loadTossPayments(clientKey) → widgets 초기화
+ *   3) widgets.setAmount → widgets.requestPayment (successUrl/failUrl 리다이렉트)
+ *   4) PaymentSuccessPage에서 confirmPayment (paymentKey + orderId + amount)
  *
  * 비인증 사용자는 PrivateRoute에 의해 로그인 페이지로 리다이렉트된다.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+/* Toss Payments SDK v2 — 결제위젯 초기화용 */
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 결제/구독 API — 같은 feature 내의 paymentApi에서 가져옴 */
@@ -55,6 +58,16 @@ const POINT_PACKS = [
 
 /** 결제 내역 페이지당 표시 건수 */
 const ORDER_PAGE_SIZE = 10;
+
+/** Toss Payments 클라이언트 키 (환경변수에서 주입) */
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY;
+
+/**
+ * 결제 성공/실패 리다이렉트 URL의 기본 경로.
+ * 현재 origin 기준으로 절대 경로를 생성한다.
+ */
+const SUCCESS_URL = `${window.location.origin}/payment/success`;
+const FAIL_URL = `${window.location.origin}/payment/fail`;
 
 export default function PaymentPage() {
   /* ── 상태 관리 ── */
@@ -226,7 +239,48 @@ export default function PaymentPage() {
   };
 
   /**
+   * Toss Payments SDK v2를 초기화하고 결제를 요청하는 공통 함수.
+   *
+   * 1) Backend createOrder로 orderId 생성
+   * 2) loadTossPayments → widgets 초기화
+   * 3) widgets.setAmount → widgets.requestPayment (redirect 방식)
+   * 4) 결제 완료 시 successUrl로 리다이렉트 → PaymentSuccessPage에서 승인 처리
+   *
+   * @param {Object} orderData - createOrder에 전달할 주문 데이터
+   * @param {string} orderName - Toss 결제창에 표시할 주문명
+   */
+  const requestTossPayment = async (orderData, orderName) => {
+    /* 1. Backend에서 주문 생성 → orderId + amount + clientKey 반환 */
+    const order = await createOrder(orderData);
+    const { orderId, amount } = order;
+    /* Backend가 clientKey를 반환하면 사용, 아니면 환경변수 fallback */
+    const clientKey = order.clientKey || TOSS_CLIENT_KEY;
+
+    if (!clientKey) {
+      throw new Error('Toss Payments 클라이언트 키가 설정되지 않았습니다.');
+    }
+
+    /* 2. Toss SDK v2 초기화 — customerKey는 user.id 사용 (회원 결제) */
+    const tossPayments = await loadTossPayments(clientKey);
+    const widgets = tossPayments.widgets({ customerKey: user.id });
+
+    /* 3. 결제 금액 설정 */
+    await widgets.setAmount({ currency: 'KRW', value: amount });
+
+    /* 4. 결제 요청 (redirect 방식 — PC/모바일 모두 지원) */
+    await widgets.requestPayment({
+      orderId,
+      orderName,
+      successUrl: SUCCESS_URL,
+      failUrl: FAIL_URL,
+      customerEmail: user.email || undefined,
+      customerName: user.nickname || user.name || undefined,
+    });
+  };
+
+  /**
    * 구독 상품 결제를 시작한다.
+   * Toss Payments SDK v2 결제위젯을 통해 결제 진행.
    *
    * @param {Object} plan - 구독 상품 객체
    */
@@ -236,20 +290,19 @@ export default function PaymentPage() {
     setError(null);
 
     try {
-      const order = await createOrder({
-        orderType: 'SUBSCRIPTION',
-        amount: plan.price,
-        planCode: plan.planCode,
-      });
-
-      showMessage(
-        'success',
-        `주문이 생성되었습니다. (주문번호: ${order.orderId?.slice(0, 8)}...) Toss 결제 위젯은 준비 중입니다.`
+      await requestTossPayment(
+        {
+          orderType: 'SUBSCRIPTION',
+          amount: plan.price,
+          planCode: plan.planCode,
+        },
+        `${plan.name} 구독`,
       );
-
-      await loadOrders();
+      /* requestPayment가 성공하면 리다이렉트되므로 이 아래는 실행되지 않음 */
     } catch (err) {
-      showMessage('error', err.message || '주문 생성에 실패했습니다.');
+      /* 사용자가 결제창을 닫은 경우 (PAY_PROCESS_CANCELED) 또는 주문 생성 실패 */
+      const msg = err?.message || '결제를 진행할 수 없습니다.';
+      showMessage('error', msg);
     } finally {
       setProcessingId(null);
     }
@@ -257,6 +310,7 @@ export default function PaymentPage() {
 
   /**
    * 포인트 팩 구매를 시작한다.
+   * Toss Payments SDK v2 결제위젯을 통해 결제 진행.
    *
    * @param {Object} pack - 포인트 팩 객체
    */
@@ -266,20 +320,18 @@ export default function PaymentPage() {
     setError(null);
 
     try {
-      const order = await createOrder({
-        orderType: 'POINT_CHARGE',
-        amount: pack.price,
-        pointsAmount: pack.points,
-      });
-
-      showMessage(
-        'success',
-        `주문이 생성되었습니다. (주문번호: ${order.orderId?.slice(0, 8)}...) Toss 결제 위젯은 준비 중입니다.`
+      await requestTossPayment(
+        {
+          orderType: 'POINT_CHARGE',
+          amount: pack.price,
+          pointsAmount: pack.points,
+        },
+        `포인트 ${pack.label} 충전`,
       );
-
-      await loadOrders();
+      /* requestPayment가 성공하면 리다이렉트되므로 이 아래는 실행되지 않음 */
     } catch (err) {
-      showMessage('error', err.message || '주문 생성에 실패했습니다.');
+      const msg = err?.message || '결제를 진행할 수 없습니다.';
+      showMessage('error', msg);
     } finally {
       setProcessingId(null);
     }

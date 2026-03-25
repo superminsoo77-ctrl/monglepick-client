@@ -56,6 +56,10 @@ import MyPage from '../features/user/pages/MyPage';
 import PointPage from '../features/point/pages/PointPage';
 /* 결제/구독 페이지 — features/payment에서 가져옴 */
 import PaymentPage from '../features/payment/pages/PaymentPage';
+/* 결제 성공 콜백 페이지 — Toss SDK redirect 후 결제 승인 처리 */
+import PaymentSuccessPage from '../features/payment/pages/PaymentSuccessPage';
+/* 결제 실패 콜백 페이지 — Toss SDK redirect 후 에러 표시 */
+import PaymentFailPage from '../features/payment/pages/PaymentFailPage';
 /* 고객센터 페이지 — features/support에서 가져옴 */
 import SupportPage from '../features/support/pages/SupportPage';
 /* 404 에러 페이지 — features/error에서 가져옴 */
@@ -174,6 +178,19 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        {/* 결제 성공 콜백 — Toss SDK에서 결제 완료 후 리다이렉트 (인증 필수) */}
+        <Route
+          path="/payment/success"
+          element={
+            <PrivateRoute>
+              <PaymentSuccessPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* 결제 실패 콜백 — Toss SDK에서 결제 실패/취소 시 리다이렉트 */}
+        <Route path="/payment/fail" element={<PaymentFailPage />} />
 
         {/* 결제/구독 관리 (인증 필수) */}
         <Route
