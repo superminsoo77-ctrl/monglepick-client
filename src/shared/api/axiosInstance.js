@@ -21,6 +21,30 @@ import axios from 'axios';
 import { getToken, setToken, getRefreshToken, setRefreshToken, clearAll } from '../utils/storage';
 import { AUTH_ENDPOINTS } from '../constants/api';
 
+/**
+ * HTTP 상태코드별 사용자 친화적 기본 에러 메시지.
+ * 백엔드 ErrorResponse.message가 없을 때 fallback으로 사용한다.
+ * raw 상태코드(400, 500 등)가 사용자에게 노출되지 않도록 한국어 메시지를 반환한다.
+ *
+ * @param {number|undefined} status - HTTP 상태코드
+ * @returns {string} 사용자 친화적 에러 메시지
+ */
+function getFallbackMessage(status) {
+  switch (status) {
+    case 400: return '입력 정보를 확인해주세요.';
+    case 401: return '인증이 필요합니다. 다시 로그인해주세요.';
+    case 403: return '접근 권한이 없습니다.';
+    case 404: return '요청하신 정보를 찾을 수 없습니다.';
+    case 409: return '이미 처리된 요청입니다.';
+    case 429: return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
+    case 500: return '서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    case 502: case 503: case 504:
+      return '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    default:
+      return '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+  }
+}
+
 /* ── 기본 URL: .env의 VITE_API_BASE_URL (개발 시 빈 문자열 → Vite 프록시 사용) ── */
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -141,12 +165,18 @@ api.interceptors.response.use(
     /*
      * 에러 응답에서 서버 메시지를 추출하여 Error 객체에 담는다.
      * 기존 fetchWithAuth의 에러 처리 패턴과 호환된다.
+     *
+     * 우선순위:
+     * 1) 백엔드 ErrorResponse.message (한국어 사용자 친화적 메시지)
+     * 2) 백엔드 detail 필드 (대체 상세 정보)
+     * 3) HTTP 상태코드별 한국어 기본 메시지 (raw 코드 노출 방지)
      */
     const data = error.response?.data;
-    const message = data?.message || data?.detail || `요청 실패 (${error.response?.status || 'NETWORK'})`;
+    const status = error.response?.status;
+    const message = data?.message || data?.detail || getFallbackMessage(status);
     const apiError = new Error(message);
     apiError.code = data?.code || null;
-    apiError.status = error.response?.status || null;
+    apiError.status = status || null;
     return Promise.reject(apiError);
   },
 );

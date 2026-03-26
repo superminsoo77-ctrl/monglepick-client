@@ -10,12 +10,8 @@ export default defineConfig(({ mode }) => {
   const backendUrl = env.VITE_BACKEND_URL || 'http://localhost:8080'
   const agentUrl = env.VITE_AGENT_URL || 'http://localhost:8000'
 
-  return {
-    plugins: [react()],
-    server: {
-      // 모든 네트워크 인터페이스에서 접근 허용 (LAN/외부 디바이스 테스트용)
-      host: '0.0.0.0',
-      proxy: {
+  // server와 preview에서 공유할 프록시 설정
+  const proxyConfig = {
         // Spring Boot 백엔드 API (인증, 포인트, 결제, 구독)
         // 더 구체적인 경로가 범용 /api 보다 먼저 선언되어야 함
         // Spring Security OAuth2 인가 엔드포인트 (소셜 로그인 시작)
@@ -59,7 +55,17 @@ export default defineConfig(({ mode }) => {
           target: agentUrl,
           changeOrigin: true,
         },
-      },
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      // 모든 네트워크 인터페이스에서 접근 허용 (LAN/외부 디바이스 테스트용)
+      host: '0.0.0.0',
+      proxy: proxyConfig,
+    },
+    preview: {
+      proxy: proxyConfig,
     },
   }
 })

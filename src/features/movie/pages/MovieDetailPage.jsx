@@ -22,6 +22,8 @@ import MovieDetailCard from '../components/MovieDetailCard';
 import ReviewList from '../../review/components/ReviewList';
 /* 로딩 스피너 — shared/components에서 가져옴 */
 import Loading from '../../../shared/components/Loading/Loading';
+/* 404 페이지 — API에서 영화를 찾을 수 없을 때 표시 */
+import NotFoundPage from '../../error/pages/NotFoundPage';
 import './MovieDetailPage.css';
 
 export default function MovieDetailPage() {
@@ -37,6 +39,8 @@ export default function MovieDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   // 에러 메시지
   const [error, setError] = useState(null);
+  // API 404 응답 여부 (영화를 찾을 수 없을 때 NotFoundPage 렌더링용)
+  const [isNotFound, setIsNotFound] = useState(false);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
@@ -47,6 +51,7 @@ export default function MovieDetailPage() {
     async function loadMovieData() {
       setIsLoading(true);
       setError(null);
+      setIsNotFound(false);
 
       try {
         // 영화 상세 정보 조회
@@ -67,7 +72,12 @@ export default function MovieDetailPage() {
           setReviews([]);
         }
       } catch (err) {
-        setError(err.message || '영화 정보를 불러올 수 없습니다.');
+        /* API 404 응답 시 NotFoundPage를 표시하도록 분기 */
+        if (err.status === 404) {
+          setIsNotFound(true);
+        } else {
+          setError(err.message || '영화 정보를 불러올 수 없습니다.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -112,6 +122,11 @@ export default function MovieDetailPage() {
         <Loading message="영화 정보를 불러오는 중..." fullPage />
       </div>
     );
+  }
+
+  // API 404 — 존재하지 않는 영화 ID일 때 NotFoundPage 표시
+  if (isNotFound) {
+    return <NotFoundPage />;
   }
 
   // 에러 발생
