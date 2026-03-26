@@ -89,8 +89,16 @@ export default function LoginForm() {
       /* 홈 페이지로 리다이렉트 */
       navigate(ROUTES.HOME);
     } catch (err) {
-      /* 서버 에러 메시지 표시 */
-      setServerError(err.message || '로그인에 실패했습니다. 다시 시도해주세요.');
+      /* 에러 코드별 사용자 친화적 메시지 분기 */
+      if (err.code === 'A003') {
+        /* 미가입 또는 비밀번호 불일치 — 회원가입 안내 포함 */
+        setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
+      } else if (err.code === 'A007') {
+        /* 소셜 로그인으로 가입된 이메일 */
+        setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
+      } else {
+        setServerError(err.message || '로그인에 실패했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -115,7 +123,12 @@ export default function LoginForm() {
       });
       navigate(ROUTES.HOME);
     } catch (err) {
-      setServerError(err.message || '테스트 유저 로그인에 실패했습니다.');
+      /* 에러 코드별 사용자 친화적 메시지 분기 */
+      if (err.code === 'A003') {
+        setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
+      } else {
+        setServerError(err.message || '테스트 유저 로그인에 실패했습니다.');
+      }
     } finally {
       setIsSubmitting(false);
     }

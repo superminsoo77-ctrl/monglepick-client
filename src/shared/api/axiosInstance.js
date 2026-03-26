@@ -141,11 +141,16 @@ api.interceptors.response.use(
      * 1) 401 Unauthorized
      * 2) 아직 재시도하지 않은 요청 (_retry 플래그)
      * 3) 토큰 갱신 요청 자체가 아닌 경우 (무한 루프 방지)
+     * 4) 인증 관련 요청(/auth/)이 아닌 경우
+     *    - 로그인 401(미가입/비밀번호 불일치)은 갱신 대상이 아님
+     *    - 회원가입, OAuth 등도 갱신 없이 에러를 컴포넌트로 전달
      */
+    const isAuthRequest = originalRequest.url?.includes('/auth/');
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH)
+      !originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH) &&
+      !isAuthRequest
     ) {
       originalRequest._retry = true;
 

@@ -137,7 +137,17 @@ export default function SignUpForm() {
       /* 홈 페이지로 리다이렉트 */
       navigate(ROUTES.HOME);
     } catch (err) {
-      setServerError(err.message || '회원가입에 실패했습니다. 다시 시도해주세요.');
+      /* 에러 코드별 사용자 친화적 메시지 분기 */
+      if (err.code === 'A001') {
+        /* 이메일 중복 — 로그인 안내 포함 */
+        setServerError('이미 사용 중인 이메일입니다. 이미 가입하셨다면 로그인을 이용해주세요.');
+      } else if (err.code === 'A002') {
+        setServerError('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.');
+      } else if (err.code === 'A007') {
+        setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
+      } else {
+        setServerError(err.message || '회원가입에 실패했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setIsSubmitting(false);
     }

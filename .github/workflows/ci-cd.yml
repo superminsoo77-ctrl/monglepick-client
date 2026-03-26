@@ -58,36 +58,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy Client + Nginx reload
+      - name: Deploy Client + Nginx rebuild
         run: |
           set -e
           echo "========== Client 배포 시작 =========="
 
-          PROJECT_DIR="${PROJECT_DIR:-/Users/yoonhyungjoo/Documents/monglepick}"
+          # 스테이징 맥북 프로젝트 경로 (Runner 환경변수 또는 기본값)
+          PROJECT_DIR="${PROJECT_DIR:-$HOME/Documents/monglepick}"
 
           # checkout된 코드를 프로젝트 디렉토리에 동기화
           rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='.env' \
             "$GITHUB_WORKSPACE/" "$PROJECT_DIR/monglepick-client/"
 
-          cd "$PROJECT_DIR/monglepick-client"
-
-          # 의존성 설치 + React 빌드 (dist/가 Nginx 볼륨 마운트)
-          echo ">>> React 빌드..."
-          npm install
-          npm run build
-
           cd "$PROJECT_DIR"
 
-          # Nginx 리로드 (dist/ 볼륨 마운트이므로 리로드만)
-          echo ">>> Nginx 리로드..."
-          docker exec staging-nginx nginx -s reload 2>/dev/null || \
-            docker compose -f docker-compose.staging.yml restart nginx
+          # Nginx 컨테이너 재빌드 (내부에서 React 빌드 + Nginx 서빙)
+          echo ">>> Nginx + Client 재빌드..."
+          docker compose -f Staging/docker-compose.app.yml --env-file Staging/.env.staging \
+            up -d --build --no-deps nginx
 
           # 헬스체크
-          if curl -sf "http://localhost/health" > /dev/null 2>&1; then
-            echo "  ✅ Nginx OK"
-          else
-            echo "  ❌ Nginx health check failed"
-          fi
+          echo ">>> Nginx 헬스체크 대기..."
+          for i in 1 2 3 4 5 6; do
+            if curl -sf "http://localhost/health" > /dev/null 2>&1; then
+              echo "  ✅ Nginx OK"
+              break
+            fi
+            echo "  ⏳ Nginx starting... ($i/6)"
+            sleep 5
+          done
 
           echo "========== ✅ Client 배포 완료 =========="
