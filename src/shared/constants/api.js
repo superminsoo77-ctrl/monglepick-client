@@ -56,7 +56,7 @@ export const MOVIE_ENDPOINTS = {
   /** 영화 상세 조회 - GET (id 파라미터 필요) */
   DETAIL: (id) => `${API_VERSION}/movies/${id}`,
   /** 영화 검색 - GET (query 파라미터 필요) */
-  SEARCH: `${API_VERSION}/search`,
+  SEARCH: `${API_VERSION}/search/movies`,
   /** 인기 영화 목록 - GET */
   POPULAR: `${API_VERSION}/movies/popular`,
   /** 최신 영화 목록 - GET */

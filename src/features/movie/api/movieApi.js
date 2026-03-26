@@ -20,25 +20,56 @@ export async function getMovie(movieId) {
   return api.get(MOVIE_ENDPOINTS.DETAIL(movieId));
 }
 
+function normalizeSearchMovie(movie) {
+  return {
+    ...movie,
+    id: movie.movie_id,
+    posterUrl: movie.poster_url,
+    trailerUrl: movie.trailer_url,
+    releaseYear: movie.release_year,
+    release_date: movie.release_year ? `${movie.release_year}-01-01` : null,
+  };
+}
+
 /**
  * 영화를 검색한다.
  * 키워드, 장르, 정렬 등의 필터를 지원한다.
  *
  * @param {Object} params - 검색 파라미터
  * @param {string} params.query - 검색 키워드
+ * @param {string} [params.searchType='all'] - 검색 대상 (all, title, director, actor)
  * @param {string} [params.genre] - 장르 필터
  * @param {string} [params.sort='relevance'] - 정렬 기준 (relevance, rating, date)
  * @param {number} [params.page=1] - 페이지 번호
  * @param {number} [params.size=20] - 페이지 크기
  * @returns {Promise<Object>} 검색 결과 ({ movies: [], total: number, page: number })
  */
-export async function searchMovies({ query, genre, sort = 'relevance', page = 1, size = 20 }) {
-  /* URL 쿼리 파라미터 구성 — undefined/null 값은 자동 제외 */
-  const params = { sort, page, size };
-  if (query) params.query = query;
+export async function searchMovies({
+  query,
+  searchType = 'all',
+  genre,
+  sort = 'relevance',
+  page = 1,
+  size = 20,
+}) {
+  /* FastAPI 검색 파라미터 구성 */
+  const params = { page, size, search_type: searchType };
+  if (query) params.q = query;
   if (genre) params.genre = genre;
+  if (sort === 'rating') {
+    params.sort_by = 'rating';
+    params.sort_order = 'desc';
+  } else if (sort === 'date') {
+    params.sort_by = 'release_date';
+    params.sort_order = 'desc';
+  }
 
-  return api.get(MOVIE_ENDPOINTS.SEARCH, { params });
+  const data = await api.get(MOVIE_ENDPOINTS.SEARCH, { params });
+  return {
+    ...data,
+    total: data?.pagination?.total || 0,
+    movies: (data?.movies || []).map(normalizeSearchMovie),
+  };
 }
 
 /**

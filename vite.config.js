@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   // 프록시 대상 URL — .env에서 가져오되, 기본값 제공
   const backendUrl = env.VITE_BACKEND_URL || 'http://localhost:8080'
   const agentUrl = env.VITE_AGENT_URL || 'http://localhost:8000'
+  const recommendUrl = env.VITE_RECOMMEND_URL || 'http://localhost:8001'
 
   // server와 preview에서 공유할 프록시 설정
   const proxyConfig = {
@@ -49,8 +50,17 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
         },
+        // Recommend FastAPI (검색/자동완성/최근검색어/온보딩)
+        '/api/v1/search': {
+          target: recommendUrl,
+          changeOrigin: true,
+        },
+        '/api/v1/onboarding': {
+          target: recommendUrl,
+          changeOrigin: true,
+        },
         // /api/v1/mypage는 /api/v1/users/me로 통합됨 (UserController)
-        // AI Agent API (채팅, 검색 등 — 나머지 모든 /api 요청)
+        // AI Agent API (채팅 등 — 나머지 모든 /api 요청)
         '/api': {
           target: agentUrl,
           changeOrigin: true,

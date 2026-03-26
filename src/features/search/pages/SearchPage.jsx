@@ -2,6 +2,7 @@
  * 검색 페이지 컴포넌트.
  *
  * 영화 검색 기능을 제공한다:
+ * - 검색 대상 선택 (통합검색/제목/감독/출연진)
  * - 키워드 검색 입력 (확대된 입력창 + 검색 아이콘)
  * - 장르 필터 ($active prop으로 활성 상태 강조)
  * - 정렬 옵션 (커스텀 셀렉트 스타일)
@@ -35,12 +36,21 @@ const SORT_OPTIONS = [
   { value: 'date',      label: '최신순' },
 ];
 
+/** 검색 대상 옵션 */
+const SEARCH_TYPE_OPTIONS = [
+  { value: 'all', label: '통합검색' },
+  { value: 'title', label: '제목' },
+  { value: 'director', label: '감독' },
+  { value: 'actor', label: '출연진' },
+];
+
 export default function SearchPage() {
   /* URL 쿼리 파라미터 연동 */
   const [searchParams, setSearchParams] = useSearchParams();
 
   /* 검색 상태 */
   const [query, setQuery]         = useState(searchParams.get('q') || '');
+  const [searchType, setSearchType] = useState(searchParams.get('searchType') || 'all');
   const [genre, setGenre]         = useState(searchParams.get('genre') || '전체');
   const [sort, setSort]           = useState(searchParams.get('sort') || 'relevance');
   const [movies, setMovies]       = useState([]);
@@ -53,11 +63,12 @@ export default function SearchPage() {
    * 검색을 실행하는 함수.
    * URL 파라미터도 동기화한다.
    */
-  const executeSearch = useCallback(async (searchQuery, searchGenre, searchSort) => {
+  const executeSearch = useCallback(async (searchQuery, currentSearchType, searchGenre, searchSort) => {
     /* 검색어가 없으면 실행하지 않음 */
     if (!searchQuery.trim()) {
       setMovies([]);
       setHasSearched(false);
+      setTotalCount(0);
       return;
     }
 
@@ -67,6 +78,7 @@ export default function SearchPage() {
     /* URL 쿼리 파라미터 업데이트 */
     const params = new URLSearchParams();
     params.set('q', searchQuery);
+    if (currentSearchType !== 'all') params.set('searchType', currentSearchType);
     if (searchGenre !== '전체') params.set('genre', searchGenre);
     if (searchSort !== 'relevance') params.set('sort', searchSort);
     setSearchParams(params, { replace: true });
@@ -74,6 +86,7 @@ export default function SearchPage() {
     try {
       const result = await searchMovies({
         query: searchQuery,
+        searchType: currentSearchType,
         genre: searchGenre === '전체' ? '' : searchGenre,
         sort: searchSort,
         page: 1,
@@ -99,13 +112,15 @@ export default function SearchPage() {
     initialLoadRef.current = true;
 
     const urlQuery = searchParams.get('q');
+    const urlSearchType = searchParams.get('searchType') || 'all';
     const urlGenre = searchParams.get('genre') || '전체';
     const urlSort  = searchParams.get('sort') || 'relevance';
     if (urlQuery) {
       setQuery(urlQuery);
+      setSearchType(urlSearchType);
       setGenre(urlGenre);
       setSort(urlSort);
-      executeSearch(urlQuery, urlGenre, urlSort);
+      executeSearch(urlQuery, urlSearchType, urlGenre, urlSort);
     }
   }, [searchParams, executeSearch]);
 
@@ -116,7 +131,7 @@ export default function SearchPage() {
    */
   const handleSearch = (e) => {
     e.preventDefault();
-    executeSearch(query, genre, sort);
+    executeSearch(query, searchType, genre, sort);
   };
 
   /**
@@ -127,7 +142,19 @@ export default function SearchPage() {
   const handleGenreChange = (selectedGenre) => {
     setGenre(selectedGenre);
     if (query.trim()) {
-      executeSearch(query, selectedGenre, sort);
+      executeSearch(query, searchType, selectedGenre, sort);
+    }
+  };
+
+  /**
+   * 검색 대상 변경 핸들러.
+   *
+   * @param {string} selectedType - 선택된 검색 대상
+   */
+  const handleSearchTypeChange = (selectedType) => {
+    setSearchType(selectedType);
+    if (query.trim()) {
+      executeSearch(query, selectedType, genre, sort);
     }
   };
 
@@ -139,7 +166,7 @@ export default function SearchPage() {
   const handleSortChange = (selectedSort) => {
     setSort(selectedSort);
     if (query.trim()) {
-      executeSearch(query, genre, selectedSort);
+      executeSearch(query, searchType, genre, selectedSort);
     }
   };
 
@@ -152,15 +179,33 @@ export default function SearchPage() {
         {/* 검색 입력 폼 */}
         <S.Form onSubmit={handleSearch}>
           <S.InputWrap>
-            {/* 검색 아이콘 */}
-            <S.InputIcon aria-hidden="true">🔍</S.InputIcon>
-            <S.Input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="영화 제목, 배우, 감독을 검색하세요..."
-              autoFocus
-            />
+            {/* 검색 대상 선택 드롭다운 */}
+            <S.SearchTypeWrap>
+              <S.SearchTypeSelect
+                value={searchType}
+                onChange={(e) => handleSearchTypeChange(e.target.value)}
+                aria-label="검색 대상 선택"
+              >
+                {SEARCH_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </S.SearchTypeSelect>
+              <S.SearchTypeArrow aria-hidden="true">▾</S.SearchTypeArrow>
+            </S.SearchTypeWrap>
+
+            {/* 검색 입력 필드 */}
+            <S.InputField>
+              <S.InputIcon aria-hidden="true">🔍</S.InputIcon>
+              <S.Input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="영화 제목, 배우, 감독을 검색하세요..."
+                autoFocus
+              />
+            </S.InputField>
             <S.SearchButton type="submit" disabled={isLoading}>
               검색
             </S.SearchButton>
@@ -234,7 +279,7 @@ export default function SearchPage() {
             <EmptyState
               icon="🎬"
               title="영화를 검색해보세요"
-              description="제목, 배우, 감독 이름으로 검색할 수 있습니다"
+              description="통합검색, 제목, 감독, 출연진 기준으로 검색할 수 있습니다"
             />
           )}
         </S.Results>

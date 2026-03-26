@@ -56,14 +56,14 @@ export const Form = styled.form`
 `;
 
 /**
- * 입력 래퍼 — 아이콘 + 인풋 + 버튼 가로 배치.
+ * 입력 래퍼 — 검색타입 + 인풋 + 버튼 가로 배치.
  * 640px 이하에서 세로로 전환(align-items: stretch).
  */
 export const InputWrap = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.sm};
-  position: relative;
+  width: 100%;
 
   ${mediaSmall} {
     flex-direction: column;
@@ -72,20 +72,83 @@ export const InputWrap = styled.div`
 `;
 
 /**
+ * 검색 대상 셀렉트 래퍼 — 커스텀 화살표 포지셔닝용.
+ */
+export const SearchTypeWrap = styled.div`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  ${mediaSmall} {
+    width: 100%;
+  }
+`;
+
+/**
+ * 검색 대상 셀렉트 — glass 스타일, 통합검색/제목/감독/출연진 선택.
+ */
+export const SearchTypeSelect = styled.select`
+  height: 48px;
+  padding: 0 ${({ theme }) => theme.spacing.xl} 0 ${({ theme }) => theme.spacing.md};
+  padding-right: calc(${({ theme }) => theme.spacing.xl} + ${({ theme }) => theme.spacing.sm});
+  background: ${({ theme }) => theme.glass.bg};
+  backdrop-filter: ${({ theme }) => theme.glass.blur};
+  -webkit-backdrop-filter: ${({ theme }) => theme.glass.blur};
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-width: 110px;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover,
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+    outline: none;
+  }
+
+  ${mediaSmall} {
+    width: 100%;
+  }
+`;
+
+/** 검색 대상 커스텀 화살표 — 셀렉트 오른쪽 절대 위치. */
+export const SearchTypeArrow = styled.span`
+  position: absolute;
+  right: ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  pointer-events: none;
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+/**
+ * 검색 입력 필드 래퍼 — 아이콘 + 인풋을 감싸는 relative 컨테이너.
+ */
+export const InputField = styled.div`
+  flex: 1;
+  position: relative;
+  min-width: 0;
+`;
+
+/**
  * 검색 아이콘 — 입력창 왼쪽 절대 위치.
- * 640px 이하에서 top 고정(14px)으로 인풋 내 위치 유지.
  */
 export const InputIcon = styled.span`
   position: absolute;
   left: ${({ theme }) => theme.spacing.md};
+  top: 50%;
+  transform: translateY(-50%);
   font-size: ${({ theme }) => theme.typography.textLg};
   z-index: 1;
   pointer-events: none;
   line-height: 1;
-
-  ${mediaSmall} {
-    top: 14px;
-  }
 `;
 
 /**
@@ -93,7 +156,7 @@ export const InputIcon = styled.span`
  * padding-left: 44px 으로 아이콘 공간 확보.
  */
 export const Input = styled.input`
-  flex: 1;
+  width: 100%;
   height: 48px;
   padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
   padding-left: 44px;
