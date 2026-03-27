@@ -16,15 +16,66 @@
  * - \n\n 기준 SSE 블록 분리
  * - JWT Authorization 헤더 선택적 주입
  * - AbortController를 통한 스트림 취소 지원
+ *
+ * 자동 재연결:
+ * - 네트워크 오류(TypeError) 발생 시 최대 3회 재시도
+ * - 지수 백오프: 1초 → 2초 → 4초
+ * - HTTP 4xx/5xx 에러는 재시도하지 않음 (서버 의도적 거부)
+ * - AbortSignal이 abort된 경우 즉시 중단
  */
 
 /* localStorage 래퍼 유틸 — 인증 토큰 안전 접근 */
 import { getToken } from '../../../shared/utils/storage';
 /* MATCH API 엔드포인트 상수 */
 import { MATCH_ENDPOINTS } from '../../../shared/constants/api';
+/* 서비스 URL — Agent 직접 호출 */
+import { SERVICE_URLS } from '../../../shared/api/serviceUrls';
 
 /**
- * Movie Match SSE 스트리밍 요청을 보내고 이벤트를 콜백으로 전달한다.
+ * 최대 재시도 횟수 (네트워크 오류 한정).
+ * @constant {number}
+ */
+const MAX_RETRY_COUNT = 3;
+
+/**
+ * 지수 백오프 기저 딜레이 (밀리초).
+ * n번째 재시도의 대기 시간: BASE_RETRY_DELAY_MS * 2^(n-1)
+ * 예: 1회→1000ms, 2회→2000ms, 3회→4000ms
+ * @constant {number}
+ */
+const BASE_RETRY_DELAY_MS = 1000;
+
+/**
+ * 지정된 밀리초만큼 비동기 대기한다.
+ * AbortSignal이 전달된 경우 abort 시 즉시 reject된다.
+ *
+ * @param {number} ms - 대기 시간 (밀리초)
+ * @param {AbortSignal} [signal] - 취소 신호
+ * @returns {Promise<void>}
+ */
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    // abort 이벤트가 발생하면 즉시 reject하여 대기를 중단한다
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+
+    const timerId = setTimeout(resolve, ms);
+
+    // 대기 중 abort가 발생하면 타이머를 취소하고 reject
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timerId);
+      reject(new DOMException('Aborted', 'AbortError'));
+    }, { once: true });
+  });
+}
+
+/**
+ * Movie Match SSE 스트리밍 요청을 보내고 이벤트를 콜백으로 전달한다 (단일 시도, 내부용).
+ *
+ * 이 함수는 재시도 로직을 포함하지 않는다.
+ * 외부에서는 재시도 래퍼인 sendMatchRequest를 사용한다.
  *
  * @param {Object} params - 요청 파라미터
  * @param {string} params.movieId1 - 첫 번째 영화 ID (예: 'tmdb_550')
@@ -40,7 +91,7 @@ import { MATCH_ENDPOINTS } from '../../../shared/constants/api';
  * @returns {Promise<void>}
  * @throws {Error} HTTP 에러 또는 네트워크 에러 발생 시
  */
-export async function sendMatchRequest(
+async function _sendMatchRequestOnce(
   { movieId1, movieId2, userId = '' },
   { onStatus, onSharedFeatures, onMatchResult, onError, onDone } = {},
   signal,
@@ -55,7 +106,7 @@ export async function sendMatchRequest(
 
   // Agent(:8000)으로 POST 요청 전송
   // Vite 프록시 설정에서 /api/* → :8000(AI Agent)으로 전달됨
-  const response = await fetch(MATCH_ENDPOINTS.STREAM, {
+  const response = await fetch(`${SERVICE_URLS.AGENT}${MATCH_ENDPOINTS.STREAM}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -126,6 +177,96 @@ export async function sendMatchRequest(
   } finally {
     // 예외 발생 시에도 reader를 반드시 해제하여 스트림 리소스 누수 방지
     reader.cancel().catch(() => {});
+  }
+}
+
+/**
+ * Movie Match SSE 스트리밍 요청을 보내고 이벤트를 콜백으로 전달한다 (자동 재연결 래퍼).
+ *
+ * 네트워크 오류(TypeError) 발생 시 지수 백오프로 최대 3회 재시도한다.
+ * HTTP 4xx/5xx 에러는 서버의 의도적 거부이므로 재시도하지 않는다.
+ * AbortSignal이 abort된 경우 즉시 중단한다.
+ *
+ * 재시도 딜레이: 1초 → 2초 → 4초 (지수 백오프, BASE_RETRY_DELAY_MS * 2^(n-1))
+ *
+ * @param {Object} params - 요청 파라미터
+ * @param {string} params.movieId1 - 첫 번째 영화 ID (예: 'tmdb_550')
+ * @param {string} params.movieId2 - 두 번째 영화 ID (예: 'tmdb_680')
+ * @param {string} [params.userId=''] - 사용자 ID (빈 문자열이면 익명)
+ * @param {Object} callbacks - SSE 이벤트 콜백 함수 객체
+ * @param {function} [callbacks.onStatus] - status 이벤트 핸들러 ({phase, message})
+ * @param {function} [callbacks.onSharedFeatures] - shared_features 이벤트 핸들러 ({common_genres, common_moods, ...})
+ * @param {function} [callbacks.onMatchResult] - match_result 이벤트 핸들러 ({movies: [...]})
+ * @param {function} [callbacks.onError] - error 이벤트 핸들러 ({error_code, message})
+ * @param {function} [callbacks.onDone] - done 이벤트 핸들러 ({})
+ * @param {AbortSignal} [signal] - 요청 취소용 AbortSignal (AbortController.signal)
+ * @returns {Promise<void>}
+ */
+export async function sendMatchRequest(
+  { movieId1, movieId2, userId = '' },
+  { onStatus, onSharedFeatures, onMatchResult, onError, onDone } = {},
+  signal,
+) {
+  const callbacks = { onStatus, onSharedFeatures, onMatchResult, onError, onDone };
+
+  // 재시도 루프: attempt는 0부터 시작하며 MAX_RETRY_COUNT까지 시도한다
+  for (let attempt = 0; attempt <= MAX_RETRY_COUNT; attempt++) {
+    try {
+      await _sendMatchRequestOnce(
+        { movieId1, movieId2, userId },
+        callbacks,
+        signal,
+      );
+      // 성공 시 루프 종료
+      return;
+    } catch (err) {
+      // AbortError: 사용자가 명시적으로 취소한 경우 즉시 중단 (재시도 안 함)
+      if (err.name === 'AbortError') {
+        if (import.meta.env.DEV) {
+          console.log('[Match SSE] 요청 취소됨 (AbortError), 재시도 중단');
+        }
+        throw err;
+      }
+
+      // HTTP 에러 (4xx/5xx): 서버의 의도적 거부이므로 재시도하지 않고 onError 콜백 호출
+      if (err.message.startsWith('HTTP ')) {
+        if (import.meta.env.DEV) {
+          console.warn('[Match SSE] HTTP 에러 발생, 재시도 없음:', err.message);
+        }
+        onError?.({ message: err.message });
+        return;
+      }
+
+      // 마지막 시도까지 실패한 경우: 최종 실패 처리
+      if (attempt === MAX_RETRY_COUNT) {
+        if (import.meta.env.DEV) {
+          console.error('[Match SSE] 최대 재시도 횟수 초과, 최종 실패:', err.message);
+        }
+        onError?.({ message: '네트워크 연결에 실패했습니다. 인터넷 연결을 확인해주세요.' });
+        return;
+      }
+
+      // 네트워크 오류(TypeError 등): 재시도 전 사용자에게 상태 알림
+      const nextAttempt = attempt + 1;
+      const retryDelayMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt); // 지수 백오프
+
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[Match SSE] 네트워크 오류 발생 (${attempt + 1}/${MAX_RETRY_COUNT}회 시도),`,
+          `${retryDelayMs}ms 후 재시도:`,
+          err.message,
+        );
+      }
+
+      // 재연결 진행 중임을 사용자에게 알림 (onStatus 콜백 재활용)
+      onStatus?.({
+        phase: 'retry',
+        message: `연결이 끊어졌습니다. 재연결 중... (${nextAttempt}/${MAX_RETRY_COUNT})`,
+      });
+
+      // 지수 백오프 대기 (AbortSignal 전달하여 대기 중 취소 가능)
+      await delay(retryDelayMs, signal);
+    }
   }
 }
 

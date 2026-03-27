@@ -12,7 +12,7 @@
  *   - media.js      : media.mobile
  */
 
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { gradientShift, borderGlow, cardShine } from '../../../shared/styles/animations';
 import { media } from '../../../shared/styles/media';
 
@@ -41,7 +41,7 @@ export const Wrapper = styled.div`
   /* BEST 카드 — 보더 글로우 + 애니메이션 */
   ${({ $isBest, theme }) =>
     $isBest &&
-    `
+    css`
     border-color: rgba(124,108,240,0.5);
     box-shadow: ${theme.glows.primary};
     animation: ${borderGlow} 3s ease infinite;

@@ -183,20 +183,27 @@ export const HeaderSubtitle = styled.p`
   line-height: 1.2;
 `;
 
-/** 새 대화 버튼 */
+/** 새 대화 버튼 — 보라 테두리 + hover 시 보라 배경 채움 */
 export const HeaderClearBtn = styled.button`
   font-size: ${({ theme }) => theme.typography.textXs};
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 16px;
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border: 1px solid rgba(124, 108, 240, 0.5);
   background: transparent;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  color: ${({ theme }) => theme.colors.primary || '#7c6cf0'};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
+  white-space: nowrap;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.borderDefault};
-    color: ${({ theme }) => theme.colors.textPrimary};
+    background: rgba(124, 108, 240, 0.15);
+    border-color: ${({ theme }) => theme.colors.primary || '#7c6cf0'};
+    color: #e8e8f0;
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 `;
 
@@ -337,6 +344,27 @@ export const MsgAvatar = styled.img`
   font-size: 12px;
   color: #fff;
   margin-top: 2px;
+`;
+
+/**
+ * 메시지 행에 표시되는 몽글이 캐릭터 아바타 래퍼.
+ *
+ * MsgAvatar와 동일한 크기(28×28)를 유지하면서
+ * MonggleCharacter가 overflow: visible로 팔/귀가 삐져나와도
+ * 레이아웃이 무너지지 않도록 overflow: visible을 허용한다.
+ * flex-shrink: 0으로 버블이 좁아져도 캐릭터 크기가 고정된다.
+ */
+export const MonggleAvatarWrapper = styled.div`
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  /* SVG overflow(팔, 귀)가 클리핑되지 않도록 */
+  overflow: visible;
+  /* 캐릭터가 중앙 정렬되도록 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 /**
@@ -684,6 +712,37 @@ export const MovieCardTrailer = styled.a`
  * ============================================================ */
 
 /**
+ * clarification 블록 전체를 감싸는 외부 래퍼.
+ *
+ * ChatMsg 내부에서 MonggleAvatarWrapper 옆에 배치되며,
+ * question 텍스트 + 힌트 칩 목록을 세로로 쌓는다.
+ * fadeIn 애니메이션으로 부드럽게 등장한다.
+ */
+export const ClarificationWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: ${fadeIn} 0.25s ease-out;
+`;
+
+/**
+ * 후속 질문 텍스트.
+ *
+ * 봇 버블과 동일한 배경/라운딩을 사용하여 시각적 일관성을 유지한다.
+ * 좌하단 모서리를 줄여 말풍선 꼬리 느낌을 준다.
+ */
+export const ClarificationQuestion = styled.p`
+  margin: 0;
+  padding: 10px 14px;
+  background-color: ${({ theme }) => theme.colors.bgCard};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  border-bottom-left-radius: ${({ theme }) => theme.radius.sm};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  line-height: 1.5;
+`;
+
+/**
  * clarification 이벤트 수신 시 표시되는 힌트 칩 컨테이너.
  * 봇 버블과 동일한 배경/라운딩을 사용한다.
  */
@@ -711,7 +770,7 @@ export const ClarificationLabel = styled.span`
   font-weight: ${({ theme }) => theme.typography.fontMedium};
 `;
 
-/** 칩 목록 (flex-wrap) */
+/** 힌트 칩 목록 (flex-wrap, 칩 사이 간격) */
 export const ClarificationChips = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -720,24 +779,35 @@ export const ClarificationChips = styled.div`
 
 /**
  * 개별 힌트 칩.
- * 비활성 상태(disabled)에서는 opacity 0.4, cursor not-allowed.
+ *
+ * 기본: 보라 테두리 + 투명 배경 + primary 색상 텍스트.
+ * hover: 보라 배경 + 흰색 텍스트 (클릭 가능함을 시각적으로 강조).
+ * disabled: opacity 0.4 + not-allowed 커서 (로딩 중 칩 잠금).
  */
 export const ClarificationChip = styled.button`
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: ${({ theme }) => theme.radius.xl};
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
   background: transparent;
-  color: ${({ theme }) => theme.colors.textPrimary};
+  color: ${({ theme }) => theme.colors.primary};
   font-size: ${({ theme }) => theme.typography.textXs};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
   line-height: 1.4;
   font-family: inherit;
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
 
   &:hover:not(:disabled) {
     background-color: ${({ theme }) => theme.colors.primary};
     border-color: ${({ theme }) => theme.colors.primary};
     color: #fff;
+    /* hover 시 살짝 위로 올라오는 효과 */
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px ${({ theme }) => theme.colors.primary}40;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   &:disabled {

@@ -3,13 +3,19 @@
  *
  * 인증 토큰, 세션 ID 등을 localStorage에 안전하게 저장/조회/삭제한다.
  * 시크릿 모드 등 localStorage 접근 불가 환경에서도 에러 없이 동작한다.
+ *
+ * [이슈6] Refresh Token 관련 설계 변경:
+ * - Refresh Token은 서버가 HttpOnly 쿠키로 관리한다.
+ * - 클라이언트(localStorage)에 Refresh Token을 저장하지 않는다.
+ * - setRefreshToken / getRefreshToken / removeRefreshToken 함수는
+ *   하위 호환성을 위해 시그니처를 유지하되, 실제 저장/조회를 수행하지 않는다.
+ *   (no-op — no operation)
+ * - Access Token은 새로고침 복원을 위해 localStorage에 계속 저장한다.
+ *   단, 만료 시 axiosInstance의 인터셉터가 자동으로 제거한다.
  */
 
-/** 인증 토큰 저장 키 */
+/** 인증 토큰(액세스 토큰) 저장 키 */
 const TOKEN_KEY = 'monglepick_auth_token';
-
-/** 리프레시 토큰 저장 키 */
-const REFRESH_TOKEN_KEY = 'monglepick_refresh_token';
 
 /** 채팅 세션 ID 저장 키 */
 const SESSION_ID_KEY = 'monglepick_session_id';
@@ -67,7 +73,7 @@ function safeRemoveItem(key) {
   }
 }
 
-// ── 인증 토큰 관련 ──
+// ── 인증 토큰(액세스 토큰) 관련 ──
 
 /**
  * 저장된 인증 토큰(액세스 토큰)을 가져온다.
@@ -80,6 +86,7 @@ export function getToken() {
 
 /**
  * 인증 토큰(액세스 토큰)을 저장한다.
+ * 새로고침 후 인증 상태를 복원하기 위해 localStorage에 저장한다.
  *
  * @param {string} token - JWT 액세스 토큰
  * @returns {boolean} 저장 성공 여부
@@ -90,6 +97,7 @@ export function setToken(token) {
 
 /**
  * 인증 토큰(액세스 토큰)을 삭제한다.
+ * 만료 감지 시 axiosInstance 인터셉터가 자동으로 호출한다.
  *
  * @returns {boolean} 삭제 성공 여부
  */
@@ -97,34 +105,48 @@ export function removeToken() {
   return safeRemoveItem(TOKEN_KEY);
 }
 
-// ── 리프레시 토큰 관련 ──
+// ── 리프레시 토큰 관련 (no-op — 서버 HttpOnly 쿠키로 관리) ──
+// [이슈6] Refresh Token은 서버가 HttpOnly 쿠키로 발급/갱신하므로
+// 클라이언트에서 localStorage에 저장하지 않는다.
+// 하위 호환성을 위해 함수 시그니처는 유지하되 실제 동작을 수행하지 않는다.
+// axiosInstance의 refresh 요청은 withCredentials: true로 쿠키를 자동 전송한다.
 
 /**
- * 저장된 리프레시 토큰을 가져온다.
+ * 리프레시 토큰을 조회한다.
  *
- * @returns {string|null} JWT 리프레시 토큰 또는 null
+ * @deprecated [이슈6] Refresh Token은 서버 HttpOnly 쿠키로 관리한다.
+ *   이 함수는 하위 호환성을 위해 유지되며 항상 null을 반환한다.
+ *   axiosInstance의 refresh 요청은 withCredentials: true로 쿠키를 자동 전송한다.
+ * @returns {null} 항상 null 반환
  */
 export function getRefreshToken() {
-  return safeGetItem(REFRESH_TOKEN_KEY);
+  // no-op: Refresh Token은 HttpOnly 쿠키로 관리 — localStorage 저장 안 함
+  return null;
 }
 
 /**
  * 리프레시 토큰을 저장한다.
  *
- * @param {string} token - JWT 리프레시 토큰
- * @returns {boolean} 저장 성공 여부
+ * @deprecated [이슈6] Refresh Token은 서버 HttpOnly 쿠키로 관리한다.
+ *   이 함수는 하위 호환성을 위해 유지되며 아무 동작도 수행하지 않는다.
+ * @returns {boolean} 항상 false 반환 (저장하지 않음)
  */
-export function setRefreshToken(token) {
-  return safeSetItem(REFRESH_TOKEN_KEY, token);
+export function setRefreshToken() {
+  // no-op: Refresh Token은 서버가 HttpOnly 쿠키로 갱신하므로 클라이언트에서 저장 금지
+  return false;
 }
 
 /**
  * 리프레시 토큰을 삭제한다.
  *
- * @returns {boolean} 삭제 성공 여부
+ * @deprecated [이슈6] Refresh Token은 서버 HttpOnly 쿠키로 관리한다.
+ *   이 함수는 하위 호환성을 위해 유지되며 아무 동작도 수행하지 않는다.
+ *   실제 쿠키 삭제는 서버 로그아웃 API(/auth/logout)가 담당한다.
+ * @returns {boolean} 항상 false 반환 (삭제하지 않음)
  */
 export function removeRefreshToken() {
-  return safeRemoveItem(REFRESH_TOKEN_KEY);
+  // no-op: 쿠키는 서버 로그아웃 API가 삭제함
+  return false;
 }
 
 // ── 세션 ID 관련 ──
@@ -204,10 +226,13 @@ export function removeUser() {
 /**
  * 모든 몽글픽 관련 localStorage 데이터를 삭제한다.
  * 로그아웃 시 호출하여 완전한 상태 초기화를 수행한다.
+ *
+ * [이슈6] Refresh Token은 서버 HttpOnly 쿠키로 관리하므로 여기서 삭제하지 않는다.
+ * 쿠키 삭제는 서버 로그아웃 API(/auth/logout)가 담당한다.
  */
 export function clearAll() {
   removeToken();
-  removeRefreshToken();
+  // removeRefreshToken() — no-op이므로 호출 불필요하나 명시적으로 유지
   removeSessionId();
   removeUser();
 }

@@ -12,12 +12,16 @@
  * 처리 상태(status)를 타이핑 인디케이터로 보여준다.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+/* 커스텀 모달 훅 — window.confirm/alert 대체 */
+import { useModal } from '../../../shared/components/Modal';
 /* 인증 Context 훅 — app/providers에서 가져옴 (userId 전달용) */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 채팅 상태 관리 훅 — 같은 feature 내의 hooks에서 가져옴 */
 import { useChat } from '../hooks/useChat';
 import MovieCard from './MovieCard';
+/* 몽글이 캐릭터 애니메이션 컴포넌트 */
+import MonggleCharacter from '../../../shared/components/MonggleCharacter/MonggleCharacter';
 import * as S from './ChatWindow.styled';
 
 /** 이미지 최대 크기 (10MB) */
@@ -28,6 +32,9 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 const DEFAULT_MAX_INPUT_LENGTH = 200;
 
 export default function ChatWindow() {
+  /* 커스텀 모달 — window.confirm/alert 대체 */
+  const { showAlert, showConfirm } = useModal();
+
   // 인증 상태에서 사용자 ID를 가져와 포인트 시스템 연동에 사용
   const user = useAuthStore((s) => s.user);
 
@@ -117,13 +124,21 @@ export default function ChatWindow() {
 
     // MIME 타입 검증
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      alert('JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.');
+      showAlert({
+        title: '지원하지 않는 형식',
+        message: 'JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.',
+        type: 'warning',
+      });
       return;
     }
 
     // 파일 크기 검증 (10MB 제한)
     if (file.size > IMAGE_MAX_SIZE_MB * 1024 * 1024) {
-      alert(`이미지 크기는 ${IMAGE_MAX_SIZE_MB}MB 이하여야 합니다.`);
+      showAlert({
+        title: '파일 크기 초과',
+        message: `이미지 크기는 ${IMAGE_MAX_SIZE_MB}MB 이하여야 합니다.`,
+        type: 'warning',
+      });
       return;
     }
 
@@ -219,6 +234,47 @@ export default function ChatWindow() {
   // 글자수 비율 (0.0 ~ 1.0+) — CharCount $ratio prop 전달용
   const charRatio = inputText.length / maxInputLength;
 
+  /**
+   * SSE 이벤트 상태에 따라 몽글이 애니메이션 상태를 결정한다.
+   *
+   * 우선순위:
+   * 1. isLoading + status(처리 중 메시지 있음) → thinking (AI가 생각하는 중)
+   * 2. isLoading + 마지막 메시지가 bot 스트리밍 중 → talking (토큰 수신 중)
+   * 3. clarification 표시 중 (로딩 완료 후) → waving (추가 질문하며 손 흔들기)
+   * 4. 마지막 메시지가 movie_cards (추천 완료) → celebrating
+   * 5. messages 길이가 0 (첫 진입) → waving (인사)
+   * 6. 그 외 대기 상태 → idle
+   *
+   * messages/clarification 참조는 useMemo deps에 포함하여 불필요한 재계산을 방지한다.
+   */
+  const monggleAnimation = useMemo(() => {
+    // AI가 처리 중이고 status 메시지가 있으면 → thinking
+    if (isLoading && status) return 'thinking';
+
+    // AI가 처리 중이고 마지막 메시지가 봇(토큰 스트리밍) → talking
+    if (isLoading) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === 'bot') return 'talking';
+      return 'thinking';
+    }
+
+    // 로딩 완료 후 clarification이 표시 중이면 → waving (추가 질문하며 손 흔들기)
+    if (clarification) return 'waving';
+
+    // 대화 결과가 있을 때
+    if (messages.length > 0) {
+      // 가장 마지막 봇 관련 메시지가 movie_cards이면 → celebrating
+      const lastBotMsg = [...messages].reverse().find(
+        (m) => m.role === 'bot' || m.role === 'movie_cards',
+      );
+      if (lastBotMsg?.role === 'movie_cards') return 'celebrating';
+      return 'idle';
+    }
+
+    // 메시지가 없는 초기 상태 → waving (환영 인사)
+    return 'waving';
+  }, [isLoading, status, clarification, messages]);
+
   return (
     <S.ChatWindowWrapper
       $isDragging={isDragging}
@@ -229,14 +285,41 @@ export default function ChatWindow() {
       {/* ── 헤더 ── */}
       <S.ChatHeader>
         <S.ChatHeaderLeft>
-          <S.HeaderAvatar src="/mongle-transparent.png" alt="몽글픽" />
+          {/*
+            헤더 몽글이: idle 상태 고정.
+            isLoading일 때 헤더 캐릭터까지 바뀌면 시선이 분산되므로
+            헤더는 항상 idle(둥실둥실)을 유지한다.
+          */}
+          <MonggleCharacter animation="idle" size="sm" />
           <div>
             <S.HeaderTitle>몽글픽</S.HeaderTitle>
             <S.HeaderSubtitle>AI 영화 추천</S.HeaderSubtitle>
           </div>
         </S.ChatHeaderLeft>
-        <S.HeaderClearBtn onClick={clearMessages} title="대화 초기화">
-          새 대화
+        <S.HeaderClearBtn
+          onClick={async () => {
+            /* 대화 내역이 있을 때만 확인 요청 — 빈 상태에서는 바로 리셋 */
+            if (messages.length > 0) {
+              const confirmed = await showConfirm({
+                title: '새 대화 시작',
+                message: '현재 대화를 종료하고 새 대화를 시작할까요?',
+                type: 'confirm',
+                confirmLabel: '시작',
+                cancelLabel: '취소',
+              });
+              if (!confirmed) return;
+            }
+            /* useChat 내부 상태 초기화 (messages, session, status, point 등) */
+            clearMessages();
+            /* ChatWindow 로컬 상태 초기화 */
+            setInputText('');
+            setAttachedImage(null);
+            /* 입력 필드에 포커스 */
+            inputRef.current?.focus();
+          }}
+          title="새 대화 시작"
+        >
+          + 새 대화
         </S.HeaderClearBtn>
       </S.ChatHeader>
 
@@ -321,7 +404,11 @@ export default function ChatWindow() {
         {/* 초기 안내 메시지 (메시지가 없을 때) */}
         {messages.length === 0 && (
           <S.ChatWelcome>
-            <S.WelcomeIcon src="/mongle-transparent.png" alt="몽글픽" />
+            {/*
+              환영 화면 몽글이: waving 애니메이션으로 인사.
+              lg 크기(96px)로 중앙에 크게 표시한다.
+            */}
+            <MonggleCharacter animation="waving" size="lg" />
             <S.WelcomeTitle>안녕하세요! 몽글픽이에요</S.WelcomeTitle>
             <S.WelcomeDesc>
               어떤 영화를 찾고 계신가요? 기분, 장르, 좋아하는 영화 등
@@ -369,7 +456,24 @@ export default function ChatWindow() {
           if (msg.role === 'bot') {
             return (
               <S.ChatMsg key={`bot-${msg.timestamp}`}>
-                <S.MsgAvatar src="/mongle-transparent.png" alt="몽글픽" />
+                {/*
+                  봇 메시지 아바타: 현재 스트리밍 중인 마지막 메시지인지 확인.
+                  - 마지막 봇 메시지이고 isLoading 중이면 → talking (입 오물오물)
+                  - 완료된 메시지이면 → idle (둥실둥실)
+                  - 취소된 메시지이면 → idle
+                */}
+                <S.MonggleAvatarWrapper>
+                  <MonggleCharacter
+                    animation={
+                      !msg.cancelled &&
+                      isLoading &&
+                      messages[messages.length - 1]?.timestamp === msg.timestamp
+                        ? 'talking'
+                        : 'idle'
+                    }
+                    size="sm"
+                  />
+                </S.MonggleAvatarWrapper>
                 <S.MsgBubble $variant="bot" $cancelled={msg.cancelled}>
                   {msg.content}
                 </S.MsgBubble>
@@ -381,7 +485,16 @@ export default function ChatWindow() {
           if (msg.role === 'movie_cards') {
             return (
               <S.ChatMsg key={`bot-${msg.timestamp}`}>
-                <S.MsgAvatar src="/mongle-transparent.png" alt="몽글픽" />
+                {/*
+                  영화 카드 아바타: 항상 celebrating (추천 결과 등장 시 기뻐하기).
+                  단, 이후에 더 많은 처리가 남아 있으면(isLoading) thinking으로 전환.
+                */}
+                <S.MonggleAvatarWrapper>
+                  <MonggleCharacter
+                    animation={isLoading ? 'thinking' : 'celebrating'}
+                    size="sm"
+                  />
+                </S.MonggleAvatarWrapper>
                 <S.ChatMovieCards>
                   {msg.movies.map((movie, mIdx) => (
                     <MovieCard key={movie.id || mIdx} movie={movie} />
@@ -397,7 +510,13 @@ export default function ChatWindow() {
         {/* 처리 상태 인디케이터 */}
         {isLoading && status && (
           <S.ChatMsg>
-            <S.MsgAvatar src="/mongle-transparent.png" alt="몽글픽" />
+            {/*
+              상태 인디케이터 아바타: thinking (AI가 처리 중).
+              status 텍스트가 표시될 때 고개 갸우뚱 + 눈 깜빡임.
+            */}
+            <S.MonggleAvatarWrapper>
+              <MonggleCharacter animation="thinking" size="sm" />
+            </S.MonggleAvatarWrapper>
             <S.ChatStatus>
               <S.StatusDots>
                 {/* 각 점에 딜레이를 적용하여 순차 바운스 효과 */}
@@ -410,41 +529,65 @@ export default function ChatWindow() {
           </S.ChatMsg>
         )}
 
-        {/* 후속 질문 힌트 칩 (clarification 이벤트 수신 시) */}
-        {clarification?.hints?.length > 0 && (
+        {/* 후속 질문 힌트 칩 (clarification 이벤트 수신 시, 로딩 중에는 숨김) */}
+        {!isLoading && clarification && (
           <S.ChatMsg>
-            <S.MsgAvatar src="/mongle-transparent.png" alt="몽글픽" />
-            <S.ChatClarification>
-              {clarification.hints.map((hint) => (
-                <S.ClarificationGroup key={hint.field}>
-                  <S.ClarificationLabel>{hint.label}</S.ClarificationLabel>
-                  <S.ClarificationChips>
-                    {hint.options.map((option) => (
-                      <S.ClarificationChip
-                        key={option}
-                        onClick={() => {
-                          // 칩 클릭 시 label(장르/분위기 등) + 선택값을 포함한 구조화된 메시지를 전송하여
-                          // LLM이 맥락을 명확히 파악할 수 있도록 한다.
-                          // 예: "음악" → "장르는 음악 좋아해" / "힐링" → "분위기는 힐링 좋아해"
-                          const contextMessage = `${hint.label}는 ${option} 좋아해`;
-                          sendMessage(contextMessage);
-                        }}
-                        disabled={isLoading}
-                      >
-                        {option}
-                      </S.ClarificationChip>
-                    ))}
-                  </S.ClarificationChips>
-                </S.ClarificationGroup>
-              ))}
-            </S.ChatClarification>
+            {/*
+              clarification 아바타: waving (추가 정보를 요청하며 손 흔들기).
+              isLoading이 false일 때만 렌더링하므로 항상 waving 고정.
+            */}
+            <S.MonggleAvatarWrapper>
+              <MonggleCharacter animation="waving" size="sm" />
+            </S.MonggleAvatarWrapper>
+
+            {/*
+              ClarificationWrapper: question + 칩 목록을 세로로 배치하는 외부 래퍼.
+              fadeIn 애니메이션이 적용되어 부드럽게 등장한다.
+            */}
+            <S.ClarificationWrapper>
+              {/* 후속 질문 텍스트 — clarification.question이 있을 때만 표시 */}
+              {clarification.question && (
+                <S.ClarificationQuestion>{clarification.question}</S.ClarificationQuestion>
+              )}
+
+              {/*
+                힌트 칩 목록.
+                SSE clarification 이벤트의 hints는 단순 string[] 배열이다.
+                각 칩 클릭 시 해당 힌트 텍스트를 그대로 sendMessage에 전달하고
+                clarification 상태를 초기화한다 (sendMessage 내부에서 setClarification(null) 호출됨).
+              */}
+              {Array.isArray(clarification.hints) && clarification.hints.length > 0 && (
+                <S.ClarificationChips>
+                  {clarification.hints.map((hint) => (
+                    <S.ClarificationChip
+                      key={hint}
+                      onClick={() => {
+                        // 힌트 칩 클릭: 해당 힌트 텍스트를 메시지로 전송.
+                        // sendMessage 내부에서 setClarification(null)을 호출하므로
+                        // 칩 UI는 자동으로 사라진다.
+                        sendMessage(hint);
+                      }}
+                      disabled={isLoading}
+                    >
+                      {hint}
+                    </S.ClarificationChip>
+                  ))}
+                </S.ClarificationChips>
+              )}
+            </S.ClarificationWrapper>
           </S.ChatMsg>
         )}
 
         {/* 에러 메시지 */}
         {error && (
           <S.ChatMsg>
-            <S.MsgAvatar src="/mongle-transparent.png" alt="몽글픽" />
+            {/*
+              에러 아바타: idle (에러 상황에서 차분하게 대기).
+              celebrating/waving은 에러 맥락과 어울리지 않으므로 idle 고정.
+            */}
+            <S.MonggleAvatarWrapper>
+              <MonggleCharacter animation="idle" size="sm" />
+            </S.MonggleAvatarWrapper>
             <S.MsgBubble $variant="error">{error}</S.MsgBubble>
           </S.ChatMsg>
         )}

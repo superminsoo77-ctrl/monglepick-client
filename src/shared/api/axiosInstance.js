@@ -1,30 +1,43 @@
 /**
- * axios 인스턴스 및 인터셉터 설정 모듈.
+ * 서비스별 axios 인스턴스 모듈.
  *
- * 전역 axios 인스턴스를 생성하고, JWT 토큰 자동 주입(request interceptor)과
- * 401 응답 시 토큰 자동 갱신 + 재시도(response interceptor)를 처리한다.
+ * 3개 서비스(Backend, Agent, Recommend)에 대해 각각 독립된 axios 인스턴스를 생성한다.
+ * - backendApi : Spring Boot Backend (인증, 포인트, 결제, 영화, 커뮤니티 등)
+ * - agentApi   : FastAPI AI Agent (채팅 SSE, Movie Match SSE)
+ * - recommendApi : FastAPI Recommend (검색, 온보딩)
+ *
+ * JWT 토큰 자동 갱신(refresh) 로직은 backendApi에만 적용된다.
+ * Agent/Recommend 인스턴스는 Bearer 토큰 주입만 수행한다.
+ *
+ * 적용된 보안 개선 사항:
+ * - [C-C2] 토큰 주입 전 JWT 3-파트 형식 검증 (유효하지 않은 토큰 자동 제거)
+ * - [W-C3] 토큰 주입 전 만료 여부 검사 (만료 시 자동 refresh 시도)
+ * - [이슈4] 뮤텍스 패턴으로 401 동시 다발 refresh race condition 방지
  *
  * 사용법:
+ *   // Backend API (default export — 기존 코드 호환)
  *   import api from '../../../shared/api/axiosInstance';
  *   const data = await api.get('/api/v1/point/balance');
- *   const data = await api.post('/api/v1/auth/login', { email, password });
  *
- * 인증 필수 요청:
- *   import api, { requireAuth } from '../../../shared/api/axiosInstance';
- *   requireAuth();  // 토큰 없으면 즉시 에러
- *   const data = await api.get('/api/v1/users/me/profile');
+ *   // 서비스별 명시적 import
+ *   import { backendApi, agentApi, recommendApi } from '../../../shared/api/axiosInstance';
+ *   const movies = await recommendApi.get('/api/v1/search/movies', { params });
  *
  * @module shared/api/axiosInstance
  */
 
 import axios from 'axios';
-import { getToken, setToken, getRefreshToken, setRefreshToken, clearAll } from '../utils/storage';
+import { getToken, setToken, removeToken, clearAll } from '../utils/storage';
 import { AUTH_ENDPOINTS } from '../constants/api';
+import { SERVICE_URLS } from './serviceUrls';
+
+/* ══════════════════════════════════════════════════════════
+ * 공통 유틸리티
+ * ══════════════════════════════════════════════════════════ */
 
 /**
  * HTTP 상태코드별 사용자 친화적 기본 에러 메시지.
  * 백엔드 ErrorResponse.message가 없을 때 fallback으로 사용한다.
- * raw 상태코드(400, 500 등)가 사용자에게 노출되지 않도록 한국어 메시지를 반환한다.
  *
  * @param {number|undefined} status - HTTP 상태코드
  * @returns {string} 사용자 친화적 에러 메시지
@@ -45,137 +58,278 @@ function getFallbackMessage(status) {
   }
 }
 
-/* ── 기본 URL: .env의 VITE_API_BASE_URL (개발 시 빈 문자열 → Vite 프록시 사용) ── */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+/**
+ * [C-C2] JWT 토큰의 기본 형식(헤더.페이로드.서명 3파트)이 유효한지 검사한다.
+ *
+ * @param {*} token - 검사할 토큰 값
+ * @returns {boolean} 유효한 JWT 형식이면 true
+ */
+function isValidJwtFormat(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  return parts.every((part) => part.length > 0);
+}
 
 /**
- * 공용 axios 인스턴스.
- * 모든 API 요청은 이 인스턴스를 통해 수행한다.
- * response interceptor가 response.data를 자동 추출하므로,
- * api.get('/foo') 호출 시 바로 JSON 데이터가 반환된다.
+ * [W-C3] JWT 토큰의 만료 여부를 검사한다.
+ * 5초의 여유(skew)를 두어 네트워크 지연 중 만료를 미리 처리한다.
+ *
+ * @param {string} token - JWT 토큰 문자열
+ * @returns {boolean} 만료되었으면 true
  */
-const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const SKEW_MS = 5000;
+    return payload.exp * 1000 < Date.now() + SKEW_MS;
+  } catch {
+    return true;
+  }
+}
 
-/* ── 토큰 갱신 동시 호출 방지용 상태 ── */
-/** 현재 진행 중인 갱신 Promise (null이면 갱신 진행 중 아님) */
-let refreshPromise = null;
+/* ══════════════════════════════════════════════════════════
+ * [이슈4] 뮤텍스 패턴 — 401 동시 다발 refresh race condition 방지
+ * ══════════════════════════════════════════════════════════ */
+
+/** 현재 refresh 진행 중 여부 (뮤텍스 플래그) */
+let isRefreshing = false;
+
+/**
+ * refresh 완료를 기다리는 요청 큐.
+ * @type {Array<{resolve: Function, reject: Function}>}
+ */
+let failedQueue = [];
+
+/**
+ * 대기 중인 요청 큐를 처리한다.
+ *
+ * @param {Error|null} error - refresh 실패 에러 (성공 시 null)
+ * @param {string|null} token - 새 액세스 토큰 (실패 시 null)
+ */
+function processQueue(error, token = null) {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+}
+
+/**
+ * refresh 요청을 큐에 추가하고 새 토큰 또는 에러를 기다린다.
+ *
+ * @returns {Promise<string>} 새 액세스 토큰
+ */
+function enqueueRefreshWaiter() {
+  return new Promise((resolve, reject) => {
+    failedQueue.push({ resolve, reject });
+  });
+}
 
 /**
  * 리프레시 토큰으로 새 액세스 토큰을 발급받는다.
- * 동시에 여러 요청이 401을 받아도 갱신 요청은 1회만 실행된다.
+ * Backend 서비스에 직접 요청한다 (인터셉터 우회를 위해 raw axios 사용).
  *
  * @returns {Promise<string>} 새 액세스 토큰
  * @throws {Error} 갱신 실패 시
  */
 async function refreshAccessToken() {
-  /* 이미 갱신 진행 중이면 같은 Promise를 공유 (중복 갱신 방지) */
-  if (refreshPromise) {
-    return refreshPromise;
-  }
+  const response = await axios.post(
+    `${SERVICE_URLS.BACKEND}${AUTH_ENDPOINTS.REFRESH}`,
+    null,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      withCredentials: true, // HttpOnly 쿠키 자동 전송
+    },
+  );
 
-  refreshPromise = (async () => {
-    const currentRefreshToken = getRefreshToken();
-    if (!currentRefreshToken) {
-      throw new Error('리프레시 토큰이 없습니다.');
-    }
-
-    /* 갱신 요청은 인터셉터를 타지 않도록 axios 원본 사용 */
-    const response = await axios.post(
-      `${BASE_URL}${AUTH_ENDPOINTS.REFRESH}`,
-      { refreshToken: currentRefreshToken },
-      { headers: { 'Content-Type': 'application/json' } },
-    );
-
-    const { accessToken, refreshToken: newRefreshToken } = response.data;
-
-    /* 새 토큰을 localStorage에 저장 */
-    if (accessToken) setToken(accessToken);
-    if (newRefreshToken) setRefreshToken(newRefreshToken);
-
-    return accessToken;
-  })();
-
-  try {
-    return await refreshPromise;
-  } finally {
-    /* 갱신 완료 후 Promise 캐시 제거 (다음 갱신 허용) */
-    refreshPromise = null;
-  }
+  const { accessToken } = response.data;
+  if (accessToken) setToken(accessToken);
+  return accessToken;
 }
 
 /* ══════════════════════════════════════════════════════════
- * REQUEST INTERCEPTOR — JWT 토큰 자동 주입
+ * 공통 인터셉터 팩토리
  * ══════════════════════════════════════════════════════════ */
-api.interceptors.request.use(
-  (config) => {
+
+/**
+ * Bearer 토큰 주입 request interceptor를 인스턴스에 부착한다.
+ * JWT 형식 검증만 수행하며, 만료 시 refresh는 하지 않는다.
+ * (Agent, Recommend 인스턴스용)
+ *
+ * @param {import('axios').AxiosInstance} instance - axios 인스턴스
+ */
+function attachSimpleTokenInjector(instance) {
+  instance.interceptors.request.use(
+    (config) => {
+      const token = getToken();
+      if (token && isValidJwtFormat(token)) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error),
+  );
+}
+
+/**
+ * 에러 응답에서 서버 메시지를 추출하는 response interceptor를 부착한다.
+ * response.data 자동 추출 + 에러 메시지 한국어 변환.
+ *
+ * @param {import('axios').AxiosInstance} instance - axios 인스턴스
+ */
+function attachErrorResponseInterceptor(instance) {
+  instance.interceptors.response.use(
+    /* 성공 응답 — response.data만 반환 */
+    (response) => response.data,
+
+    /* 에러 응답 — 서버 메시지 추출 + Error 객체 생성 */
+    (error) => {
+      const data = error.response?.data;
+      const status = error.response?.status;
+      const message = data?.message || data?.detail || getFallbackMessage(status);
+      const apiError = new Error(message);
+      apiError.code = data?.code || null;
+      apiError.status = status || null;
+      return Promise.reject(apiError);
+    },
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+ * 서비스별 axios 인스턴스 생성
+ * ══════════════════════════════════════════════════════════ */
+
+/**
+ * Backend API 인스턴스 (Spring Boot :8080).
+ * - JWT 자동 갱신 interceptor 포함 (request: 형식검증+만료검사+refresh, response: 401 뮤텍스)
+ * - withCredentials: true (HttpOnly Refresh Token 쿠키 전송)
+ */
+const backendApi = axios.create({
+  baseURL: SERVICE_URLS.BACKEND,
+  timeout: 30000,
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+/**
+ * Agent API 인스턴스 (FastAPI :8000).
+ * - Bearer 토큰 주입만 수행 (refresh 없음)
+ * - SSE(fetch) 호출 시에는 이 인스턴스를 사용하지 않고 SERVICE_URLS.AGENT를 직접 참조
+ */
+const agentApi = axios.create({
+  baseURL: SERVICE_URLS.AGENT,
+  timeout: 60000, // AI 추론 응답 대기 시간 고려
+  headers: { 'Content-Type': 'application/json' },
+});
+
+/**
+ * Recommend API 인스턴스 (FastAPI :8001).
+ * - Bearer 토큰 주입만 수행 (refresh 없음)
+ */
+const recommendApi = axios.create({
+  baseURL: SERVICE_URLS.RECOMMEND,
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+/* ── Backend: 전체 JWT interceptor (형식검증 + 만료검사 + refresh + 401 뮤텍스) ── */
+backendApi.interceptors.request.use(
+  async (config) => {
     const token = getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+
+    if (!token) return config;
+
+    // [C-C2] JWT 형식 검증
+    if (!isValidJwtFormat(token)) {
+      removeToken();
+      return config;
     }
+
+    // [W-C3] 토큰 만료 검사 — 만료 임박 시 미리 refresh 시도
+    if (isTokenExpired(token)) {
+      if (isRefreshing) {
+        try {
+          const newToken = await enqueueRefreshWaiter();
+          config.headers.Authorization = `Bearer ${newToken}`;
+        } catch {
+          // refresh 실패 — Authorization 헤더 없이 요청
+        }
+        return config;
+      }
+
+      isRefreshing = true;
+      try {
+        const newToken = await refreshAccessToken();
+        processQueue(null, newToken);
+        config.headers.Authorization = `Bearer ${newToken}`;
+      } catch (err) {
+        processQueue(err, null);
+        clearAll();
+        window.location.href = '/login';
+        return Promise.reject(err);
+      } finally {
+        isRefreshing = false;
+      }
+      return config;
+    }
+
+    // 유효한 토큰 주입
+    config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error),
 );
 
-/* ══════════════════════════════════════════════════════════
- * RESPONSE INTERCEPTOR
- * 1) 성공 응답 → response.data 자동 추출 (기존 fetchWithAuth 호환)
- * 2) 401 에러 → 토큰 갱신 + 원래 요청 재시도
- * ══════════════════════════════════════════════════════════ */
-api.interceptors.response.use(
-  /* 성공 응답 — response.data만 반환 (JSON 데이터 직접 접근) */
+/* ── Backend: 401 응답 시 뮤텍스 패턴 refresh + 재시도 ── */
+backendApi.interceptors.response.use(
   (response) => response.data,
 
-  /* 에러 응답 — 401일 때만 갱신 시도 */
   async (error) => {
     const originalRequest = error.config;
 
-    /*
-     * 조건:
-     * 1) 401 Unauthorized
-     * 2) 아직 재시도하지 않은 요청 (_retry 플래그)
-     * 3) 토큰 갱신 요청 자체가 아닌 경우 (무한 루프 방지)
-     * 4) 인증 관련 요청(/auth/)이 아닌 경우
-     *    - 로그인 401(미가입/비밀번호 불일치)은 갱신 대상이 아님
-     *    - 회원가입, OAuth 등도 갱신 없이 에러를 컴포넌트로 전달
-     */
     const isAuthRequest = originalRequest.url?.includes('/auth/');
+    const isRefreshRequest = originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH);
+
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH) &&
+      !isRefreshRequest &&
       !isAuthRequest
     ) {
       originalRequest._retry = true;
 
+      if (isRefreshing) {
+        try {
+          const newToken = await enqueueRefreshWaiter();
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return backendApi(originalRequest);
+        } catch (queueError) {
+          return Promise.reject(queueError);
+        }
+      }
+
+      isRefreshing = true;
+
       try {
         const newToken = await refreshAccessToken();
-        /* 새 토큰으로 원래 요청 재시도 */
+        processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return api(originalRequest);
+        return backendApi(originalRequest);
       } catch (refreshError) {
-        /* 갱신 실패 → 인증 정보 삭제 + 로그인 페이지로 리다이렉트 */
+        processQueue(refreshError, null);
         clearAll();
         window.location.href = '/login';
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 
-    /*
-     * 에러 응답에서 서버 메시지를 추출하여 Error 객체에 담는다.
-     * 기존 fetchWithAuth의 에러 처리 패턴과 호환된다.
-     *
-     * 우선순위:
-     * 1) 백엔드 ErrorResponse.message (한국어 사용자 친화적 메시지)
-     * 2) 백엔드 detail 필드 (대체 상세 정보)
-     * 3) HTTP 상태코드별 한국어 기본 메시지 (raw 코드 노출 방지)
-     */
+    // 에러 메시지 추출
     const data = error.response?.data;
     const status = error.response?.status;
     const message = data?.message || data?.detail || getFallbackMessage(status);
@@ -186,16 +340,23 @@ api.interceptors.response.use(
   },
 );
 
+/* ── Agent: 토큰 주입 + 에러 처리 ── */
+attachSimpleTokenInjector(agentApi);
+attachErrorResponseInterceptor(agentApi);
+
+/* ── Recommend: 토큰 주입 + 에러 처리 ── */
+attachSimpleTokenInjector(recommendApi);
+attachErrorResponseInterceptor(recommendApi);
+
+/* ══════════════════════════════════════════════════════════
+ * 공용 유틸리티 export
+ * ══════════════════════════════════════════════════════════ */
+
 /**
  * 인증 필수 가드.
  * 토큰이 없으면 즉시 에러를 던진다.
- * 포인트, 결제, 마이페이지 등 반드시 인증이 필요한 API 호출 전에 사용한다.
  *
  * @throws {Error} 인증 토큰이 없을 때
- *
- * @example
- * requireAuth();
- * const profile = await api.get(MYPAGE_ENDPOINTS.PROFILE);
  */
 export function requireAuth() {
   const token = getToken();
@@ -204,4 +365,8 @@ export function requireAuth() {
   }
 }
 
-export default api;
+/* ── Named exports ── */
+export { backendApi, agentApi, recommendApi };
+
+/* ── Default export: backendApi (기존 코드 호환) ── */
+export default backendApi;

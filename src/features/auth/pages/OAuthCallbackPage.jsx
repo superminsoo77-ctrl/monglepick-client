@@ -63,14 +63,17 @@ export default function OAuthCallbackPage() {
         const stateKey = `oauth_state_${provider}`;
         const savedState = sessionStorage.getItem(stateKey);
 
-        // 검증 전에 항상 state를 삭제하여 구식 state 잔류 방지
-        sessionStorage.removeItem(stateKey);
-
-        // state 검증 (CSRF 방지)
-        // 모든 제공자(Google/Kakao/Naver)는 state를 반드시 반환한다는 전제
+        // [C-C1] CSRF 검증을 먼저 수행한 후 state를 삭제한다.
+        // 이전 코드는 삭제를 먼저 실행하여 검증 실패 시에도 state가 지워지는 문제가 있었다.
+        // 검증을 먼저 통과해야만 sessionStorage에서 state를 제거한다.
         if (!state || state !== savedState) {
+          // 검증 실패 시에도 구식 state 잔류를 방지하기 위해 삭제
+          sessionStorage.removeItem(stateKey);
           throw new Error('잘못된 인증 요청입니다. 다시 시도해주세요.');
         }
+
+        // 검증 성공 후 사용된 state 삭제 (재사용 방지)
+        sessionStorage.removeItem(stateKey);
 
         if (!code) {
           throw new Error('인가 코드가 없습니다. 다시 시도해주세요.');

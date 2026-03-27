@@ -27,10 +27,13 @@ import {
   setToken,
   getUser,
   setUser,
-  setRefreshToken,
   clearAll,
 } from '../utils/storage';
-/* removeToken, removeUser, removeRefreshToken은 logout에서 clearAll()로 일괄 처리하므로 미사용 */
+// [이슈6] setRefreshToken 제거 — Refresh Token은 서버 HttpOnly 쿠키로 관리
+// removeToken, removeUser는 logout에서 clearAll()로 일괄 처리하므로 미사용
+
+// 서버 로그아웃 API — Refresh Token DB 삭제 + HttpOnly 쿠키 만료 처리
+import { logoutAPI } from '../../features/auth/api/authApi';
 
 /**
  * 인증 Zustand 스토어.
@@ -90,33 +93,50 @@ const useAuthStore = create((set, get) => {
 
     /**
      * 로그인 처리.
-     * API 응답으로 받은 토큰과 사용자 정보를 상태와 localStorage에 저장한다.
+     * API 응답으로 받은 액세스 토큰과 사용자 정보를 상태와 localStorage에 저장한다.
+     *
+     * [이슈6] refreshToken 파라미터는 하위 호환성을 위해 시그니처에 유지하지만
+     * localStorage에 저장하지 않는다. Refresh Token은 서버가 HttpOnly 쿠키로 관리하며,
+     * axiosInstance의 refresh 요청 시 withCredentials: true로 자동 전송된다.
      *
      * @param {Object} params - 로그인 응답 데이터
-     * @param {string} params.accessToken - JWT 액세스 토큰
-     * @param {string} [params.refreshToken] - JWT 리프레시 토큰
+     * @param {string} params.accessToken - JWT 액세스 토큰 (localStorage 저장)
+     * @param {string} [params.refreshToken] - JWT 리프레시 토큰 (사용 안 함 — 서버 쿠키 관리)
      * @param {Object} params.user - 사용자 정보 객체 (id, email, nickname 등)
      */
+    // eslint-disable-next-line no-unused-vars
     login: ({ accessToken, refreshToken, user: userData }) => {
-      /* 상태 업데이트 */
+      /* Zustand 상태 업데이트 */
       set({ token: accessToken, user: userData });
 
-      /* localStorage에 영속 저장 */
+      /* localStorage에 영속 저장 (새로고침 후 인증 상태 복원용) */
       setToken(accessToken);
       setUser(userData);
 
-      /* 리프레시 토큰이 있으면 별도 저장 */
-      if (refreshToken) {
-        setRefreshToken(refreshToken);
-      }
+      // [이슈6] refreshToken은 서버 HttpOnly 쿠키로 관리하므로 저장하지 않음
     },
 
     /**
      * 로그아웃 처리.
-     * 상태와 localStorage의 모든 인증 정보를 삭제한다.
+     * 1) 서버에 로그아웃 요청 → Refresh Token DB 삭제 + HttpOnly 쿠키 만료
+     * 2) 클라이언트 상태(Zustand) + localStorage 인증 정보 전체 삭제
+     *
+     * 서버 요청 실패 시에도 클라이언트 상태는 반드시 삭제한다 (best-effort).
+     * 네트워크 오류나 서버 오류가 있어도 로그아웃은 항상 완료된다.
      */
-    logout: () => {
+    logout: async () => {
+      // 서버에 로그아웃 요청 (쿠키의 Refresh Token DB 삭제 + 쿠키 만료 처리)
+      try {
+        await logoutAPI();
+      } catch (err) {
+        // 네트워크 오류 시에도 클라이언트 상태는 삭제 (best-effort)
+        // 서버 로그아웃 실패가 클라이언트 로그아웃을 막아서는 안 됨
+        console.warn('[auth] 서버 로그아웃 실패:', err.message);
+      }
+
+      // Zustand 상태 초기화
       set({ token: null, user: null });
+      // localStorage 인증 정보 전체 삭제 (accessToken, user 등)
       clearAll();
     },
 

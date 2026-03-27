@@ -11,7 +11,7 @@
  * 공유 믹스인/애니메이션/미디어쿼리 활용.
  */
 
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 import { fadeInUp, cardShine, borderGlow } from '../../../shared/styles/animations';
 import { gradientText } from '../../../shared/styles/mixins';
 import { media } from '../../../shared/styles/media';
@@ -163,7 +163,9 @@ export const PlanCard = styled.div`
   transition: all ${({ theme }) => theme.transitions.fast};
   overflow: hidden;
   box-shadow: ${({ $isBest, theme }) => $isBest ? theme.glows.primary : 'none'};
-  animation: ${({ $isBest }) => $isBest ? borderGlow : 'none'} 3s ease infinite;
+  ${({ $isBest }) => $isBest
+    ? css`animation: ${borderGlow} 3s ease infinite;`
+    : ''}
 
   /* 카드 hover shine */
   &::after {
