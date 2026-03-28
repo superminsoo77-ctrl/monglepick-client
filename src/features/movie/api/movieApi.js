@@ -17,7 +17,20 @@ import { MOVIE_ENDPOINTS, SEARCH_ENDPOINTS } from '../../../shared/constants/api
  * @returns {Promise<Object>} 영화 상세 정보 객체
  */
 export async function getMovie(movieId) {
-  return backendApi.get(MOVIE_ENDPOINTS.DETAIL(movieId));
+  const movie = await backendApi.get(MOVIE_ENDPOINTS.DETAIL(movieId));
+  return {
+    ...movie,
+    id: movie.movie_id,
+    posterUrl: movie.poster_url,
+    backdropUrl: movie.backdrop_url,
+    original_title: movie.original_title,
+    releaseYear: movie.release_year,
+    release_date: movie.release_date || (movie.release_year ? `${movie.release_year}-01-01` : null),
+    trailerUrl: movie.trailer_url,
+    cast: (movie.cast || []).map((actor) => (
+      typeof actor === 'string' ? { name: actor } : actor
+    )),
+  };
 }
 
 function normalizeSearchMovie(movie) {
