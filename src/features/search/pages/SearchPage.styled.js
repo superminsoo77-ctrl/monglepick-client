@@ -367,3 +367,20 @@ export const SkeletonGrid = styled.div`
     gap: ${({ theme }) => theme.spacing.md};
   }
 `;
+
+/**
+ * 추가 로딩용 스켈레톤 그리드.
+ * 기존 MovieList 아래에 자연스럽게 이어지는 카드 로딩 표시로 사용한다.
+ */
+export const LoadMoreGrid = styled(SkeletonGrid)`
+  margin-top: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 무한 스크롤 감지를 위한 sentinel 요소.
+ * 화면에는 거의 보이지 않지만 IntersectionObserver의 타겟이 된다.
+ */
+export const LoadMoreSentinel = styled.div`
+  width: 100%;
+  height: 1px;
+`;

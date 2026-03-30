@@ -23,6 +23,8 @@ import Skeleton from '../../../shared/components/Skeleton/Skeleton';
 import EmptyState from '../../../shared/components/EmptyState/EmptyState';
 import * as S from './SearchPage.styled';
 
+const PAGE_SIZE = 20;
+
 /** 장르 필터 옵션 */
 const GENRE_FILTERS = [
   '전체', '액션', '코미디', '드라마', '로맨스', 'SF', '스릴러',
@@ -55,33 +57,52 @@ export default function SearchPage() {
   const [sort, setSort]           = useState(searchParams.get('sort') || 'relevance');
   const [movies, setMovies]       = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   /* 검색 수행 여부 (초기 상태와 구분) */
   const [hasSearched, setHasSearched] = useState(false);
+  const loadMoreRef = useRef(null);
 
   /**
    * 검색을 실행하는 함수.
    * URL 파라미터도 동기화한다.
    */
-  const executeSearch = useCallback(async (searchQuery, currentSearchType, searchGenre, searchSort) => {
+  const executeSearch = useCallback(async (
+    searchQuery,
+    currentSearchType,
+    searchGenre,
+    searchSort,
+    page = 1,
+    append = false,
+  ) => {
     /* 검색어가 없으면 실행하지 않음 */
     if (!searchQuery.trim()) {
       setMovies([]);
       setHasSearched(false);
       setTotalCount(0);
+      setCurrentPage(1);
+      setHasMore(false);
       return;
     }
 
-    setIsLoading(true);
-    setHasSearched(true);
+    if (append) {
+      setIsFetchingMore(true);
+    } else {
+      setIsLoading(true);
+      setHasSearched(true);
+    }
 
-    /* URL 쿼리 파라미터 업데이트 */
-    const params = new URLSearchParams();
-    params.set('q', searchQuery);
-    if (currentSearchType !== 'all') params.set('searchType', currentSearchType);
-    if (searchGenre !== '전체') params.set('genre', searchGenre);
-    if (searchSort !== 'relevance') params.set('sort', searchSort);
-    setSearchParams(params, { replace: true });
+    if (!append) {
+      /* URL 쿼리 파라미터 업데이트 */
+      const params = new URLSearchParams();
+      params.set('q', searchQuery);
+      if (currentSearchType !== 'all') params.set('searchType', currentSearchType);
+      if (searchGenre !== '전체') params.set('genre', searchGenre);
+      if (searchSort !== 'relevance') params.set('sort', searchSort);
+      setSearchParams(params, { replace: true });
+    }
 
     try {
       const result = await searchMovies({
@@ -89,16 +110,30 @@ export default function SearchPage() {
         searchType: currentSearchType,
         genre: searchGenre === '전체' ? '' : searchGenre,
         sort: searchSort,
-        page: 1,
-        size: 20,
+        page,
+        size: PAGE_SIZE,
       });
-      setMovies(result?.movies || []);
-      setTotalCount(result?.total || 0);
+
+      const nextMovies = result?.movies || [];
+      const nextTotal = result?.total || 0;
+
+      setMovies((prev) => (append ? [...prev, ...nextMovies] : nextMovies));
+      setTotalCount(nextTotal);
+      setCurrentPage(page);
+      setHasMore(page * PAGE_SIZE < nextTotal);
     } catch {
-      setMovies([]);
-      setTotalCount(0);
+      if (!append) {
+        setMovies([]);
+        setTotalCount(0);
+        setCurrentPage(1);
+        setHasMore(false);
+      }
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsFetchingMore(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [setSearchParams]);
 
@@ -169,6 +204,50 @@ export default function SearchPage() {
       executeSearch(query, searchType, genre, selectedSort);
     }
   };
+
+  /**
+   * 현재 조건으로 다음 페이지를 로드한다.
+   */
+  const loadMoreMovies = useCallback(() => {
+    if (!hasSearched || isLoading || isFetchingMore || !hasMore || !query.trim()) {
+      return;
+    }
+
+    executeSearch(query, searchType, genre, sort, currentPage + 1, true);
+  }, [
+    currentPage,
+    executeSearch,
+    genre,
+    hasMore,
+    hasSearched,
+    isFetchingMore,
+    isLoading,
+    query,
+    searchType,
+    sort,
+  ]);
+
+  /**
+   * 결과 목록 하단 sentinel이 화면에 들어오면 다음 페이지를 자동 요청한다.
+   */
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasSearched || !hasMore) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadMoreMovies();
+        }
+      },
+      {
+        rootMargin: '240px 0px',
+      },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, hasSearched, loadMoreMovies]);
 
   return (
     <S.Wrapper>
@@ -262,7 +341,21 @@ export default function SearchPage() {
 
           {/* 검색 완료 — 결과 표시 */}
           {hasSearched && !isLoading && movies.length > 0 && (
-            <MovieList movies={movies} />
+            <>
+              <MovieList movies={movies} />
+
+              {isFetchingMore && (
+                <S.LoadMoreGrid>
+                  {[1, 2, 3, 4].map((n) => (
+                    <Skeleton key={`load-more-${n}`} variant="card" />
+                  ))}
+                </S.LoadMoreGrid>
+              )}
+
+              {hasMore && (
+                <S.LoadMoreSentinel ref={loadMoreRef} aria-hidden="true" />
+              )}
+            </>
           )}
 
           {/* 검색 완료 — 결과 없음 */}
