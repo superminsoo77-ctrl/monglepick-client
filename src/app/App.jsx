@@ -14,6 +14,7 @@
  *   - /home                     : 홈 페이지 (인기/최신 영화 목록)
  *   - /search                   : 검색 결과 페이지
  *   - /movie/:id                : 영화 상세 페이지
+ *   - /match                     : 둘이 영화 고르기 (두 영화 교집합 추천, 비로그인 가능)
  *   - /community                : 커뮤니티 (게시판 + 리뷰)
  *   - /mypage                   : 마이페이지 (프로필/시청이력/위시리스트)
  *   - /point                    : 포인트 관리 (잔액/출석/아이템/이력)
@@ -56,19 +57,17 @@ import MyPage from '../features/user/pages/MyPage';
 import PointPage from '../features/point/pages/PointPage';
 /* 결제/구독 페이지 — features/payment에서 가져옴 */
 import PaymentPage from '../features/payment/pages/PaymentPage';
-/* 결제 성공 콜백 페이지 — Toss SDK redirect 후 결제 승인 처리 */
-import PaymentSuccessPage from '../features/payment/pages/PaymentSuccessPage';
-/* 결제 실패 콜백 페이지 — Toss SDK redirect 후 에러 표시 */
-import PaymentFailPage from '../features/payment/pages/PaymentFailPage';
 /* 고객센터 페이지 — features/support에서 가져옴 */
 import SupportPage from '../features/support/pages/SupportPage';
-/* Movie Match 페이지 — features/match에서 가져옴 (두 영화 교집합 추천) */
+/* 둘이 영화 고르기 페이지 — features/match에서 가져옴 (비로그인 가능) */
 import MatchPage from '../features/match/pages/MatchPage';
 /* 404 에러 페이지 — features/error에서 가져옴 */
 import NotFoundPage from '../features/error/pages/NotFoundPage';
 
 /* 로딩 스피너 — shared/components에서 가져옴 (PrivateRoute 로딩 중 표시용) */
 import Loading from '../shared/components/Loading/Loading';
+/* App 전용 레이아웃 스타일 */
+import './App.css';
 
 /**
  * 인증이 필요한 라우트를 보호하는 래퍼 컴포넌트.
@@ -145,6 +144,16 @@ function App() {
           }
         />
 
+        {/* 둘이 영화 고르기 — 두 영화 교집합 추천 (비로그인 가능) */}
+        <Route
+          path="/match"
+          element={
+            <MainLayout>
+              <MatchPage />
+            </MainLayout>
+          }
+        />
+
         {/* 커뮤니티 — 게시판 + 리뷰 */}
         <Route
           path="/community"
@@ -179,19 +188,6 @@ function App() {
           }
         />
 
-        {/* 결제 성공 콜백 — Toss SDK에서 결제 완료 후 리다이렉트 (인증 필수) */}
-        <Route
-          path="/payment/success"
-          element={
-            <PrivateRoute>
-              <PaymentSuccessPage />
-            </PrivateRoute>
-          }
-        />
-
-        {/* 결제 실패 콜백 — Toss SDK에서 결제 실패/취소 시 리다이렉트 */}
-        <Route path="/payment/fail" element={<PaymentFailPage />} />
-
         {/* 결제/구독 관리 (인증 필수) */}
         <Route
           path="/payment"
@@ -210,16 +206,6 @@ function App() {
           element={
             <MainLayout>
               <SupportPage />
-            </MainLayout>
-          }
-        />
-
-        {/* Movie Match — 두 영화 교집합 기반 함께 볼 영화 추천 (인증 불필요) */}
-        <Route
-          path="/match"
-          element={
-            <MainLayout>
-              <MatchPage />
             </MainLayout>
           }
         />

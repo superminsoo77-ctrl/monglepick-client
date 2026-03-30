@@ -9,7 +9,7 @@
  */
 
 import styled, { css } from 'styled-components';
-import { fadeInUp, borderGlow } from '../../../shared/styles/animations';
+import { fadeInUp } from '../../../shared/styles/animations';
 import { gradientText } from '../../../shared/styles/mixins';
 
 /**
@@ -31,10 +31,11 @@ export const Form = styled.form`
   position: relative;
   z-index: 1;
   animation: ${fadeInUp} 0.5s ease forwards;
+  /* hover 시 border-color만 transition으로 변경 (animation 덮어쓰기 금지 — fadeInUp 재실행 깜빡임 방지) */
   transition: border-color 1.5s ease;
 
   &:hover {
-    animation: ${borderGlow} 3s ease infinite;
+    border-color: rgba(6, 214, 160, 0.5);
   }
 `;
 
