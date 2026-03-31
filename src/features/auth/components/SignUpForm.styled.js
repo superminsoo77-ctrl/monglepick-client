@@ -332,6 +332,93 @@ export const SocialButton = styled.button`
     `}
 `;
 
+/* ── 약관 동의 ── */
+
+/** 약관 전체 동의 행 — 전체 동의 체크박스 + 라벨. */
+export const TermsAllRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  cursor: pointer;
+`;
+
+/** 개별 약관 항목들을 감싸는 컨테이너. */
+export const TermsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding-left: ${({ theme }) => theme.spacing.sm};
+`;
+
+/** 개별 약관 행 — 체크박스 + 라벨 + 보기 링크. */
+export const TermsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 커스텀 체크박스.
+ * $checked prop이 true이면 gradient 배경 + 체크 아이콘 표시.
+ *
+ * @prop {boolean} $checked - 체크 여부
+ * @prop {boolean} $required - 필수 항목 여부 (에러 표시용)
+ */
+export const Checkbox = styled.div`
+  width: 18px;
+  height: 18px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  border: 1.5px solid ${({ $checked, $error, theme }) =>
+    $error ? theme.colors.error : $checked ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $checked, theme }) =>
+    $checked ? theme.gradients.primary : 'transparent'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translateY(-1px);
+    display: ${({ $checked }) => ($checked ? 'block' : 'none')};
+  }
+`;
+
+/** 약관 라벨 텍스트. */
+export const TermsLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ $bold, theme }) =>
+    $bold ? theme.colors.textPrimary : theme.colors.textSecondary};
+  font-weight: ${({ $bold, theme }) =>
+    $bold ? theme.typography.fontSemibold : theme.typography.fontRegular};
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+`;
+
+/** 필수/선택 배지. */
+export const TermsBadge = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  padding: 1px 6px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ $required }) =>
+    $required ? 'rgba(248, 113, 113, 0.15)' : 'rgba(124, 108, 240, 0.15)'};
+  color: ${({ $required, theme }) =>
+    $required ? theme.colors.error : theme.colors.primary};
+`;
+
 /** 하단 안내 텍스트 (로그인 링크 등). */
 export const Footer = styled.p`
   font-size: ${({ theme }) => theme.typography.textSm};

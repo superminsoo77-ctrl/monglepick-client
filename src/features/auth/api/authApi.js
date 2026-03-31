@@ -33,10 +33,13 @@ import axios from 'axios';
  * @param {string} params.email - 이메일 주소
  * @param {string} params.password - 비밀번호
  * @param {string} params.nickname - 닉네임
+ * @param {boolean} params.requiredTerm - 필수 약관 동의 (필수)
+ * @param {boolean} [params.optionTerm] - 선택 약관 동의
+ * @param {boolean} [params.marketingAgreed] - 마케팅 수신 동의
  * @returns {Promise<Object>} 회원가입 응답 (accessToken, user)
  */
-export async function signup({ email, password, nickname }) {
-  return api.post(AUTH_ENDPOINTS.SIGNUP, { email, password, nickname });
+export async function signup({ email, password, nickname, requiredTerm, optionTerm, marketingAgreed }) {
+  return api.post(AUTH_ENDPOINTS.SIGNUP, { email, password, nickname, requiredTerm, optionTerm, marketingAgreed });
 }
 
 /**

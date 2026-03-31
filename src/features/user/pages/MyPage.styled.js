@@ -13,8 +13,18 @@
  *   - true 이면 탭 버튼에 gradient 하단 바 + primary 색상을 적용한다.
  */
 
-import styled, { css } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 import { fadeInUp, cardShine } from '../../../shared/styles/animations';
+
+const overlayFadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+
+const modalSlideUp = keyframes`
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 24px)) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+`;
 
 /* ── 640px 이하 모바일 브레이크포인트 ── */
 const mediaMobile = '@media (max-width: 640px)';
@@ -439,6 +449,222 @@ export const PreferencesTags = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/* ── 프로필 수정 모달 ── */
+
+export const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  animation: ${overlayFadeIn} 0.2s ease;
+`;
+
+export const ModalContainer = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: ${({ theme }) => theme.glass.bg};
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  padding: ${({ theme }) => theme.spacing.xl};
+  animation: ${modalSlideUp} 0.25s ease;
+
+  @media (max-width: 520px) {
+    max-width: calc(100vw - 32px);
+    padding: ${({ theme }) => theme.spacing.lg};
+  }
+`;
+
+export const ModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.spacing.xl};
+`;
+
+export const ModalTitle = styled.h2`
+  font-size: ${({ theme }) => theme.typography.textXl};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  margin: 0;
+`;
+
+export const ModalCloseBtn = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: ${({ theme }) => theme.spacing.xs};
+  line-height: 1;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  transition: color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+`;
+
+export const ModalSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding-bottom: ${({ theme }) => theme.spacing.xl};
+  border-bottom: 1px solid rgba(124, 108, 240, 0.1);
+  margin-bottom: ${({ theme }) => theme.spacing.xl};
+
+  &:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+`;
+
+export const ModalSectionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textMuted};
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+`;
+
+export const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const FormLabel = styled.label`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const FormInput = styled.input`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  transition: border-color ${({ theme }) => theme.transitions.fast};
+  box-sizing: border-box;
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 2px rgba(124, 108, 240, 0.15);
+  }
+
+  ${({ $error, theme }) =>
+    $error &&
+    css`
+      border-color: ${theme.colors.error};
+    `}
+`;
+
+export const FormHelperText = styled.p`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  margin: 0;
+  color: ${({ $error, theme }) =>
+    $error ? theme.colors.error : theme.colors.textMuted};
+`;
+
+export const AvatarPreviewRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+export const AvatarPreviewImg = styled.div`
+  width: 56px;
+  height: 56px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ $src, theme }) =>
+    $src
+      ? `url(${$src}) center/cover no-repeat`
+      : `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.primaryDark})`};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: ${({ theme }) => theme.typography.textXl};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  flex-shrink: 0;
+  border: 2px solid ${({ theme }) => theme.glass.border};
+`;
+
+export const ModalButtonRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  justify-content: flex-end;
+  margin-top: ${({ theme }) => theme.spacing.xl};
+`;
+
+export const ModalCancelBtn = styled.button`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
+  background: none;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.textMuted};
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+`;
+
+export const ModalSaveBtn = styled.button`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.gradients.primary};
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    box-shadow: ${({ theme }) => theme.glows.primary};
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+export const ModalErrorBar = styled.p`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.error};
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: ${({ theme }) => theme.radius.md};
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  margin: 0 0 ${({ theme }) => theme.spacing.md};
 `;
 
 /**

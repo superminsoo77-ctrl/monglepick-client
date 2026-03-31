@@ -36,7 +36,7 @@ export async function getProfile() {
  */
 export async function updateProfile(profileData) {
   requireAuth();
-  return api.put(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData);
+  return api.patch(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData);
 }
 
 // ── 시청 이력 ──

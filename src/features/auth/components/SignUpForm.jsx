@@ -67,12 +67,26 @@ export default function SignUpForm() {
   const [password,        setPassword]        = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [nickname,        setNickname]        = useState('');
+  /* 약관 동의 상태 */
+  const [requiredTerm,    setRequiredTerm]    = useState(false);
+  const [optionTerm,      setOptionTerm]      = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
   /* 필드별 에러 메시지 */
   const [errors,      setErrors]      = useState({});
   /* API 호출 중 상태 */
   const [isSubmitting, setIsSubmitting] = useState(false);
   /* 서버 에러 메시지 */
   const [serverError,  setServerError]  = useState('');
+
+  /* 전체 동의 여부 */
+  const allChecked = requiredTerm && optionTerm && marketingAgreed;
+
+  function handleAllCheck() {
+    const next = !allChecked;
+    setRequiredTerm(next);
+    setOptionTerm(next);
+    setMarketingAgreed(next);
+  }
 
   const login    = useAuthStore((s) => s.login);
   const navigate = useNavigate();
@@ -105,6 +119,9 @@ export default function SignUpForm() {
     const nicknameResult = validateNickname(nickname);
     if (!nicknameResult.isValid) newErrors.nickname = nicknameResult.message;
 
+    /* 필수 약관 동의 검증 */
+    if (!requiredTerm) newErrors.requiredTerm = '필수 약관에 동의해주세요';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -125,7 +142,14 @@ export default function SignUpForm() {
 
     try {
       /* 회원가입 API 호출 */
-      const response = await signupAPI({ email, password, nickname });
+      const response = await signupAPI({
+        email,
+        password,
+        nickname,
+        requiredTerm,
+        optionTerm,
+        marketingAgreed,
+      });
 
       /* 가입 성공 시 자동 로그인 처리 */
       login({
@@ -234,6 +258,59 @@ export default function SignUpForm() {
         />
         {errors.passwordConfirm && (
           <S.FieldError>{errors.passwordConfirm}</S.FieldError>
+        )}
+      </S.Field>
+
+      {/* 약관 동의 */}
+      <S.Field>
+        {/* 전체 동의 */}
+        <S.TermsAllRow onClick={handleAllCheck}>
+          <S.Checkbox $checked={allChecked} />
+          <S.TermsLabel $bold>전체 동의</S.TermsLabel>
+        </S.TermsAllRow>
+
+        {/* 개별 약관 */}
+        <S.TermsList>
+          {/* 필수 약관 */}
+          <S.TermsRow>
+            <S.Checkbox
+              $checked={requiredTerm}
+              $error={!!errors.requiredTerm}
+              onClick={() => setRequiredTerm((v) => !v)}
+            />
+            <S.TermsLabel onClick={() => setRequiredTerm((v) => !v)}>
+              서비스 이용약관
+            </S.TermsLabel>
+            <S.TermsBadge $required>필수</S.TermsBadge>
+          </S.TermsRow>
+
+          {/* 선택 약관 */}
+          <S.TermsRow>
+            <S.Checkbox
+              $checked={optionTerm}
+              onClick={() => setOptionTerm((v) => !v)}
+            />
+            <S.TermsLabel onClick={() => setOptionTerm((v) => !v)}>
+              개인정보 수집 및 이용 동의
+            </S.TermsLabel>
+            <S.TermsBadge>선택</S.TermsBadge>
+          </S.TermsRow>
+
+          {/* 마케팅 동의 */}
+          <S.TermsRow>
+            <S.Checkbox
+              $checked={marketingAgreed}
+              onClick={() => setMarketingAgreed((v) => !v)}
+            />
+            <S.TermsLabel onClick={() => setMarketingAgreed((v) => !v)}>
+              마케팅 정보 수신 동의
+            </S.TermsLabel>
+            <S.TermsBadge>선택</S.TermsBadge>
+          </S.TermsRow>
+        </S.TermsList>
+
+        {errors.requiredTerm && (
+          <S.FieldError>{errors.requiredTerm}</S.FieldError>
         )}
       </S.Field>
 

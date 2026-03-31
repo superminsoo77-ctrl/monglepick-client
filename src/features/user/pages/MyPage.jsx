@@ -1,41 +1,13 @@
-/**
- * 마이페이지 컴포넌트.
- *
- * 로그인한 사용자의 개인 정보를 관리하는 페이지.
- * 탭으로 구분된 다음 섹션을 포함한다:
- * - 프로필: 사용자 기본 정보 (닉네임, 이메일)
- * - 시청 이력: 시청한 영화 목록
- * - 위시리스트: 찜한 영화 목록
- * - 선호 설정: 선호 장르/분위기 설정
- *
- * 개선 사항:
- * - 프로필 카드 glassmorphism 효과
- * - 아바타 그라데이션 테두리 (80px)
- * - 등급 배지 표시
- * - 탭 전환 시 fade-in 애니메이션
- * - 빈 시청이력/위시리스트에 EmptyState 컴포넌트
- * - 프로필 편집 버튼 (UI만)
- *
- * 비인증 상태에서 접근 시 로그인 페이지로 리다이렉트한다.
- */
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-/* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
-/* 마이페이지 API — 같은 feature 내의 userApi에서 가져옴 */
-import { getProfile, getWatchHistory, getWishlist } from '../api/userApi';
-/* 라우트 경로 상수 — shared/constants에서 가져옴 */
+import { getProfile, getWatchHistory, getWishlist, updateProfile } from '../api/userApi';
 import { ROUTES } from '../../../shared/constants/routes';
-/* 영화 목록 컴포넌트 — shared/components에서 가져옴 */
 import MovieList from '../../../shared/components/MovieList/MovieList';
-/* 로딩 스피너 — shared/components에서 가져옴 */
 import Loading from '../../../shared/components/Loading/Loading';
-/* 빈 상태 컴포넌트 — shared/components에서 가져옴 */
 import EmptyState from '../../../shared/components/EmptyState/EmptyState';
 import * as S from './MyPage.styled';
 
-/** 탭 정의 */
 const TABS = [
   { id: 'profile', label: '프로필' },
   { id: 'history', label: '시청 이력' },
@@ -43,30 +15,236 @@ const TABS = [
   { id: 'preferences', label: '선호 설정' },
 ];
 
+/* ── 프로필 수정 모달 ── */
+function EditProfileModal({ profile, onClose, onSaved }) {
+  const user = useAuthStore((s) => s.user);
+
+  const [nickname, setNickname] = useState(profile?.nickname || user?.nickname || '');
+  const [profileImageUrl, setProfileImageUrl] = useState(profile?.profileImageUrl || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  /* ESC 키로 닫기 */
+  const handleKeyDown = useCallback(
+    (e) => { if (e.key === 'Escape') onClose(); },
+    [onClose],
+  );
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  /* 스크롤 방지 */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  function validate() {
+    const errors = {};
+    if (nickname && (nickname.length < 2 || nickname.length > 20)) {
+      errors.nickname = '닉네임은 2자 이상 20자 이하여야 합니다';
+    }
+    if (profileImageUrl && profileImageUrl.length > 500) {
+      errors.profileImageUrl = '이미지 URL은 500자를 초과할 수 없습니다';
+    }
+    const isChangingPassword = newPassword || currentPassword;
+    if (isChangingPassword) {
+      if (!currentPassword) errors.currentPassword = '현재 비밀번호를 입력해주세요';
+      if (!newPassword) {
+        errors.newPassword = '새 비밀번호를 입력해주세요';
+      } else if (newPassword.length < 8 || newPassword.length > 128) {
+        errors.newPassword = '비밀번호는 8자 이상 128자 이하여야 합니다';
+      }
+      if (newPassword && newPassword !== confirmPassword) {
+        errors.confirmPassword = '새 비밀번호가 일치하지 않습니다';
+      }
+    }
+    return errors;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitError(null);
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
+
+    /* 변경된 필드만 포함 (null 필드는 백엔드에서 무시) */
+    const payload = {};
+    if (nickname !== (profile?.nickname || user?.nickname || '')) {
+      payload.nickname = nickname || null;
+    }
+    if (profileImageUrl !== (profile?.profileImageUrl || '')) {
+      payload.profileImageUrl = profileImageUrl || null;
+    }
+    if (newPassword && currentPassword) {
+      payload.currentPassword = currentPassword;
+      payload.newPassword = newPassword;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      onClose();
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const updated = await updateProfile(payload);
+      onSaved(updated);
+    } catch (err) {
+      setSubmitError(err.message || '저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const displayInitial = nickname?.charAt(0) || user?.nickname?.charAt(0) || 'U';
+
+  return (
+    <>
+      <S.ModalOverlay onClick={onClose} />
+      <S.ModalContainer role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
+        <S.ModalHeader>
+          <S.ModalTitle id="edit-profile-title">프로필 수정</S.ModalTitle>
+          <S.ModalCloseBtn onClick={onClose} aria-label="닫기">✕</S.ModalCloseBtn>
+        </S.ModalHeader>
+
+        {submitError && <S.ModalErrorBar role="alert">{submitError}</S.ModalErrorBar>}
+
+        <form onSubmit={handleSubmit}>
+          {/* 기본 정보 */}
+          <S.ModalSection>
+            <S.ModalSectionTitle>기본 정보</S.ModalSectionTitle>
+
+            <S.FormField>
+              <S.FormLabel htmlFor="edit-nickname">닉네임</S.FormLabel>
+              <S.FormInput
+                id="edit-nickname"
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="닉네임 (2~20자)"
+                $error={!!fieldErrors.nickname}
+              />
+              {fieldErrors.nickname && (
+                <S.FormHelperText $error>{fieldErrors.nickname}</S.FormHelperText>
+              )}
+            </S.FormField>
+
+            <S.FormField>
+              <S.FormLabel htmlFor="edit-image-url">프로필 이미지 URL</S.FormLabel>
+              <S.AvatarPreviewRow>
+                <S.AvatarPreviewImg $src={profileImageUrl || null}>
+                  {!profileImageUrl && displayInitial}
+                </S.AvatarPreviewImg>
+                <S.FormInput
+                  id="edit-image-url"
+                  type="url"
+                  value={profileImageUrl}
+                  onChange={(e) => setProfileImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  $error={!!fieldErrors.profileImageUrl}
+                  style={{ flex: 1 }}
+                />
+              </S.AvatarPreviewRow>
+              {fieldErrors.profileImageUrl ? (
+                <S.FormHelperText $error>{fieldErrors.profileImageUrl}</S.FormHelperText>
+              ) : (
+                <S.FormHelperText>이미지 URL을 입력하면 미리보기가 표시됩니다</S.FormHelperText>
+              )}
+            </S.FormField>
+          </S.ModalSection>
+
+          {/* 비밀번호 변경 */}
+          <S.ModalSection>
+            <S.ModalSectionTitle>비밀번호 변경</S.ModalSectionTitle>
+
+            <S.FormField>
+              <S.FormLabel htmlFor="edit-current-pw">현재 비밀번호</S.FormLabel>
+              <S.FormInput
+                id="edit-current-pw"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="현재 비밀번호"
+                autoComplete="current-password"
+                $error={!!fieldErrors.currentPassword}
+              />
+              {fieldErrors.currentPassword && (
+                <S.FormHelperText $error>{fieldErrors.currentPassword}</S.FormHelperText>
+              )}
+            </S.FormField>
+
+            <S.FormField>
+              <S.FormLabel htmlFor="edit-new-pw">새 비밀번호</S.FormLabel>
+              <S.FormInput
+                id="edit-new-pw"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="새 비밀번호 (8~128자)"
+                autoComplete="new-password"
+                $error={!!fieldErrors.newPassword}
+              />
+              {fieldErrors.newPassword && (
+                <S.FormHelperText $error>{fieldErrors.newPassword}</S.FormHelperText>
+              )}
+            </S.FormField>
+
+            <S.FormField>
+              <S.FormLabel htmlFor="edit-confirm-pw">새 비밀번호 확인</S.FormLabel>
+              <S.FormInput
+                id="edit-confirm-pw"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="새 비밀번호 재입력"
+                autoComplete="new-password"
+                $error={!!fieldErrors.confirmPassword}
+              />
+              {fieldErrors.confirmPassword && (
+                <S.FormHelperText $error>{fieldErrors.confirmPassword}</S.FormHelperText>
+              )}
+            </S.FormField>
+          </S.ModalSection>
+
+          <S.ModalButtonRow>
+            <S.ModalCancelBtn type="button" onClick={onClose}>취소</S.ModalCancelBtn>
+            <S.ModalSaveBtn type="submit" disabled={isSubmitting}>
+              {isSubmitting ? '저장 중...' : '저장'}
+            </S.ModalSaveBtn>
+          </S.ModalButtonRow>
+        </form>
+      </S.ModalContainer>
+    </>
+  );
+}
+
+/* ── 마이페이지 ── */
 export default function MyPagePage() {
-  // 현재 활성 탭
   const [activeTab, setActiveTab] = useState('profile');
-  // 프로필 정보
   const [profile, setProfile] = useState(null);
-  // 시청 이력
   const [watchHistory, setWatchHistory] = useState([]);
-  // 위시리스트
   const [wishlist, setWishlist] = useState([]);
-  // 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
-  // 에러 메시지
   const [error, setError] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const authLoading = useAuthStore((s) => s.isLoading);
   const navigate = useNavigate();
 
-  /* PrivateRoute가 비인증 리다이렉트를 처리하므로 여기서는 생략 */
-
-  /**
-   * 탭 전환 시 해당 데이터를 로드한다.
-   */
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -103,7 +281,15 @@ export default function MyPagePage() {
     loadTabData();
   }, [activeTab, isAuthenticated]);
 
-  // 인증 로딩 중
+  function handleProfileSaved(updated) {
+    setProfile(updated);
+    /* Zustand store + localStorage 동기화 */
+    if (updated?.nickname || updated?.profileImageUrl) {
+      updateUser({ ...user, ...updated });
+    }
+    setIsEditModalOpen(false);
+  }
+
   if (authLoading) {
     return <Loading message="인증 확인 중..." fullPage />;
   }
@@ -111,9 +297,8 @@ export default function MyPagePage() {
   return (
     <S.Wrapper>
       <S.Inner>
-        {/* 페이지 헤더 — 프로필 카드 (glassmorphism) */}
+        {/* 페이지 헤더 */}
         <S.Header>
-          {/* 아바타 — 그라데이션 테두리 */}
           <S.AvatarWrap>
             <S.Avatar>
               {user?.nickname?.charAt(0) || 'U'}
@@ -122,18 +307,16 @@ export default function MyPagePage() {
           <S.UserInfo>
             <S.NameRow>
               <S.Nickname>{user?.nickname || '사용자'}</S.Nickname>
-              {/* 등급 배지 */}
               <S.GradeBadge>{profile?.grade || user?.grade || 'BRONZE'}</S.GradeBadge>
             </S.NameRow>
             <S.Email>{user?.email || ''}</S.Email>
-            {/* 프로필 편집 버튼 (UI만) */}
-            <S.EditBtn>
+            <S.EditBtn onClick={() => setIsEditModalOpen(true)}>
               ✏️ 프로필 수정
             </S.EditBtn>
           </S.UserInfo>
         </S.Header>
 
-        {/* 탭 네비게이션 — 그라데이션 하단 바 */}
+        {/* 탭 네비게이션 */}
         <S.Tabs role="tablist" aria-label="마이페이지 탭">
           {TABS.map((tab) => (
             <S.Tab
@@ -149,7 +332,6 @@ export default function MyPagePage() {
           ))}
         </S.Tabs>
 
-        {/* 에러 메시지 */}
         {error && (
           <S.ErrorBar role="alert">
             {error}
@@ -157,7 +339,6 @@ export default function MyPagePage() {
           </S.ErrorBar>
         )}
 
-        {/* 탭 콘텐츠 — fadeInUp 애니메이션 */}
         <S.Content key={activeTab}>
           {/* 프로필 탭 */}
           {activeTab === 'profile' && (
@@ -168,21 +349,15 @@ export default function MyPagePage() {
                 <S.ProfileCard>
                   <S.ProfileField>
                     <S.ProfileLabel>닉네임</S.ProfileLabel>
-                    <S.ProfileValue>
-                      {profile?.nickname || user?.nickname || '-'}
-                    </S.ProfileValue>
+                    <S.ProfileValue>{profile?.nickname || user?.nickname || '-'}</S.ProfileValue>
                   </S.ProfileField>
                   <S.ProfileField>
                     <S.ProfileLabel>이메일</S.ProfileLabel>
-                    <S.ProfileValue>
-                      {profile?.email || user?.email || '-'}
-                    </S.ProfileValue>
+                    <S.ProfileValue>{profile?.email || user?.email || '-'}</S.ProfileValue>
                   </S.ProfileField>
                   <S.ProfileField>
                     <S.ProfileLabel>가입일</S.ProfileLabel>
-                    <S.ProfileValue>
-                      {profile?.createdAt || '-'}
-                    </S.ProfileValue>
+                    <S.ProfileValue>{profile?.createdAt || '-'}</S.ProfileValue>
                   </S.ProfileField>
                 </S.ProfileCard>
               )}
@@ -255,6 +430,15 @@ export default function MyPagePage() {
           )}
         </S.Content>
       </S.Inner>
+
+      {/* 프로필 수정 모달 */}
+      {isEditModalOpen && (
+        <EditProfileModal
+          profile={profile}
+          onClose={() => setIsEditModalOpen(false)}
+          onSaved={handleProfileSaved}
+        />
+      )}
     </S.Wrapper>
   );
 }
