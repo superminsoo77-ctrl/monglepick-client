@@ -4,9 +4,17 @@
  * 3단계 플로우:
  * 1. 설정: 라운드(8/16/32) + 장르 선택 → 게임 시작
  * 2. 대결: 두 영화 중 하나 선택 → 다음 매치 진행
- * 3. 결과: 우승 영화 + 순위 표시
+ * 3. 결과: 우승 영화 표시
  *
  * @module features/worldcup/pages/WorldcupPage
+ *
+ * @변경이력
+ * v2 — Backend DTO 필드명 정합성 수정
+ *   - handleStart: data.gameId → data.sessionId || data.gameId (sessionId 우선)
+ *   - handlePick 완료 판정: result.isFinished || result.gameCompleted 둘 다 체크
+ *   - handlePick 라운드 완료: result.nextMatch || nextMatches[0] 처리
+ *   - handlePick nextMatches 배열로 다음 라운드 매치 교체
+ *   - MovieCard 클릭: movie1Id/movie2Id (movieAId/movieBId alias) 우선 사용
  */
 
 import { useState, useCallback } from 'react';
@@ -35,9 +43,7 @@ const GENRE_OPTIONS = [
   { value: 'THRILLER', label: '스릴러' },
 ];
 
-/**
- * 게임 단계 열거.
- */
+/** 게임 단계 열거 */
 const PHASE = {
   SETUP: 'setup',
   BATTLE: 'battle',
@@ -68,13 +74,14 @@ export default function WorldcupPage() {
   const [winner, setWinner] = useState(null);
   const [rankings, setRankings] = useState([]);
 
-  /**
-   * 현재 매치 데이터.
-   */
+  /** 현재 표시할 매치 데이터 */
   const currentMatch = matches[currentMatchIdx] || null;
 
   /**
    * 게임 시작 핸들러.
+   *
+   * startWorldcup API를 호출하고 sessionId(gameId 별칭)와 첫 라운드 매치를 저장한다.
+   * Backend 응답에 sessionId와 gameId 두 필드가 모두 있으며 sessionId를 우선 사용한다.
    */
   const handleStart = useCallback(async () => {
     setIsStarting(true);
@@ -83,11 +90,13 @@ export default function WorldcupPage() {
         round: selectedRound,
         genre: selectedGenre || undefined,
       });
-      setGameId(data.gameId);
+
+      // sessionId 우선, 없으면 gameId 폴백 (Backend v2 응답에는 두 필드 모두 존재)
+      setGameId(data.sessionId || data.gameId);
       setMatches(data.matches || []);
       setCurrentMatchIdx(0);
       setCurrentRoundLabel(`${selectedRound}강`);
-      setTotalMatchesInRound(Math.ceil((data.matches || []).length));
+      setTotalMatchesInRound((data.matches || []).length);
       setMatchInRound(1);
       setPhase(PHASE.BATTLE);
     } catch (err) {
@@ -103,6 +112,18 @@ export default function WorldcupPage() {
 
   /**
    * 영화 선택(Pick) 핸들러.
+   *
+   * submitPick API를 호출하고 응답에 따라 다음 상태로 전환한다.
+   *
+   * 완료 판정:
+   *   - result.gameCompleted || result.isFinished — 둘 다 체크 (Backend alias 대응)
+   *
+   * 라운드 완료 처리:
+   *   - result.nextMatches 배열이 있으면 해당 매치들로 교체하고 0번 인덱스부터 진행
+   *   - result.nextMatch 단일 객체가 있으면 배열에 추가하고 다음 인덱스로 이동
+   *   - 둘 다 없으면 기존 배열에서 다음 인덱스로 이동
+   *
+   * @param {string} winnerId - 선택한 영화의 movie1Id/movieAId 값
    */
   const handlePick = useCallback(async (winnerId) => {
     if (!currentMatch || !gameId) return;
@@ -114,26 +135,40 @@ export default function WorldcupPage() {
         winnerId,
       });
 
-      if (result.isFinished) {
-        /* 게임 종료 → 결과 조회 */
-        const resultData = await getWorldcupResult(gameId);
-        setWinner(resultData.winner || result.finalWinner);
-        setRankings(resultData.rankings || []);
+      // 완료 판정 — gameCompleted(Backend 원본) 또는 isFinished(alias) 둘 다 체크
+      if (result.gameCompleted || result.isFinished) {
+        // 게임 종료 → 결과 조회 API 호출
+        try {
+          const resultData = await getWorldcupResult(gameId);
+          // winner 객체: 결과 API의 winner 우선, 없으면 winnerMovieId/finalWinner로 폴백
+          setWinner(resultData.winner || { movieId: result.winnerMovieId || result.finalWinner });
+          setRankings(resultData.rankings || []);
+        } catch {
+          // 결과 조회 실패 시 pick 응답의 winnerMovieId로 최소한 표시
+          setWinner({ movieId: result.winnerMovieId || result.finalWinner });
+          setRankings([]);
+        }
         setPhase(PHASE.RESULT);
+
+      } else if (result.nextMatches && result.nextMatches.length > 0) {
+        // 라운드 완료 — nextMatches 배열로 새 라운드 전체 교체
+        setMatches(result.nextMatches);
+        setCurrentMatchIdx(0);
+        setMatchInRound(1);
+        setTotalMatchesInRound(result.nextMatches.length);
+        // 라운드 번호 라벨 갱신 (currentRound 필드 활용)
+        if (result.currentRound) {
+          setCurrentRoundLabel(`${result.currentRound}강`);
+        }
+
       } else if (result.nextMatch) {
-        /* 다음 매치로 진행 (서버가 nextMatch를 반환하는 경우) */
+        // 라운드 내 단일 매치 응답 — 배열에 추가하고 다음 인덱스로 이동
         setMatches((prev) => [...prev, result.nextMatch]);
         setCurrentMatchIdx((prev) => prev + 1);
         setMatchInRound((prev) => prev + 1);
 
-        /* 라운드 라벨 업데이트 */
-        if (result.roundLabel) {
-          setCurrentRoundLabel(result.roundLabel);
-          setMatchInRound(1);
-          setTotalMatchesInRound(result.totalMatchesInRound || 1);
-        }
       } else {
-        /* nextMatch 없이 다음 인덱스로 이동 (클라이언트 측 매치 배열 사용) */
+        // nextMatch/nextMatches 없음 — 기존 배열에서 다음 인덱스로 이동
         const nextIdx = currentMatchIdx + 1;
         if (nextIdx < matches.length) {
           setCurrentMatchIdx(nextIdx);
@@ -149,9 +184,7 @@ export default function WorldcupPage() {
     }
   }, [currentMatch, gameId, currentMatchIdx, matches.length, showAlert]);
 
-  /**
-   * 다시하기 핸들러.
-   */
+  /** 다시하기 핸들러 */
   const handleRestart = () => {
     setPhase(PHASE.SETUP);
     setGameId(null);
@@ -163,6 +196,7 @@ export default function WorldcupPage() {
 
   /**
    * 포스터 URL 생성.
+   * posterPath(camelCase) 또는 poster_path(snake_case) 모두 지원.
    */
   const getPoster = (movie) => {
     if (!movie) return null;
@@ -172,6 +206,7 @@ export default function WorldcupPage() {
 
   /**
    * 장르 배열 파싱.
+   * JSON 문자열 또는 배열 모두 지원.
    */
   const parseGenres = (movie) => {
     if (!movie) return '';
@@ -182,6 +217,24 @@ export default function WorldcupPage() {
         ? (() => { try { return JSON.parse(g); } catch { return []; } })()
         : [];
     return arr.slice(0, 2).join(', ');
+  };
+
+  /**
+   * 매치 카드에서 영화 ID를 추출한다.
+   *
+   * Backend v2 응답에서 매치 객체는 movie1Id/movie2Id(alias)와
+   * movieAId/movieBId(원본) 두 가지 필드를 모두 포함한다.
+   * movie1Id/movie2Id를 우선 사용하고 없으면 movieAId/movieBId로 폴백한다.
+   *
+   * @param {Object} match - 매치 객체
+   * @param {1|2} slot     - 영화 슬롯 번호 (1 또는 2)
+   * @returns {string|undefined} 영화 ID
+   */
+  const getMovieId = (match, slot) => {
+    if (!match) return undefined;
+    if (slot === 1) return match.movie1Id || match.movieAId;
+    if (slot === 2) return match.movie2Id || match.movieBId;
+    return undefined;
   };
 
   return (
@@ -240,8 +293,8 @@ export default function WorldcupPage() {
           </S.RoundInfo>
 
           <S.BattleArea>
-            {/* 영화 1 */}
-            <S.MovieCard onClick={() => handlePick(currentMatch.movie1?.movieId || currentMatch.movie1?.id)}>
+            {/* 영화 1 — movie1Id(alias) 우선, 없으면 movieAId 폴백 */}
+            <S.MovieCard onClick={() => handlePick(getMovieId(currentMatch, 1))}>
               {getPoster(currentMatch.movie1) ? (
                 <S.MoviePoster
                   src={getPoster(currentMatch.movie1)}
@@ -263,8 +316,8 @@ export default function WorldcupPage() {
             {/* VS */}
             <S.VsBadge>VS</S.VsBadge>
 
-            {/* 영화 2 */}
-            <S.MovieCard onClick={() => handlePick(currentMatch.movie2?.movieId || currentMatch.movie2?.id)}>
+            {/* 영화 2 — movie2Id(alias) 우선, 없으면 movieBId 폴백 */}
+            <S.MovieCard onClick={() => handlePick(getMovieId(currentMatch, 2))}>
               {getPoster(currentMatch.movie2) ? (
                 <S.MoviePoster
                   src={getPoster(currentMatch.movie2)}
@@ -299,7 +352,7 @@ export default function WorldcupPage() {
                 <S.PosterPlaceholder>&#x1F3AC;</S.PosterPlaceholder>
               )}
               <S.MovieInfo>
-                <S.MovieTitle>{winner.title}</S.MovieTitle>
+                <S.MovieTitle>{winner.title || '최애 영화'}</S.MovieTitle>
                 <S.MovieMeta>
                   {winner.releaseYear || winner.release_year || ''}
                   {parseGenres(winner) && ` · ${parseGenres(winner)}`}
@@ -308,7 +361,7 @@ export default function WorldcupPage() {
             </S.WinnerCard>
           )}
 
-          {/* 순위 */}
+          {/* 순위 (rankings가 있을 때만 표시) */}
           {rankings.length > 0 && (
             <>
               <S.HistoryTitle>최종 순위</S.HistoryTitle>
@@ -329,7 +382,7 @@ export default function WorldcupPage() {
             </>
           )}
 
-          {/* 액션 */}
+          {/* 액션 버튼 */}
           <S.ResultActions>
             <S.ResultBtn onClick={handleRestart}>
               다시 하기

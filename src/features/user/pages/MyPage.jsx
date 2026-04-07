@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../../shared/stores/useAuthStore';
-import { getProfile, getWatchHistory, getWishlist, updateProfile } from '../api/userApi';
+import { getProfile, getWishlist, updateProfile } from '../api/userApi';
 import { ROUTES } from '../../../shared/constants/routes';
 import MovieList from '../../../shared/components/MovieList/MovieList';
 import Loading from '../../../shared/components/Loading/Loading';
@@ -10,7 +10,6 @@ import * as S from './MyPage.styled';
 
 const TABS = [
   { id: 'profile', label: '프로필' },
-  { id: 'history', label: '시청 이력' },
   { id: 'wishlist', label: '위시리스트' },
   { id: 'preferences', label: '선호 설정' },
 ];
@@ -233,7 +232,6 @@ function EditProfileModal({ profile, onClose, onSaved }) {
 export default function MyPagePage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [profile, setProfile] = useState(null);
-  const [watchHistory, setWatchHistory] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -256,11 +254,6 @@ export default function MyPagePage() {
           case 'profile': {
             const profileData = await getProfile();
             setProfile(profileData);
-            break;
-          }
-          case 'history': {
-            const historyData = await getWatchHistory();
-            setWatchHistory(historyData?.watchHistory || []);
             break;
           }
           case 'wishlist': {
@@ -360,27 +353,6 @@ export default function MyPagePage() {
                     <S.ProfileValue>{profile?.createdAt || '-'}</S.ProfileValue>
                   </S.ProfileField>
                 </S.ProfileCard>
-              )}
-            </div>
-          )}
-
-          {/* 시청 이력 탭 */}
-          {activeTab === 'history' && (
-            <div>
-              {!isLoading && watchHistory.length === 0 ? (
-                <EmptyState
-                  icon="🎬"
-                  title="시청 이력이 없습니다"
-                  description="영화를 시청하면 여기에 기록됩니다"
-                  actionLabel="영화 검색하기"
-                  onAction={() => navigate(ROUTES.SEARCH)}
-                />
-              ) : (
-                <MovieList
-                  movies={watchHistory.map((item) => item.movie || item)}
-                  loading={isLoading}
-                  title="시청한 영화"
-                />
               )}
             </div>
           )}

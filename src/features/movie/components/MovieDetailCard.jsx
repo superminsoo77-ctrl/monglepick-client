@@ -18,6 +18,9 @@
  * @param {Object} props.movie - 영화 상세 정보 객체
  * @param {function} [props.onWishlistToggle] - 위시리스트 토글 콜백
  * @param {boolean} [props.isWishlisted=false] - 위시리스트 포함 여부
+ * @param {number} [props.likeCount=0] - 영화 좋아요 수
+ * @param {boolean} [props.isLiked=false] - 현재 사용자의 좋아요 여부
+ * @param {function} [props.onLikeToggle] - 좋아요 토글 콜백 (movieId 전달)
  */
 
 import { useState } from 'react';
@@ -27,7 +30,16 @@ import { formatRating, formatRatingStars, formatRuntime, formatDate } from '../.
 /* styled-components — MovieDetailCard.styled.js */
 import * as S from './MovieDetailCard.styled';
 
-export default function MovieDetailCard({ movie, onWishlistToggle, isWishlisted = false, onWatchComplete }) {
+export default function MovieDetailCard({
+  movie,
+  onWishlistToggle,
+  isWishlisted = false,
+  wishlistLoading = false,
+  onWatchComplete,
+  likeCount = 0,
+  isLiked = false,
+  onLikeToggle,
+}) {
   // 줄거리 펼치기/접기 상태
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
   // 트레일러 표시 상태
@@ -153,9 +165,23 @@ export default function MovieDetailCard({ movie, onWishlistToggle, isWishlisted 
                 /* $wishlisted: transient prop — DOM에 전달되지 않음 */
                 $wishlisted={isWishlisted}
                 onClick={() => onWishlistToggle(movie.id)}
+                disabled={wishlistLoading}
               >
                 {isWishlisted ? '♥ 위시리스트에 추가됨' : '♡ 위시리스트에 추가'}
               </S.WishlistBtn>
+            )}
+
+            {/* 영화 좋아요 버튼 — 인스타그램 스타일 토글
+                $liked: true이면 채워진 하트 + error 색상, false이면 빈 하트 + 기본 색상.
+                likeCount가 0이면 숫자를 표시하지 않아 버튼을 깔끔하게 유지한다. */}
+            {onLikeToggle && (
+              <S.LikeBtn
+                $liked={isLiked}
+                onClick={() => onLikeToggle(movie.id)}
+                aria-label={isLiked ? '좋아요 취소' : '좋아요'}
+              >
+                {isLiked ? '♥' : '♡'}{likeCount > 0 ? ` ${likeCount.toLocaleString()}` : ''}
+              </S.LikeBtn>
             )}
 
             {/* Phase 5-2: 시청 완료 버튼 */}
@@ -182,7 +208,7 @@ export default function MovieDetailCard({ movie, onWishlistToggle, isWishlisted 
             src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
             title="트레일러"
             frameBorder="0"
-            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+            sandbox="allow-scripts allow-presentation allow-popups"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />

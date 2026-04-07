@@ -130,20 +130,47 @@ export const Footer = styled.div`
   align-items: center;
 `;
 
-/** 좋아요 버튼 — hover 시 빨간색 */
+/**
+ * 좋아요 버튼 — 인스타그램 스타일 하트 토글.
+ *
+ * $liked prop (transient — DOM에 전달되지 않음):
+ *   - true  → error 색상 테두리·배경·텍스트 (채워진 하트 ♥)
+ *   - false → 투명 배경·테두리 없음·muted 텍스트 (빈 하트 ♡)
+ *
+ * :active 시 scale(0.85) 팝 애니메이션으로 터치감을 준다.
+ * :disabled 시 opacity 0.6 + cursor default으로 비활성 상태를 표현한다.
+ */
 export const LikeBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: ${({ theme }) => theme.typography.textXs};
-  color: ${({ theme }) => theme.colors.textMuted};
   padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
-  border-radius: ${({ theme }) => theme.radius.sm};
-  background: none;
-  border: none;
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme, $liked }) =>
+    $liked ? theme.colors.error : 'transparent'};
+  background: ${({ theme, $liked }) =>
+    $liked ? theme.colors.errorBg : 'none'};
+  color: ${({ theme, $liked }) =>
+    $liked ? theme.colors.error : theme.colors.textMuted};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
 
-  &:hover {
+  /* 클릭 시 팝 애니메이션 */
+  &:active {
+    transform: scale(0.85);
+  }
+
+  &:hover:not(:disabled) {
     color: ${({ theme }) => theme.colors.error};
     background-color: ${({ theme }) => theme.colors.errorBg};
+    border-color: ${({ theme }) => theme.colors.error};
+  }
+
+  /* 미인증 / movieId 없음 — 비활성 상태 */
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 `;
 

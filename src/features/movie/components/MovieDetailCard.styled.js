@@ -300,6 +300,38 @@ export const WishlistBtn = styled(Btn)`
     `}
 `;
 
+/**
+ * 영화 좋아요 버튼 — 인스타그램 스타일 하트 토글.
+ *
+ * $liked prop:
+ *   - true  → error 색상 테두리·배경·텍스트 (채워진 하트 ♥)
+ *   - false → 기본 테두리·투명 배경·muted 텍스트 (빈 하트 ♡)
+ *
+ * :active 시 scale(0.9) 팝 애니메이션으로 터치감을 준다.
+ */
+export const LikeBtn = styled(Btn)`
+  border-radius: ${({ theme }) => theme.radius.full};
+  border-color: ${({ theme, $liked }) =>
+    $liked ? theme.colors.error : theme.colors.borderDefault};
+  background: ${({ theme, $liked }) =>
+    $liked ? theme.colors.errorBg : 'transparent'};
+  color: ${({ theme, $liked }) =>
+    $liked ? theme.colors.error : theme.colors.textMuted};
+
+  /* 클릭 시 팝 애니메이션 */
+  &:active {
+    transform: scale(0.9);
+  }
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.error};
+    color: ${({ theme }) => theme.colors.error};
+    background: ${({ theme }) => theme.colors.errorBg};
+    /* Btn 기본 hover(gradient)를 덮어씀 */
+    box-shadow: none;
+  }
+`;
+
 /* 트레일러 버튼 — primary-light 배경 */
 export const TrailerBtn = styled(Btn)`
   background-color: ${({ theme }) => theme.colors.primaryLight};

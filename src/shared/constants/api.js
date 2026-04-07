@@ -59,6 +59,21 @@ export const MOVIE_ENDPOINTS = {
   POPULAR: `${API_VERSION}/movies/popular`,
   /** 최신 영화 목록 - GET */
   LATEST: `${API_VERSION}/movies/latest`,
+  /**
+   * 영화 좋아요 토글 - POST (id 파라미터 필요, JWT 필요)
+   * 응답: { liked: boolean, likeCount: number }
+   */
+  LIKE: (id) => `${API_VERSION}/movies/${id}/like`,
+  /**
+   * 영화 좋아요 상태 조회 - GET (id 파라미터 필요, JWT 필요)
+   * 응답: { liked: boolean, likeCount: number }
+   */
+  LIKE_STATUS: (id) => `${API_VERSION}/movies/${id}/like`,
+  /**
+   * 영화 좋아요 수 조회 - GET (id 파라미터 필요, 공개 API)
+   * 응답: { liked: false, likeCount: number }
+   */
+  LIKE_COUNT: (id) => `${API_VERSION}/movies/${id}/like/count`,
 };
 
 /**
@@ -82,19 +97,30 @@ export const COMMUNITY_ENDPOINTS = {
   REVIEW_LIKE: (movieId, reviewId) => `${API_VERSION}/movies/${movieId}/reviews/${reviewId}/like`,
   /** 게시글 수정 - PUT / 삭제 - DELETE (postId 파라미터 필요) */
   UPDATE_POST: (postId) => `${API_VERSION}/posts/${postId}`,
+  /**
+   * 게시글 좋아요 토글 - POST (postId 파라미터 필요, JWT 필요)
+   * 응답: { liked: boolean, likeCount: number }
+   */
+  POST_LIKE: (postId) => `${API_VERSION}/posts/${postId}/like`,
+  /**
+   * 게시글 댓글 좋아요 토글 - POST (postId, commentId 파라미터 필요, JWT 필요)
+   * 응답: { liked: boolean, likeCount: number }
+   */
+  COMMENT_LIKE: (postId, commentId) => `${API_VERSION}/posts/${postId}/comments/${commentId}/like`,
 };
 
 /**
  * 마이페이지(MyPage) 관련 엔드포인트.
- * 사용자 프로필, 시청 이력, 위시리스트를 처리한다.
+ * 사용자 프로필, 위시리스트, 선호 설정을 처리한다.
+ *
+ * 시청 이력 엔드포인트는 폐기되었으며 (2026-04-08), "리뷰 작성 = 시청 완료" 단일 진실
+ * 원본 원칙에 따라 reviews API로 통합되었다.
  */
 export const MYPAGE_ENDPOINTS = {
   /** 프로필 조회 - GET (Backend: /api/v1/users/me/profile) */
   PROFILE: `${API_VERSION}/users/me/profile`,
   /** 프로필 수정 - PUT */
   UPDATE_PROFILE: `${API_VERSION}/users/me/profile`,
-  /** 시청 이력 조회 - GET */
-  WATCH_HISTORY: `${API_VERSION}/users/me/watch-history`,
   /** 위시리스트 조회 - GET */
   WISHLIST: `${API_VERSION}/users/me/wishlist`,
   /** 위시리스트 추가 - POST / 삭제 - DELETE (movieId 파라미터 필요) */
@@ -136,6 +162,30 @@ export const POINT_ENDPOINTS = {
   ITEMS: `${API_VERSION}/point/items`,
   /** 아이템 교환 - POST (path: itemId, query: userId) */
   EXCHANGE: (itemId) => `${API_VERSION}/point/items/${itemId}/exchange`,
+};
+
+/**
+ * 포인트 상점(PointShop) 관련 엔드포인트 — AI 이용권 구매 전용.
+ *
+ * <p>설계서 v3.2 §16에 정의된 AI 이용권 구매 경로로,
+ * {@code point_items} DB 테이블의 교환 아이템과는 별도로 운영된다.
+ * 구매된 이용권은 {@code user_ai_quota.purchased_ai_tokens}에 누적되며,
+ * QuotaService의 AI 3-소스 모델 3단계(PURCHASED)에서 소비된다.</p>
+ *
+ * <h4>상품 구성 (Backend PointShopService 하드코딩)</h4>
+ * <ul>
+ *   <li>AI_TOKEN_5     — 200P → 5회</li>
+ *   <li>AI_TOKEN_20    — 700P → 20회 (번들 할인)</li>
+ *   <li>AI_DAILY_EXTEND — 100P → 5회 (일일 한도 우회)</li>
+ * </ul>
+ */
+export const POINT_SHOP_ENDPOINTS = {
+  /** 상점 아이템 목록 + 현재 잔액/토큰 잔여 - GET */
+  ITEMS: `${API_VERSION}/point/shop/items`,
+  /** AI 이용권 팩 구매 - POST (query: packType) */
+  PURCHASE_AI_TOKENS: `${API_VERSION}/point/shop/ai-tokens`,
+  /** 일일 한도 우회 AI 이용권 구매 - POST */
+  PURCHASE_AI_EXTEND: `${API_VERSION}/point/shop/ai-extend`,
 };
 
 /**
@@ -256,6 +306,23 @@ export const ROADMAP_ENDPOINTS = {
   START_COURSE: (id) => `${API_VERSION}/roadmap/courses/${id}/start`,
   /** 영화 시청 완료 마킹 - POST (path: courseId, movieId) */
   COMPLETE_MOVIE: (courseId, movieId) => `${API_VERSION}/roadmap/courses/${courseId}/movies/${movieId}/complete`,
+};
+
+/**
+ * 퀴즈(Quiz) 관련 엔드포인트.
+ * 영화 퀴즈 목록 조회 및 정답 제출을 처리한다.
+ *
+ * - GET  BY_MOVIE(movieId) — 영화별 PUBLISHED 퀴즈 목록 (공개, 비로그인 허용)
+ * - GET  TODAY             — 오늘의 퀴즈 목록 (공개, 비로그인 허용)
+ * - POST SUBMIT(quizId)    — 정답 제출 및 채점 (JWT 필수)
+ */
+export const QUIZ_ENDPOINTS = {
+  /** 영화별 PUBLISHED 퀴즈 목록 - GET (공개) */
+  BY_MOVIE: (movieId) => `${API_VERSION}/quizzes/movie/${movieId}`,
+  /** 오늘의 퀴즈 목록 - GET (공개) */
+  TODAY: `${API_VERSION}/quizzes/today`,
+  /** 정답 제출 및 채점 - POST (JWT 필수, body: { answer }) */
+  SUBMIT: (quizId) => `${API_VERSION}/quizzes/${quizId}/submit`,
 };
 
 /**

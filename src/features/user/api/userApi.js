@@ -39,21 +39,6 @@ export async function updateProfile(profileData) {
   return api.patch(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData);
 }
 
-// ── 시청 이력 ──
-
-/**
- * 사용자의 시청 이력을 조회한다.
- *
- * @param {Object} [options={}] - 조회 파라미터
- * @param {number} [options.page=1] - 페이지 번호
- * @param {number} [options.size=20] - 페이지 크기
- * @returns {Promise<Object>} 시청 이력 ({ watchHistory: [], total: number })
- */
-export async function getWatchHistory({ page = 1, size = 20 } = {}) {
-  requireAuth();
-  return api.get(MYPAGE_ENDPOINTS.WATCH_HISTORY, { params: { page, size } });
-}
-
 // ── 위시리스트 ──
 
 /**

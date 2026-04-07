@@ -5,6 +5,11 @@
  * 영화 이상형 월드컵 게임을 진행한다.
  *
  * @module features/worldcup/api/worldcupApi
+ *
+ * @변경이력
+ * v2 — Backend DTO 필드명 정합성 수정
+ *   - startWorldcup: round → roundSize, genre → genreFilter
+ *   - submitPick: gameId → sessionId, winnerId → winnerMovieId
  */
 
 import { backendApi, requireAuth } from '../../../shared/api/axiosInstance';
@@ -12,39 +17,60 @@ import { WORLDCUP_ENDPOINTS } from '../../../shared/constants/api';
 
 /**
  * 월드컵 게임 시작.
- * 서버에서 라운드에 맞는 영화 목록을 반환한다.
+ *
+ * Backend {@code POST /api/v1/worldcup/start}를 호출한다.
+ * candidateMovieIds를 전달하지 않으므로 서버가 DB에서 장르 기반 랜덤 선택을 수행한다.
  *
  * @param {Object} params
- * @param {number} [params.round=16] - 토너먼트 라운드 (8, 16, 32)
- * @param {string} [params.genre] - 장르 필터
- * @returns {Promise<{gameId, round, matches: Array<{matchId, movie1, movie2}>}>}
+ * @param {number} [params.round=16] - 토너먼트 라운드 크기 (8, 16, 32)
+ * @param {string} [params.genre]   - 장르 필터 (생략 시 전체 장르)
+ * @returns {Promise<{sessionId: number, gameId: number, roundSize: number, currentRound: number, matches: Array}>}
  */
 export async function startWorldcup({ round = 16, genre } = {}) {
   requireAuth();
-  const body = { round };
-  if (genre) body.genre = genre;
+  // Backend 필드명: roundSize (round 아님), genreFilter (genre 아님)
+  const body = { roundSize: round };
+  if (genre) body.genreFilter = genre;
   return backendApi.post(WORLDCUP_ENDPOINTS.START, body);
 }
 
 /**
  * 선택 제출 (한 매치 결과).
  *
+ * Backend {@code POST /api/v1/worldcup/pick}를 호출한다.
+ *
  * @param {Object} params
- * @param {string} params.gameId - 게임 ID
- * @param {string} params.matchId - 매치 ID
+ * @param {number} params.gameId   - 게임 ID (Backend의 sessionId와 동일)
+ * @param {number} params.matchId  - 매치 ID
  * @param {string} params.winnerId - 선택한 영화 ID
- * @returns {Promise<{nextMatch?: Object, isFinished: boolean, finalWinner?: Object}>}
+ * @returns {Promise<{
+ *   sessionId: number,
+ *   gameCompleted: boolean,
+ *   isFinished: boolean,
+ *   winnerMovieId: string|null,
+ *   finalWinner: string|null,
+ *   nextMatches: Array,
+ *   nextMatch: Object|null
+ * }>}
  */
 export async function submitPick({ gameId, matchId, winnerId }) {
   requireAuth();
-  return backendApi.post(WORLDCUP_ENDPOINTS.PICK, { gameId, matchId, winnerId });
+  // Backend 필드명: sessionId (gameId 아님), winnerMovieId (winnerId 아님)
+  return backendApi.post(WORLDCUP_ENDPOINTS.PICK, {
+    sessionId: gameId,       // Frontend gameId → Backend sessionId
+    matchId,
+    winnerMovieId: winnerId, // Frontend winnerId → Backend winnerMovieId
+  });
 }
 
 /**
  * 게임 결과 조회.
  *
- * @param {string} gameId
- * @returns {Promise<{gameId, winner, rankings: Array, completedAt}>}
+ * Backend {@code GET /api/v1/worldcup/result/{sessionId}}를 호출한다.
+ * gameId는 sessionId와 동일한 값이다.
+ *
+ * @param {number} gameId - 게임 ID (sessionId와 동일)
+ * @returns {Promise<{gameId: number, sessionId: number, winnerMovieId: string, winner: Object, completedAt: string}>}
  */
 export async function getWorldcupResult(gameId) {
   requireAuth();

@@ -51,12 +51,18 @@ import SearchPage from '../features/search/pages/SearchPage';
 import MovieDetailPage from '../features/movie/pages/MovieDetailPage';
 /* 커뮤니티 페이지 — features/community에서 가져옴 */
 import CommunityPage from '../features/community/pages/CommunityPage';
+/* 커뮤니티 게시글 상세 페이지 — 댓글 섹션 포함 */
+import PostDetailPage from '../features/community/pages/PostDetailPage';
 /* 마이페이지 — features/user에서 가져옴 */
 import MyPage from '../features/user/pages/MyPage';
 /* 포인트 관리 페이지 — features/point에서 가져옴 */
 import PointPage from '../features/point/pages/PointPage';
 /* 결제/구독 페이지 — features/payment에서 가져옴 */
 import PaymentPage from '../features/payment/pages/PaymentPage';
+/* 결제 성공 콜백 페이지 — Toss Payments v2 successUrl 리다이렉트 대상 */
+import PaymentSuccessPage from '../features/payment/pages/PaymentSuccessPage';
+/* 결제 실패 콜백 페이지 — Toss Payments v2 failUrl 리다이렉트 대상 */
+import PaymentFailPage from '../features/payment/pages/PaymentFailPage';
 /* 고객센터 페이지 — features/support에서 가져옴 */
 import SupportPage from '../features/support/pages/SupportPage';
 /* 둘이 영화 고르기 페이지 — features/match에서 가져옴 (비로그인 가능) */
@@ -175,6 +181,20 @@ function App() {
           }
         />
 
+        {/*
+          커뮤니티 게시글 상세 (비로그인 허용).
+          PostList에서 {@code /community/:id} Link로 진입하며,
+          댓글 섹션이 CommentSection 내부에서 독립적으로 렌더링된다.
+        */}
+        <Route
+          path="/community/:id"
+          element={
+            <MainLayout>
+              <PostDetailPage />
+            </MainLayout>
+          }
+        />
+
         {/* 마이페이지 — 프로필/시청이력/위시리스트 (인증 필수) */}
         <Route
           path="/mypage"
@@ -208,6 +228,39 @@ function App() {
                 <PaymentPage />
               </MainLayout>
             </PrivateRoute>
+          }
+        />
+
+        {/*
+          결제 성공 콜백 (인증 필수).
+          Toss Payments v2 successUrl로 지정되며,
+          쿼리파라미터(paymentKey/orderId/amount)를 추출해
+          Backend POST /api/v1/payment/confirm 호출로 승인을 완료한다.
+          승인 API가 JWT를 요구하므로 PrivateRoute로 보호한다.
+        */}
+        <Route
+          path="/payment/success"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <PaymentSuccessPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/*
+          결제 실패 콜백 (레이아웃 O, 인증 없음).
+          Toss Payments v2 failUrl로 지정되며,
+          쿼리파라미터(code/message/orderId)로 사용자 친화 메시지를 표시만 한다.
+          서버 호출이 없으므로 로그인 없이도 표시 가능하도록 PrivateRoute를 제외한다.
+        */}
+        <Route
+          path="/payment/fail"
+          element={
+            <MainLayout>
+              <PaymentFailPage />
+            </MainLayout>
           }
         />
 

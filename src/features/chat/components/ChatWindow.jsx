@@ -91,6 +91,8 @@ export default function ChatWindow() {
   const inputRef = useRef(null);
   // 숨겨진 파일 입력 ref
   const fileInputRef = useRef(null);
+  // 이전 isLoading 상태 추적 — 채팅 완료(true→false) 시 사이드바 자동 업데이트용
+  const wasLoadingRef = useRef(false);
 
   /**
    * 사이드바 열 때 세션 목록 로드 (인증된 사용자만).
@@ -170,6 +172,23 @@ export default function ChatWindow() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status]);
+
+  /**
+   * 채팅 완료(isLoading true→false) 시 사이드바에 현재 세션을 즉시 추가한다.
+   * 사이드바를 닫고 다시 열지 않아도 방금 나눈 대화가 목록에 바로 보인다.
+   */
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading && currentSessionId && isAuthenticated) {
+      const userMsgs = messages.filter((m) => m.role === 'user');
+      addSessionToTop({
+        sessionId: currentSessionId,
+        title: userMsgs[0]?.content?.slice(0, 50) || '새 대화',
+        turnCount: userMsgs.length,
+        lastMessageAt: new Date().toISOString(),
+      });
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 메시지 전송 핸들러.

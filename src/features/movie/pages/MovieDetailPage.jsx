@@ -13,7 +13,7 @@ import { trackEvent } from '../../../shared/utils/eventTracker';
 /* 커스텀 모달 훅 — window.alert 대체 */
 import { useModal } from '../../../shared/components/Modal';
 /* 영화 API — 같은 feature 내의 movieApi에서 가져옴 */
-import { getMovie } from '../api/movieApi';
+import { getMovie, toggleMovieLike, getMovieLikeStatus } from '../api/movieApi';
 /* 리뷰 API — features/review에서 가져옴 */
 import { getReviews } from '../../review/api/reviewApi';
 /* 위시리스트 API — features/user에서 가져옴 */
@@ -56,6 +56,13 @@ export default function MovieDetailPage() {
 
   // Phase 5-2: 시청 후 평점 팝업 상태
   const [showFeedback, setShowFeedback] = useState(false);
+
+  // 영화 좋아요 상태 — 인스타그램 스타일 낙관적 UI 업데이트에 사용
+  const [isLiked, setIsLiked] = useState(false);
+  // 영화 좋아요 수 — 서버 응답으로 동기화하며 낙관적으로 ±1 조정
+  const [likeCount, setLikeCount] = useState(0);
+  // 위시리스트 중복 요청 방지 — API 응답 전 버튼 재클릭 차단
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
@@ -105,6 +112,17 @@ export default function MovieDetailPage() {
           // 리뷰 로드 실패 시 빈 배열
           setReviews([]);
         }
+
+        // 로그인한 경우 좋아요 상태 로드 (실패해도 영화 정보는 표시)
+        if (isAuthenticated) {
+          try {
+            const likeStatus = await getMovieLikeStatus(id);
+            setIsLiked(likeStatus.liked);
+            setLikeCount(likeStatus.likeCount);
+          } catch {
+            // 좋아요 상태 로드 실패는 무시 — 기본값(false, 0) 유지
+          }
+        }
       } catch (err) {
         /* API 404 응답 시 NotFoundPage를 표시하도록 분기 */
         if (err.status === 404) {
@@ -120,7 +138,7 @@ export default function MovieDetailPage() {
     if (id) {
       loadMovieData();
     }
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   /**
    * 위시리스트 토글 핸들러.
@@ -138,6 +156,10 @@ export default function MovieDetailPage() {
       return;
     }
 
+    // 중복 클릭 방지 — API 응답 전 재요청 차단
+    if (isWishlistLoading) return;
+    setIsWishlistLoading(true);
+
     try {
       if (isWishlisted) {
         // 이미 찜한 상태 → 제거 (DELETE)
@@ -154,6 +176,43 @@ export default function MovieDetailPage() {
         message: err.message || '위시리스트 변경에 실패했습니다.',
         type: 'error',
       });
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  };
+
+  /**
+   * 영화 좋아요 토글 핸들러 (인스타그램 스타일 — 낙관적 UI 업데이트).
+   *
+   * 1. 미인증 사용자는 로그인 안내 후 중단.
+   * 2. 서버 응답 전에 UI를 먼저 낙관적으로 업데이트해 반응성을 높인다.
+   * 3. 서버 응답으로 실제 상태(liked, likeCount)를 동기화한다.
+   * 4. 요청 실패 시 낙관적 업데이트를 롤백한다.
+   */
+  const handleLikeToggle = async () => {
+    if (!isAuthenticated) {
+      await showAlert({
+        title: '로그인 필요',
+        message: '좋아요를 사용하려면 로그인이 필요합니다.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    // 낙관적 UI 업데이트 — 서버 응답 전에 즉시 반영
+    const optimisticLiked = !isLiked;
+    setIsLiked(optimisticLiked);
+    setLikeCount((prev) => (optimisticLiked ? prev + 1 : Math.max(0, prev - 1)));
+
+    try {
+      // 서버에 토글 요청 후 실제 상태로 동기화
+      const result = await toggleMovieLike(id);
+      setIsLiked(result.liked);
+      setLikeCount(result.likeCount);
+    } catch {
+      // 실패 시 낙관적 업데이트 롤백
+      setIsLiked(!optimisticLiked);
+      setLikeCount((prev) => (!optimisticLiked ? prev + 1 : Math.max(0, prev - 1)));
     }
   };
 
@@ -171,18 +230,27 @@ export default function MovieDetailPage() {
 
   /**
    * Phase 5-2: 평점 제출 콜백.
-   * WatchHistory API에 시청 기록 + 평점을 저장한다.
+   * 리뷰 API에 평점 + 코멘트를 저장한다.
+   * "봤다" 버튼 → 리뷰 작성 = 시청 완료 확인의 단일 소스 (watch_history 대체).
+   *
+   * 엑셀 5번 reviews 정합:
+   *  - reviewSource       : 작성 출처 참조 ID. 영화 상세 페이지는 별도 참조 엔티티가 없으므로 'detail' 표식 사용.
+   *  - reviewCategoryCode : 6종 분류 enum. 상세 페이지에서 직접 작성하는 경우는 AI 추천 카테고리에 속하지 않으므로
+   *                        가장 가까운 분류인 'AI_RECOMMEND'로 채운다 (영화 상세는 AI 추천 결과 화면에서도 진입).
+   *
+   * 중복 리뷰(이미 리뷰 작성한 영화)는 서버 409로 거부되지만 UX를 차단하지 않고 조용히 무시한다.
    */
-  const handleFeedbackSubmit = async (rating) => {
+  const handleFeedbackSubmit = async (rating, content) => {
     try {
-      await backendApi.post('/api/v1/watch-history', {
+      await backendApi.post(`/api/v1/movies/${id}/reviews`, {
         movieId: id,
         rating,
-        watchSource: 'detail',
-        completionStatus: 'COMPLETED',
+        content: content || null,
+        reviewSource: 'detail',
+        reviewCategoryCode: 'AI_RECOMMEND',
       });
     } catch {
-      // 저장 실패해도 UX 차단하지 않음
+      // 중복 리뷰(409) 포함 모든 오류: UX 차단하지 않음
     }
     setShowFeedback(false);
   };
@@ -221,7 +289,11 @@ export default function MovieDetailPage() {
           movie={movie}
           onWishlistToggle={handleWishlistToggle}
           isWishlisted={isWishlisted}
+          wishlistLoading={isWishlistLoading}
           onWatchComplete={handleWatchComplete}
+          likeCount={likeCount}
+          isLiked={isLiked}
+          onLikeToggle={handleLikeToggle}
         />
 
         {/* Phase 5-2: 시청 후 평점 팝업 */}
@@ -238,7 +310,8 @@ export default function MovieDetailPage() {
           <S.SectionTitle>
             리뷰 {reviews.length > 0 && <span>({reviews.length})</span>}
           </S.SectionTitle>
-          <ReviewList reviews={reviews} />
+          {/* movieId를 전달해야 리뷰 좋아요 토글 API를 호출할 수 있다 */}
+          <ReviewList reviews={reviews} movieId={id} />
         </S.ReviewsSection>
       </S.InnerContainer>
     </S.MovieDetailPageWrapper>

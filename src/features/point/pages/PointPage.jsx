@@ -26,6 +26,12 @@ import {
   getPointItems,
   exchangeItem,
 } from '../api/pointApi';
+/* 포인트 상점 API — AI 이용권 구매 전용 (Backend PointShopController) */
+import {
+  getShopItems,
+  purchaseAiTokens,
+  purchaseAiDailyExtend,
+} from '../api/pointShopApi';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
 /* 로딩 스피너 — shared/components에서 가져옴 */
@@ -34,6 +40,7 @@ import Loading from '../../../shared/components/Loading/Loading';
 import BalanceCard from '../components/BalanceCard';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import ItemExchange from '../components/ItemExchange';
+import PointShopSection from '../components/PointShopSection';
 import PointHistory from '../components/PointHistory';
 /* 포맷 유틸 — shared/utils에서 가져옴 */
 import { formatDate, formatNumberWithComma as formatNumber } from '../../../shared/utils/formatters';
@@ -58,6 +65,12 @@ export default function PointPage() {
   const [items, setItems] = useState([]);
   /* 현재 선택된 아이템 카테고리 */
   const [selectedCategory, setSelectedCategory] = useState('전체');
+  /* 포인트 상점(AI 이용권) 상태 — PointShopController 응답 ({ currentBalance, currentAiTokens, items }) */
+  const [shopState, setShopState] = useState(null);
+  /* 포인트 상점 로딩 플래그 */
+  const [isLoadingShop, setIsLoadingShop] = useState(true);
+  /* 현재 구매 처리 중인 상점 아이템 ID (AI_TOKEN_5 등) */
+  const [purchasingItemId, setPurchasingItemId] = useState(null);
   /* 포인트 이력 (Spring Page 응답) */
   const [history, setHistory] = useState({ content: [], totalPages: 0, totalElements: 0 });
   /* 현재 이력 페이지 번호 (0-indexed) */
@@ -156,6 +169,27 @@ export default function PointPage() {
   }, [selectedCategory]);
 
   /**
+   * 포인트 상점(AI 이용권) 상태를 로드한다.
+   *
+   * Backend GET /api/v1/point/shop/items를 호출해
+   * 현재 잔액 · AI 이용권 잔여 횟수 · 판매 상품 3종을 한 번에 가져온다.
+   * 실패 시 shopState=null로 두어 섹션에서 에러 메시지를 표시한다.
+   */
+  const loadShopState = useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoadingShop(true);
+    try {
+      const data = await getShopItems();
+      setShopState(data);
+    } catch (err) {
+      console.error('포인트 상점 조회 실패:', err);
+      setShopState(null);
+    } finally {
+      setIsLoadingShop(false);
+    }
+  }, [user?.id]);
+
+  /**
    * 포인트 이력을 로드한다.
    * 페이지 변경 시 호출된다.
    */
@@ -185,8 +219,9 @@ export default function PointPage() {
     if (isAuthenticated && user?.id) {
       loadBalance();
       loadAttendanceStatus();
+      loadShopState();
     }
-  }, [isAuthenticated, user?.id, loadBalance, loadAttendanceStatus]);
+  }, [isAuthenticated, user?.id, loadBalance, loadAttendanceStatus, loadShopState]);
 
   /* 카테고리 변경 시 아이템 재로드 */
   useEffect(() => {
@@ -269,6 +304,64 @@ export default function PointPage() {
   };
 
   /**
+   * AI 이용권 구매 버튼 클릭 핸들러.
+   *
+   * <p>상품 itemId를 분기해 PointShopController의 두 엔드포인트 중
+   * 알맞은 것을 호출한다.</p>
+   *
+   * <ul>
+   *   <li>AI_TOKEN_5 / AI_TOKEN_20 → POST /point/shop/ai-tokens (query: packType)</li>
+   *   <li>AI_DAILY_EXTEND           → POST /point/shop/ai-extend</li>
+   * </ul>
+   *
+   * 구매 성공 후 잔액과 상점 상태를 재로드하여 UI를 갱신한다.
+   *
+   * @param {Object} item - 구매 대상 상품 ({ itemId, name, cost, amount, description })
+   */
+  const handlePurchaseShopItem = async (item) => {
+    if (!user?.id || purchasingItemId) return;
+
+    const confirmed = await showConfirm({
+      title: 'AI 이용권 구매',
+      message: `'${item.name}'을(를) ${formatNumber(item.cost)}P로 구매하시겠습니까?`,
+      type: 'confirm',
+      confirmLabel: '구매',
+    });
+    if (!confirmed) return;
+
+    setPurchasingItemId(item.itemId);
+    setError(null);
+
+    try {
+      let result;
+      if (item.itemId === 'AI_DAILY_EXTEND') {
+        result = await purchaseAiDailyExtend();
+      } else {
+        result = await purchaseAiTokens(item.itemId);
+      }
+
+      await showAlert({
+        title: '구매 완료',
+        message:
+          `'${item.name}' 구매 완료!\n` +
+          `추가된 이용권: ${result.addedTokens}회\n` +
+          `잔액: ${formatNumber(result.remainingBalance)}P\n` +
+          `총 이용권: ${result.totalPurchasedTokens}회`,
+        type: 'success',
+      });
+
+      /* 잔액/상점 상태/이력 재동기화 */
+      await Promise.all([loadBalance(), loadShopState(), loadHistory()]);
+    } catch (err) {
+      setError(err.message || 'AI 이용권 구매에 실패했습니다.');
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 3000);
+    } finally {
+      setPurchasingItemId(null);
+    }
+  };
+
+  /**
    * 충전하기 버튼 클릭 — 결제 페이지로 이동.
    */
   const handleNavigatePayment = () => {
@@ -310,6 +403,15 @@ export default function PointPage() {
           isLoading={isLoadingAttendance}
           isCheckingAttendance={isCheckingAttendance}
           onCheckAttendance={handleCheckAttendance}
+        />
+
+        {/* 섹션 2-B: AI 이용권 상점 (PointShopController) */}
+        <PointShopSection
+          shopState={shopState}
+          isLoading={isLoadingShop}
+          purchasingItemId={purchasingItemId}
+          onPurchase={handlePurchaseShopItem}
+          formatNumber={formatNumber}
         />
 
         {/* 섹션 3: 아이템 교환 */}

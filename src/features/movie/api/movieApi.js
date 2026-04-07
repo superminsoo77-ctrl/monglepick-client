@@ -9,6 +9,7 @@
 import { backendApi, recommendApi } from '../../../shared/api/axiosInstance';
 /* API 상수 */
 import { MOVIE_ENDPOINTS, SEARCH_ENDPOINTS } from '../../../shared/constants/api';
+// MOVIE_ENDPOINTS.LIKE / LIKE_STATUS / LIKE_COUNT 포함
 
 /**
  * 영화 상세 정보를 조회한다.
@@ -112,4 +113,27 @@ export async function getPopularMovies(page = 1, size = 20) {
  */
 export async function getLatestMovies(page = 1, size = 20) {
   return backendApi.get(MOVIE_ENDPOINTS.LATEST, { params: { page, size } });
+}
+
+/**
+ * 영화 좋아요를 토글한다 (인스타그램 스타일 — 한 번 클릭으로 등록/취소 자동 전환).
+ * 동일 엔드포인트 POST 호출로 등록 ↔ 취소가 자동 전환된다.
+ * JWT 인증이 필요하다.
+ *
+ * @param {string|number} movieId - 영화 ID
+ * @returns {Promise<{liked: boolean, likeCount: number}>} 토글 후 좋아요 상태
+ */
+export async function toggleMovieLike(movieId) {
+  return backendApi.post(MOVIE_ENDPOINTS.LIKE(movieId));
+}
+
+/**
+ * 로그인한 사용자의 영화 좋아요 상태를 조회한다.
+ * JWT 인증이 필요하다.
+ *
+ * @param {string|number} movieId - 영화 ID
+ * @returns {Promise<{liked: boolean, likeCount: number}>} 현재 좋아요 상태
+ */
+export async function getMovieLikeStatus(movieId) {
+  return backendApi.get(MOVIE_ENDPOINTS.LIKE_STATUS(movieId));
 }
