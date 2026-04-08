@@ -49,13 +49,19 @@ import * as S from './PaymentPage.styled';
 
 /**
  * 포인트 팩 상품 목록.
- * 일회성 포인트 구매 옵션을 정의한다.
+ *
+ * 설계서 v3.2 §13.1 / 엑셀 Table 50 기준 — 1P = 10원 통일.
+ * 사용자용 포인트 팩 조회 API 가 백엔드에 아직 없어 하드코딩으로 표시하지만,
+ * 백엔드 {@code point_pack_prices} 테이블의 초기값과 완전히 동일하게 맞춰두었다.
+ * 추후 `GET /api/v1/point-packs` 엔드포인트가 추가되면 API 연동으로 전환할 예정.
  */
 const POINT_PACKS = [
-  { id: 'pack_1000', points: 1000, price: 1900, label: '1,000P', bonus: null },
-  { id: 'pack_3000', points: 3000, price: 4900, label: '3,000P', bonus: '10% 보너스' },
-  { id: 'pack_5000', points: 5000, price: 7900, label: '5,000P', bonus: '15% 보너스' },
-  { id: 'pack_10000', points: 10000, price: 14900, label: '10,000P', bonus: '25% 보너스', best: true },
+  { id: 'pack_100',   points: 100,   price: 1000,   label: '100P',    bonus: null },
+  { id: 'pack_200',   points: 200,   price: 2000,   label: '200P',    bonus: null },
+  { id: 'pack_500',   points: 500,   price: 5000,   label: '500P',    bonus: null },
+  { id: 'pack_1000',  points: 1000,  price: 10000,  label: '1,000P',  bonus: null },
+  { id: 'pack_5000',  points: 5000,  price: 50000,  label: '5,000P',  bonus: null },
+  { id: 'pack_10000', points: 10000, price: 100000, label: '10,000P', bonus: null, best: true },
 ];
 
 /** 결제 내역 페이지당 표시 건수 */
@@ -90,6 +96,8 @@ export default function PaymentPage() {
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  /* 구독 플랜 로드 실패 메시지 — 하드코딩 fallback 제거 후 에러 배너로 전환 */
+  const [plansError, setPlansError] = useState(null);
   /* 결제 처리 중 (어떤 상품의 결제가 진행 중인지) */
   const [processingId, setProcessingId] = useState(null);
   /* 구독 취소 처리 중 */
@@ -114,50 +122,23 @@ export default function PaymentPage() {
 
   /**
    * 구독 상품 목록을 로드한다.
+   *
+   * 백엔드 `GET /api/v1/subscription/plans` (SubscriptionController#getPlans) 의 응답을
+   * 그대로 화면에 표시한다. 과거에는 API 실패 시 하드코딩된 플랜으로 degrade 했지만,
+   * 설계서 v3.2 가격/포인트와 맞지 않는 구값을 보여줄 위험이 있어 완전히 제거하고
+   * 에러 배너 + 재시도 UI 로 전환했다.
    */
   const loadPlans = useCallback(async () => {
     setIsLoadingPlans(true);
+    setPlansError(null);
     try {
       const data = await getSubscriptionPlans();
+      /* Array 또는 {content:[]} 두 형식 모두 수용 */
       setPlans(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
-      console.error('구독 상품 조회 실패:', err);
-      /* API 미구현 시 기본 구독 상품으로 표시 */
-      setPlans([
-        {
-          planCode: 'monthly_basic',
-          name: '월간 기본',
-          price: 3900,
-          pointsPerPeriod: 3000,
-          periodType: 'MONTHLY',
-          description: '매월 3,000P 지급',
-        },
-        {
-          planCode: 'monthly_premium',
-          name: '월간 프리미엄',
-          price: 7900,
-          pointsPerPeriod: 8000,
-          periodType: 'MONTHLY',
-          description: '매월 8,000P 지급',
-        },
-        {
-          planCode: 'yearly_basic',
-          name: '연간 기본',
-          price: 39000,
-          pointsPerPeriod: 40000,
-          periodType: 'YEARLY',
-          description: '연 40,000P 지급',
-        },
-        {
-          planCode: 'yearly_premium',
-          name: '연간 프리미엄',
-          price: 79000,
-          pointsPerPeriod: 100000,
-          periodType: 'YEARLY',
-          description: '연 100,000P 지급 (최고 혜택)',
-          best: true,
-        },
-      ]);
+      console.error('[PaymentPage] 구독 상품 조회 실패:', err);
+      setPlans([]);
+      setPlansError(err?.message || '구독 상품 목록을 불러올 수 없습니다.');
     } finally {
       setIsLoadingPlans(false);
     }
@@ -410,8 +391,24 @@ export default function PaymentPage() {
             구독하면 매 주기마다 포인트가 자동 지급됩니다.
           </S.SectionDesc>
 
+          {/*
+            렌더 우선순위:
+            1) 로딩 중   → Loading 스피너
+            2) 에러 발생 → 에러 배너 + 재시도 버튼 (하드코딩 fallback 없이)
+            3) 빈 목록   → "등록된 상품이 없습니다" 안내
+            4) 정상      → PlansGrid 카드 목록
+          */}
           {isLoadingPlans ? (
             <Loading message="구독 상품 로딩 중..." />
+          ) : plansError ? (
+            <S.ErrorBanner role="alert">
+              <span>{plansError}</span>
+              <S.RetryBtn type="button" onClick={loadPlans}>
+                다시 시도
+              </S.RetryBtn>
+            </S.ErrorBanner>
+          ) : plans.length === 0 ? (
+            <S.EmptyMsg>현재 판매 중인 구독 상품이 없습니다.</S.EmptyMsg>
           ) : (
             <S.PlansGrid>
               {plans.map((plan) => (

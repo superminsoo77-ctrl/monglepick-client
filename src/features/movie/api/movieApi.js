@@ -107,12 +107,21 @@ export async function getPopularMovies(page = 1, size = 20) {
 /**
  * 최신 영화 목록을 조회한다.
  *
- * @param {number} [page=1] - 페이지 번호
- * @param {number} [size=20] - 페이지 크기
- * @returns {Promise<Object>} 최신 영화 목록 ({ movies: [], total: number })
+ * 백엔드 `GET /api/v1/movies/latest` 는 Spring Data `Page<MovieResponse>` 를 반환한다.
+ * getPopularMovies 와 동일한 `{ movies, total }` 형식으로 정규화하여 호출부에서 일관되게 사용할 수 있게 한다.
+ *
+ * @param {number} [page=1]  - 페이지 번호 (1-based, API 호출 시 0-based 로 변환)
+ * @param {number} [size=8]  - 페이지 크기 (홈 섹션 기본 8)
+ * @returns {Promise<{movies: Array, total: number}>} 최신 영화 목록 + 전체 개수
  */
-export async function getLatestMovies(page = 1, size = 20) {
-  return backendApi.get(MOVIE_ENDPOINTS.LATEST, { params: { page, size } });
+export async function getLatestMovies(page = 1, size = 8) {
+  const result = await backendApi.get(MOVIE_ENDPOINTS.LATEST, {
+    params: { page: page - 1, size },
+  });
+  return {
+    movies: result?.content || [],
+    total: result?.totalElements || 0,
+  };
 }
 
 /**

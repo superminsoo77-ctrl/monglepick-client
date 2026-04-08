@@ -618,3 +618,51 @@ export const PaginationInfo = styled.span`
   font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
+
+/**
+ * 구독 상품 로드 실패 시 표시되는 에러 배너.
+ * 과거 하드코딩 fallback 을 제거한 뒤 이 배너가 노출되도록 리팩터링했다.
+ */
+export const ErrorBanner = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid ${({ theme }) => theme.colors.error};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  line-height: 1.55;
+`;
+
+/** 에러 배너 내부의 "다시 시도" 버튼 */
+export const RetryBtn = styled.button`
+  padding: 8px 18px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.error};
+  color: #ffffff;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    opacity: 0.85;
+  }
+`;
+
+/** 빈 목록 안내 박스 (구독 상품이 0개일 때) */
+export const EmptyMsg = styled.p`
+  padding: 48px 16px;
+  text-align: center;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  border: 1px dashed ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  margin: 0;
+`;

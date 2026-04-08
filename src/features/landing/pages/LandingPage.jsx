@@ -30,31 +30,36 @@ const MOVIE_CARDS = [
   { title: '라라랜드', genre: '뮤지컬 · 로맨스', rating: '8.0', year: '2016', style: { top: 250, right: 10, rot: -3, dur: 4.2, delay: 0.8 } },
 ];
 
-/* ── 팀원 데이터 ── */
+/* ── 팀원 데이터 ──
+   진행률은 WBS v5(2026-03-31) 기준 + 이후 완료 작업 반영.
+   윤형주: Phase 0~9 + R-0~R-6 + 관리자 페이지 72 EP + 운영 도구 + Client 전반 완료
+   김민규: 인증/사용자/플레이리스트 + 관리자 사용자 관리 11 EP
+   정한나: monglepick-recommend FastAPI 전담 (Like 도메인 이관 + 검색/온보딩)
+   이민수: 커뮤니티 전반 + 관리자 콘텐츠 관리 9 EP                                       */
 const TEAM_MEMBERS = [
   {
     initials: 'YH', name: '윤형주', role: 'Backend Developer · AI Engineer', color: '#7c6cf0',
-    desc: 'AI Agent 전체 설계 및 구현, LangGraph 기반 대화형 추천 시스템, 데이터 파이프라인(117만건), 인프라 구축(Docker/CI-CD/Nginx) 총괄',
-    tags: ['LangGraph', 'FastAPI', 'Docker', 'Ollama', 'RAG', 'CI/CD'],
-    progress: 85, req: 'REQ_040, REQ_052~065, REQ_089, REQ_118~121 · 인프라 전체',
+    desc: 'AI Agent 16노드 그래프, 추천/매칭/콘텐츠분석/로드맵 4종 에이전트, 결제·포인트·리워드 시스템, 관리자 페이지 72 EP, 인프라(4-VM/Docker/CI-CD) 총괄',
+    tags: ['LangGraph', 'FastAPI', 'Spring Boot', 'Toss Pay', 'Ollama', 'CI/CD'],
+    progress: 90, req: '146건 중 49 완료 + 5 진행 · 전 영역 리딩',
   },
   {
     initials: 'MG', name: '김민규', role: 'Team Lead · Backend Developer', color: '#ef476f',
-    desc: 'Spring Boot 백엔드 핵심 기능 개발. 회원가입/로그인 인증 시스템, 마이페이지, 플레이리스트, 도장깨기 코스 등 사용자 경험의 근간을 담당',
-    tags: ['Spring Boot', 'JWT', 'JPA', 'MySQL', 'Security'],
-    progress: 45, req: 'REQ_001, REQ_006~030, REQ_090~117 · 약 40건',
+    desc: 'Spring Boot 백엔드 핵심 기능 개발. 회원가입/로그인 인증 시스템, 마이페이지, 플레이리스트, 도장깨기 코스, 관리자 사용자 관리 페이지 담당',
+    tags: ['Spring Boot', 'JWT', 'JPA', 'MyBatis', 'MySQL'],
+    progress: 50, req: '58건 중 11 완료 + 13 진행 · auth/user/playlist',
   },
   {
     initials: 'HN', name: '정한나', role: 'Search & Recommendation', color: '#06d6a0',
-    desc: 'FastAPI 기반 검색/추천 서비스 단독 개발. 영화 검색, 온보딩(이상형 월드컵), 개인화 추천 목록, 영화 상세 정보 등 사용자 발견 경험 전체를 책임',
-    tags: ['FastAPI', 'Python', 'Redis', 'SQLAlchemy'],
-    progress: 60, req: 'REQ_002~005, REQ_066~088 · 약 28건',
+    desc: 'FastAPI 기반 검색/추천 서비스 단독 개발. 영화 검색, 온보딩(이상형 월드컵), 개인화 추천, 영화 Like 도메인(write-behind) 이관 담당',
+    tags: ['FastAPI', 'SQLAlchemy', 'Redis', 'Write-behind'],
+    progress: 35, req: '34건 중 5 진행 · monglepick-recommend 전담',
   },
   {
     initials: 'MS', name: '이민수', role: 'Community & Social', color: '#ffd166',
-    desc: '커뮤니티 생태계 전담 개발. 게시글 CRUD, 댓글/대댓글, 좋아요, AI 영화 퀴즈, 같이보기 파티, AI 자동 리뷰 등 소셜 기능 구현',
-    tags: ['Spring Boot', 'JPA', 'REST API', 'WebSocket'],
-    progress: 35, req: 'REQ_031~047 · 커뮤니티/퀴즈/파티/AI리뷰',
+    desc: '커뮤니티 생태계 전담 개발. 게시글 CRUD, 댓글/대댓글, 좋아요, 신고/혐오표현, AI 영화 퀴즈, 관리자 콘텐츠 관리 9 EP 담당',
+    tags: ['Spring Boot', 'JPA', 'REST API', 'AI 퀴즈'],
+    progress: 55, req: '22건 중 9 완료 + 3 진행 · 커뮤니티 전반',
   },
 ];
 
@@ -538,7 +543,7 @@ export default function LandingPage() {
           <S.DataGrid>
             {[
               { value: '1.17M', label: 'TMDB 영화 데이터', sub: '25.6GB JSONL, 39개 필드' },
-              { value: '157K', label: '현재 DB 적재', sub: '5개 DB 동기화' },
+              { value: '910K', label: '현재 DB 적재', sub: '5개 DB 동기화 + 무드태그' },
               { value: '26M', label: '시청 이력 레코드', sub: '270K 유저 기반 CF' },
               { value: '117K', label: 'KOBIS 영화', sub: '영화진흥위원회 API' },
               { value: '43K', label: 'KMDb 영화', sub: '한국영화데이터베이스' },
@@ -572,11 +577,17 @@ export default function LandingPage() {
           <S.Reveal className="lp-reveal">
             <S.TimelineList>
               {[
-                { dot: 'done', title: 'Phase 0~1 — 스캐폴딩 + 데이터 파이프라인', desc: 'FastAPI 구조, Docker Compose, TMDB/Kaggle/KOBIS/KMDb 수집, 하이브리드 RAG', badge: 'done' },
-                { dot: 'done', title: 'Phase 2~3 — LLM 체인 + Chat Agent', desc: '6개 LLM 체인, LangGraph 13노드 StateGraph, SSE/sync API, 148 tests', badge: 'done' },
-                { dot: 'done', title: 'Phase 4 — 추천 엔진 + 보안 강화', desc: '7노드 CF+CBF+MMR, VLM 이미지 분석, 세션 영속화, 보안 강화 — 308 tests', badge: 'done' },
-                { dot: 'active', title: '전체 재적재', desc: 'TMDB 1.17M건 스트리밍 배치 → 3DB 적재 (run_full_reload.py)', badge: 'active' },
-                { dot: '', title: 'Phase 5~8', desc: 'SSE 최적화, LangChain Tools, 콘텐츠 분석, 테스트 & 최적화', badge: 'pending' },
+                /* 진행 현황 — CLAUDE.md 기준 (2026-04-08 업데이트)
+                   Phase 0~9 + R-0~R-6 + 관리자 + 활동 리워드까지 모두 완료.
+                   현재 운영 환경 다국어 검색 재적재(ML-4)와 LoRA 파인튜닝이 남아있다 */
+                { dot: 'done', title: 'Phase 0~4 — 데이터 + RAG + Chat Agent + 추천 엔진', desc: '5DB 하이브리드 RAG, LangGraph 16노드 StateGraph(relation 포함), CF+CBF+MMR 추천 엔진', badge: 'done' },
+                { dot: 'done', title: 'Phase 5~8 — Movie Match + 콘텐츠 분석 + 로드맵', desc: 'Movie Match 6노드, 4기능 콘텐츠 분석(포스터/혐오/패턴), 개인화 로드맵 LangGraph, 332 tests pass', badge: 'done' },
+                { dot: 'done', title: 'Phase 9 + R-0~R-6 — 결제 + 인증 + 포인트', desc: 'Toss Payments 실연동, JWT/OAuth2, 6등급 팝콘 쿼터, 포인트 단일 재화(1P=10원), 55개 활동 리워드 정책', badge: 'done' },
+                { dot: 'done', title: '관리자 페이지 + 운영 도구 (10탭 + 운영 11서브탭)', desc: 'Backend 72 EP 충족, 운영 도구 통합 페이지(사용자 제재/포인트 조정/이용권/앱 공지)', badge: 'done' },
+                { dot: 'done', title: '910K건 5DB 적재 + 유저 활동 수집', desc: '910,140건 영화 데이터, 무드태그 보강, 다국어 검색 코드(ML-1~3), 유저 활동 수집 Phase 0~5', badge: 'done' },
+                { dot: 'done', title: 'Client 윤형주 영역 + 다크/라이트 모드', desc: '채팅+포인트+결제+고객센터+추천내역+플레이리스트+업적+월드컵+로드맵, 반응형 + 테마 시스템', badge: 'done' },
+                { dot: 'active', title: '다국어 검색 Phase ML-4 — 운영 재적재', desc: '운영 서버 Qdrant 임베딩 재적재 + Elasticsearch 인덱스 재생성 진행 중', badge: 'active' },
+                { dot: '', title: '몽글이 LoRA 파인튜닝', desc: 'EXAONE 4.0 1.2B 페르소나 파인튜닝 → vLLM 서빙(Tesla T4)', badge: 'pending' },
               ].map((item) => (
                 <S.TimelineItem key={item.title}>
                   <S.TimelineDot $variant={item.dot} />

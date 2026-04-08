@@ -385,3 +385,40 @@ export const MoviesMore = styled.a`
     text-decoration: underline;
   }
 `;
+
+/**
+ * 섹션 로드 실패 시 표시되는 에러 배너.
+ * Promise.allSettled 로 한쪽이 실패해도 다른 섹션은 살아있어야 하므로
+ * 그리드/스켈레톤 위에 얇게 추가되는 형태로 디자인한다.
+ */
+export const SectionError = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid ${({ theme }) => theme.colors.error};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+/** SectionError 내부의 "다시 시도" 버튼 */
+export const SectionRetry = styled.button`
+  padding: 6px 14px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.error};
+  color: #ffffff;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  border: none;
+  cursor: pointer;
+  transition: opacity ${({ theme }) => theme.transitions.fast};
+  white-space: nowrap;
+
+  &:hover {
+    opacity: 0.85;
+  }
+`;

@@ -73,6 +73,8 @@ import RecommendationPage from '../features/recommendation/pages/RecommendationP
 import PlaylistPage from '../features/playlist/pages/PlaylistPage';
 /* 업적/도장깨기 페이지 — features/achievement에서 가져옴 */
 import AchievementPage from '../features/achievement/pages/AchievementPage';
+/* 영화 퀴즈 페이지 — features/quiz에서 가져옴 (비로그인 열람 허용, 제출만 JWT 필수) */
+import QuizPage from '../features/quiz/pages/QuizPage';
 /* 영화 월드컵 페이지 — features/worldcup에서 가져옴 */
 import WorldcupPage from '../features/worldcup/pages/WorldcupPage';
 /* 영화 로드맵 페이지 — features/roadmap에서 가져옴 */
@@ -319,6 +321,21 @@ function App() {
                 <AchievementPage />
               </MainLayout>
             </PrivateRoute>
+          }
+        />
+
+        {/*
+          영화 퀴즈 페이지 — 오늘의 퀴즈 목록 표시.
+          비로그인 사용자도 문제 열람은 허용하며(PrivateRoute 제외),
+          정답 제출 시 submitQuizAnswer 내부의 requireAuth() 가드로
+          로그인 필요 에러가 발생해 QuizCard 에서 안내 메시지로 전환된다.
+        */}
+        <Route
+          path="/quiz"
+          element={
+            <MainLayout>
+              <QuizPage />
+            </MainLayout>
           }
         />
 

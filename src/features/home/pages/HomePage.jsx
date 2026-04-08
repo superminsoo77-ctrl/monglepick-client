@@ -7,14 +7,14 @@
  * - 빠른 채팅 진입: 추천 질문 카드
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
 /* 영화 목록 컴포넌트 — shared/components에서 가져옴 */
 import MovieList from '../../../shared/components/MovieList/MovieList';
-/* 인기 영화 API — features/movie에서 가져옴 */
-import { getPopularMovies } from '../../movie/api/movieApi';
+/* 인기/최신 영화 API — features/movie에서 가져옴 */
+import { getPopularMovies, getLatestMovies } from '../../movie/api/movieApi';
 /* styled-components — HomePage.styled.js */
 import * as S from './HomePage.styled';
 
@@ -47,31 +47,68 @@ const SUGGESTION_CARDS = [
 ];
 
 export default function HomePage() {
-  // 인기 영화 목록 상태
+  /** 인기 영화 목록 (backend /movies/popular) */
   const [popularMovies, setPopularMovies] = useState([]);
-  // 로딩 상태
-  const [isLoading, setIsLoading] = useState(true);
+  /** 인기 영화 로딩 상태 */
+  const [isPopularLoading, setIsPopularLoading] = useState(true);
+  /** 인기 영화 로드 실패 메시지 */
+  const [popularError, setPopularError] = useState(null);
+
+  /** 최신 영화 목록 (backend /movies/latest) */
+  const [latestMovies, setLatestMovies] = useState([]);
+  /** 최신 영화 로딩 상태 */
+  const [isLatestLoading, setIsLatestLoading] = useState(true);
+  /** 최신 영화 로드 실패 메시지 */
+  const [latestError, setLatestError] = useState(null);
 
   const navigate = useNavigate();
 
   /**
-   * 컴포넌트 마운트 시 인기 영화를 로드한다.
-   * API 호출 실패 시 빈 배열로 처리한다 (에러 전파 방지).
+   * 인기/최신 영화 목록을 병렬로 로드한다.
+   *
+   * `Promise.allSettled` 를 사용하여 한쪽이 실패해도 다른 섹션은 정상 표시되도록 한다.
+   * 각 섹션은 독립적인 loading/error 상태를 가지며, 재시도 버튼으로 개별 재호출할 수 있다.
    */
-  useEffect(() => {
-    async function loadMovies() {
-      try {
-        const result = await getPopularMovies(1, 8);
-        setPopularMovies(result?.movies || []);
-      } catch {
-        // API 미구현 시 빈 배열로 표시 (스켈레톤 역할)
-        setPopularMovies([]);
-      } finally {
-        setIsLoading(false);
-      }
+  const loadMovies = useCallback(async () => {
+    setIsPopularLoading(true);
+    setIsLatestLoading(true);
+    setPopularError(null);
+    setLatestError(null);
+
+    const [popularResult, latestResult] = await Promise.allSettled([
+      getPopularMovies(1, 8),
+      getLatestMovies(1, 8),
+    ]);
+
+    /* 인기 영화 처리 */
+    if (popularResult.status === 'fulfilled') {
+      setPopularMovies(popularResult.value?.movies || []);
+    } else {
+      console.error('[HomePage] 인기 영화 로드 실패:', popularResult.reason);
+      setPopularError(
+        popularResult.reason?.message || '인기 영화를 불러올 수 없습니다.',
+      );
+      setPopularMovies([]);
     }
-    loadMovies();
+    setIsPopularLoading(false);
+
+    /* 최신 영화 처리 */
+    if (latestResult.status === 'fulfilled') {
+      setLatestMovies(latestResult.value?.movies || []);
+    } else {
+      console.error('[HomePage] 최신 영화 로드 실패:', latestResult.reason);
+      setLatestError(
+        latestResult.reason?.message || '최신 영화를 불러올 수 없습니다.',
+      );
+      setLatestMovies([]);
+    }
+    setIsLatestLoading(false);
   }, []);
+
+  /* 최초 마운트 시 1회 로드 */
+  useEffect(() => {
+    loadMovies();
+  }, [loadMovies]);
 
   /**
    * 추천 질문 카드 클릭 시 채팅 페이지로 이동.
@@ -156,7 +193,40 @@ export default function HomePage() {
               더 보기 →
             </S.MoviesMore>
           </S.MoviesHeader>
-          <MovieList movies={popularMovies} loading={isLoading} />
+          {/*
+            popularError 가 있으면 간단한 재시도 안내를 표시하되, 스켈레톤/그리드도
+            그대로 살려둠 — 시각적 깨짐 방지.
+          */}
+          {popularError && (
+            <S.SectionError role="alert">
+              {popularError}
+              <S.SectionRetry type="button" onClick={loadMovies}>
+                다시 시도
+              </S.SectionRetry>
+            </S.SectionError>
+          )}
+          <MovieList movies={popularMovies} loading={isPopularLoading} />
+        </S.MoviesInner>
+      </S.Movies>
+
+      {/* ── 최신 영화 섹션 ── */}
+      <S.Movies>
+        <S.MoviesInner>
+          <S.MoviesHeader>
+            <S.MoviesTitle>최신 영화</S.MoviesTitle>
+            <S.MoviesMore as={Link} to={ROUTES.SEARCH}>
+              더 보기 →
+            </S.MoviesMore>
+          </S.MoviesHeader>
+          {latestError && (
+            <S.SectionError role="alert">
+              {latestError}
+              <S.SectionRetry type="button" onClick={loadMovies}>
+                다시 시도
+              </S.SectionRetry>
+            </S.SectionError>
+          )}
+          <MovieList movies={latestMovies} loading={isLatestLoading} />
         </S.MoviesInner>
       </S.Movies>
     </S.Wrapper>

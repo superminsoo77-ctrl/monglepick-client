@@ -67,6 +67,8 @@ export const ROUTES = {
   PLAYLIST_DETAIL: '/playlist/:id',
   /** 업적/도장깨기 페이지 — 사용자 업적 및 도장깨기 진행 */
   ACHIEVEMENT: '/achievement',
+  /** 퀴즈 페이지 — 오늘의 영화 퀴즈 (비로그인 열람 가능, 제출은 로그인 필수) */
+  QUIZ: '/quiz',
   /** 월드컵 페이지 — 영화 이상형 월드컵 */
   WORLDCUP: '/worldcup',
   /** 로드맵 페이지 — 영화 학습 코스 */
@@ -106,4 +108,35 @@ export const NAV_ITEMS = [
   { path: ROUTES.WORLDCUP, label: '영화 월드컵' },    // /worldcup (이상형 월드컵)
   { path: ROUTES.COMMUNITY, label: '커뮤니티' },     // /community (게시판 + 리뷰)
   { path: ROUTES.SEARCH, label: '검색' },           // /search (키워드 + 필터)
+];
+
+/**
+ * 로그인한 사용자 전용 메뉴 항목 목록.
+ *
+ * Header 우상단 유저 아바타 클릭 시 펼쳐지는 드롭다운과
+ * 모바일 햄버거 메뉴 내부 인증 섹션에서 공용으로 사용한다.
+ *
+ * 항목 구성 원칙:
+ *   1) 프로필(루트) → 2) 콘텐츠 그룹(추천/플레이리스트/업적/로드맵)
+ *   → 3) 결제·리워드 그룹(포인트/결제) → 4) 지원(고객센터)
+ *
+ * 그룹 구분을 위해 `divider: true` 항목을 섞어둔다.
+ * 드롭다운 렌더러는 이 플래그를 만나면 구분선만 출력하고 path는 무시한다.
+ */
+export const USER_MENU_ITEMS = [
+  { path: ROUTES.MYPAGE, label: '마이페이지' },          // /mypage
+  { divider: true },
+  /* 콘텐츠 그룹 — AI 추천 결과/소장/도전과제/학습 코스 */
+  { path: ROUTES.RECOMMENDATIONS, label: '추천 내역' },  // /recommendations
+  { path: ROUTES.PLAYLIST, label: '플레이리스트' },       // /playlist
+  { path: ROUTES.ACHIEVEMENT, label: '업적·도장깨기' },  // /achievement
+  { path: ROUTES.QUIZ, label: '영화 퀴즈' },            // /quiz (오늘의 퀴즈)
+  { path: ROUTES.ROADMAP, label: '영화 로드맵' },        // /roadmap
+  { divider: true },
+  /* 결제·리워드 그룹 — 단일 재화(포인트) + 결제/구독 */
+  { path: ROUTES.POINT, label: '포인트' },              // /point
+  { path: ROUTES.PAYMENT, label: '결제·구독' },         // /payment
+  { divider: true },
+  /* 지원 */
+  { path: ROUTES.SUPPORT, label: '고객센터' },          // /support
 ];
