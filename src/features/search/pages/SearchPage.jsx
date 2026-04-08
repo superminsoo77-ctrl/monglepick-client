@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 /* 영화 검색 API — features/movie에서 가져옴 */
-import { searchMovies } from '../../movie/api/movieApi';
+import { logSearchResultClick, searchMovies } from '../../movie/api/movieApi';
 /* Phase 2: 사용자 행동 이벤트 추적 */
 import { trackEvent } from '../../../shared/utils/eventTracker';
 /* 영화 목록 컴포넌트 — shared/components에서 가져옴 */
@@ -26,6 +26,7 @@ import EmptyState from '../../../shared/components/EmptyState/EmptyState';
 import * as S from './SearchPage.styled';
 
 const PAGE_SIZE = 20;
+const SEARCH_CACHE_STORAGE_KEY = 'monglepick_search_page_cache';
 
 /** 장르 필터 옵션 */
 const GENRE_FILTERS = [
@@ -48,6 +49,40 @@ const SEARCH_TYPE_OPTIONS = [
   { value: 'actor', label: '출연진' },
 ];
 
+function buildSearchCacheKey({ query, searchType, genre, sort }) {
+  return JSON.stringify({
+    query: query || '',
+    searchType: searchType || 'all',
+    genre: genre || '전체',
+    sort: sort || 'relevance',
+  });
+}
+
+function readSearchCache() {
+  try {
+    const raw = window.sessionStorage.getItem(SEARCH_CACHE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSearchCache(payload) {
+  try {
+    window.sessionStorage.setItem(SEARCH_CACHE_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // sessionStorage 저장 실패는 검색 UX를 막지 않음
+  }
+}
+
+function clearSearchCache() {
+  try {
+    window.sessionStorage.removeItem(SEARCH_CACHE_STORAGE_KEY);
+  } catch {
+    // sessionStorage 접근 실패는 무시
+  }
+}
+
 export default function SearchPage() {
   /* URL 쿼리 파라미터 연동 */
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,7 +100,21 @@ export default function SearchPage() {
   const [hasMore, setHasMore] = useState(false);
   /* 검색 수행 여부 (초기 상태와 구분) */
   const [hasSearched, setHasSearched] = useState(false);
+  const [lastSearchContext, setLastSearchContext] = useState(null);
   const loadMoreRef = useRef(null);
+
+  const restoreSearchSnapshot = useCallback((snapshot) => {
+    if (!snapshot) return;
+
+    setMovies(snapshot.movies || []);
+    setTotalCount(snapshot.totalCount || 0);
+    setCurrentPage(snapshot.currentPage || 1);
+    setHasMore(Boolean(snapshot.hasMore));
+    setHasSearched(Boolean(snapshot.hasSearched));
+    setLastSearchContext(snapshot.lastSearchContext || null);
+    setIsLoading(false);
+    setIsFetchingMore(false);
+  }, []);
 
   /**
    * 검색을 실행하는 함수.
@@ -86,6 +135,8 @@ export default function SearchPage() {
       setTotalCount(0);
       setCurrentPage(1);
       setHasMore(false);
+      setLastSearchContext(null);
+      clearSearchCache();
       return;
     }
 
@@ -123,6 +174,13 @@ export default function SearchPage() {
       setTotalCount(nextTotal);
       setCurrentPage(page);
       setHasMore(page * PAGE_SIZE < nextTotal);
+      setLastSearchContext({
+        query: searchQuery,
+        searchType: currentSearchType,
+        genre: searchGenre,
+        sort: searchSort,
+        resultCount: nextTotal,
+      });
 
       /* Phase 2: 검색 실행 이벤트 (첫 페이지만 기록) */
       if (!append) {
@@ -137,6 +195,8 @@ export default function SearchPage() {
         setTotalCount(0);
         setCurrentPage(1);
         setHasMore(false);
+        setLastSearchContext(null);
+        clearSearchCache();
       }
     } finally {
       if (append) {
@@ -165,9 +225,53 @@ export default function SearchPage() {
       setSearchType(urlSearchType);
       setGenre(urlGenre);
       setSort(urlSort);
+
+      const cacheKey = buildSearchCacheKey({
+        query: urlQuery,
+        searchType: urlSearchType,
+        genre: urlGenre,
+        sort: urlSort,
+      });
+      const cachedSearch = readSearchCache();
+
+      if (cachedSearch?.key === cacheKey) {
+        restoreSearchSnapshot(cachedSearch.snapshot);
+        return;
+      }
+
       executeSearch(urlQuery, urlSearchType, urlGenre, urlSort);
     }
-  }, [searchParams, executeSearch]);
+  }, [executeSearch, restoreSearchSnapshot, searchParams]);
+
+  useEffect(() => {
+    if (!hasSearched || !lastSearchContext?.query?.trim()) {
+      return;
+    }
+
+    writeSearchCache({
+      key: buildSearchCacheKey({
+        query: lastSearchContext.query,
+        searchType: lastSearchContext.searchType,
+        genre: lastSearchContext.genre,
+        sort: lastSearchContext.sort,
+      }),
+      snapshot: {
+        movies,
+        totalCount,
+        currentPage,
+        hasMore,
+        hasSearched,
+        lastSearchContext,
+      },
+    });
+  }, [
+    currentPage,
+    hasMore,
+    hasSearched,
+    lastSearchContext,
+    movies,
+    totalCount,
+  ]);
 
   /**
    * 검색 폼 제출 핸들러.
@@ -258,6 +362,27 @@ export default function SearchPage() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore, hasSearched, loadMoreMovies]);
+
+  const handleMovieClick = useCallback(async (movie) => {
+    if (!lastSearchContext?.query?.trim()) {
+      return;
+    }
+
+    try {
+      await logSearchResultClick({
+        keyword: lastSearchContext.query,
+        clickedMovieId: movie.id || movie.movieId,
+        resultCount: lastSearchContext.resultCount,
+        filters: {
+          search_type: lastSearchContext.searchType,
+          genre: lastSearchContext.genre === '전체' ? null : lastSearchContext.genre,
+          sort: lastSearchContext.sort,
+        },
+      });
+    } catch {
+      // 클릭 로그 저장 실패가 상세 페이지 이동을 막으면 안 됨
+    }
+  }, [lastSearchContext]);
 
   return (
     <S.Wrapper>
@@ -352,7 +477,7 @@ export default function SearchPage() {
           {/* 검색 완료 — 결과 표시 */}
           {hasSearched && !isLoading && movies.length > 0 && (
             <>
-              <MovieList movies={movies} />
+              <MovieList movies={movies} onMovieClick={handleMovieClick} />
 
               {isFetchingMore && (
                 <S.LoadMoreGrid>

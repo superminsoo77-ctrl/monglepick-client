@@ -87,6 +87,30 @@ export async function searchMovies({
 }
 
 /**
+ * 검색 결과 클릭 로그를 저장한다.
+ *
+ * @param {Object} params - 클릭 로그 파라미터
+ * @param {string} params.keyword - 검색 키워드
+ * @param {string} params.clickedMovieId - 클릭한 영화 ID
+ * @param {number} params.resultCount - 검색 결과 수
+ * @param {Object} [params.filters] - 검색 필터 정보
+ * @returns {Promise<Object>} 저장 결과
+ */
+export async function logSearchResultClick({
+  keyword,
+  clickedMovieId,
+  resultCount,
+  filters,
+}) {
+  return recommendApi.post(SEARCH_ENDPOINTS.CLICK_LOG, {
+    keyword,
+    clicked_movie_id: clickedMovieId,
+    result_count: resultCount,
+    filters,
+  });
+}
+
+/**
  * 인기 영화 목록을 조회한다.
  * Spring Data Page 응답(content)을 { movies, total } 형식으로 변환한다.
  *

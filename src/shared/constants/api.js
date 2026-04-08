@@ -141,6 +141,8 @@ export const SEARCH_ENDPOINTS = {
   SEARCH: `${API_VERSION}/search`,
   /** 자동완성 - GET (query 파라미터 필요) */
   AUTOCOMPLETE: `${API_VERSION}/search/autocomplete`,
+  /** 검색 결과 클릭 로그 저장 - POST */
+  CLICK_LOG: `${API_VERSION}/search/click`,
 };
 
 /**
