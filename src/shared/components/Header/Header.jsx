@@ -99,12 +99,19 @@ export default function Header() {
   /*
    * 라우트 변경 시 드롭다운/모바일 메뉴 자동 닫기.
    * 항목 클릭 → 페이지 이동 → 메뉴 자동 닫힘 흐름을 보장한다.
+   *
+   * eslint-disable react-hooks/set-state-in-effect — 라우트 동기화는 외부 시스템(React Router)
+   * 변화에 반응하는 합법적 effect 사용 사례이다. 라우터 location.pathname 자체가 외부 상태이며,
+   * 이를 받아 UI 메뉴 상태를 닫는 것은 "외부 → React" 한 방향 동기화로 cascading 렌더의
+   * 의미가 다르다. setState 4개를 묶어 단일 batch 로 처리되므로 성능 영향도 없다.
    */
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setIsUserMenuOpen(false);
     setIsMobileMenuOpen(false);
     setOpenNavDropdown(null);
     setOpenMobileSections(new Set());
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [location.pathname]);
 
   /**

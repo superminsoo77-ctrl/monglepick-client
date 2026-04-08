@@ -201,7 +201,7 @@ export const CalendarCell = styled.div`
     `}
 
   /* 출석 완료 — gradient + glow */
-  ${({ $isChecked }) =>
+  ${({ $isChecked, theme }) =>
     $isChecked &&
     css`
       background: linear-gradient(135deg, ${theme.colors.primaryLight}, rgba(6, 214, 160, 0.15));

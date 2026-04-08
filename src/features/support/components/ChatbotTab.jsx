@@ -68,7 +68,7 @@ export default function ChatbotTab({ onSwitchToTicket }) {
           needsHumanAgent: data.needsHumanAgent || false,
         },
       ]);
-    } catch (err) {
+    } catch {
       /* API 실패 시 폴백 응답 */
       setMessages((prev) => [
         ...prev,

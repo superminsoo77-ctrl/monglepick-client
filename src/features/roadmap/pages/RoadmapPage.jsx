@@ -96,7 +96,7 @@ export default function RoadmapPage() {
         (data.completedMovies || []).map((m) => m.movieId || m.id || m),
       );
       setCompletedMovieIds(completed);
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '코스를 불러올 수 없습니다.', type: 'error' });
       navigate(ROUTES.ROADMAP, { replace: true });
     } finally {
@@ -148,7 +148,7 @@ export default function RoadmapPage() {
         }
         return next;
       });
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '처리에 실패했습니다.', type: 'error' });
     }
   };

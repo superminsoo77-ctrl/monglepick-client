@@ -112,7 +112,7 @@ export default function ChatWindow() {
       const detail = await loadSessionMessages(session.sessionId);
       loadExistingSession(detail.sessionId, detail.messages);
       navigate(`/chat/${detail.sessionId}`, { replace: true });
-    } catch (err) {
+    } catch {
       showAlert({
         title: '로드 실패',
         message: '대화를 불러올 수 없습니다.',
@@ -141,7 +141,7 @@ export default function ChatWindow() {
         clearMessages();
         navigate('/chat', { replace: true });
       }
-    } catch (err) {
+    } catch {
       showAlert({
         title: '삭제 실패',
         message: '대화 삭제에 실패했습니다.',

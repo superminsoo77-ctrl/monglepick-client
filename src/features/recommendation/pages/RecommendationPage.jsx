@@ -95,7 +95,7 @@ export default function RecommendationPage() {
             : rec,
         ),
       );
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '찜 처리에 실패했습니다.', type: 'error' });
     }
   };
@@ -113,7 +113,7 @@ export default function RecommendationPage() {
             : rec,
         ),
       );
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '봤어요 처리에 실패했습니다.', type: 'error' });
     }
   };
@@ -132,7 +132,7 @@ export default function RecommendationPage() {
         ),
       );
       showAlert({ title: '감사합니다', message: '평가가 등록되었습니다.', type: 'success' });
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '평가 등록에 실패했습니다.', type: 'error' });
     }
   };

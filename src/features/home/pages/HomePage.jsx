@@ -105,8 +105,16 @@ export default function HomePage() {
     setIsLatestLoading(false);
   }, []);
 
-  /* 최초 마운트 시 1회 로드 */
+  /*
+   * 최초 마운트 시 1회 로드.
+   *
+   * eslint-disable react-hooks/set-state-in-effect — loadMovies 는 fetch + setState 를
+   * 묶은 사용자 액션 콜백이며, useEffect 안에서 외부 데이터(인기/최신 영화)를 가져오는
+   * 합법적 사용 사례이다. fetch 응답 도착 후 setState 가 일어나므로 cascading 렌더와는
+   * 의미가 다르며, React 공식 docs 의 "fetching data in effect" 패턴과 일치한다.
+   */
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadMovies();
   }, [loadMovies]);
 

@@ -70,7 +70,7 @@ export default function PlaylistPage() {
     try {
       const data = await getPlaylistDetail(playlistId);
       setDetail(data);
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '플레이리스트를 불러올 수 없습니다.', type: 'error' });
       navigate(ROUTES.PLAYLIST, { replace: true });
     } finally {
@@ -140,7 +140,7 @@ export default function PlaylistPage() {
     try {
       await deletePlaylist(playlist.id);
       loadPlaylists();
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '삭제에 실패했습니다.', type: 'error' });
     }
   };
@@ -163,7 +163,7 @@ export default function PlaylistPage() {
         ...prev,
         movies: (prev.movies || []).filter((m) => (m.movieId || m.id) !== movieId),
       }));
-    } catch (err) {
+    } catch {
       showAlert({ title: '오류', message: '영화 제거에 실패했습니다.', type: 'error' });
     }
   };

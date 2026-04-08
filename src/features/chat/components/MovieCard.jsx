@@ -14,7 +14,7 @@
  * - OTT 플랫폼
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { trackEvent } from '../../../shared/utils/eventTracker';
 
 /* styled-components 기반 스타일 — theme 토큰으로 다크/라이트 모드 자동 대응 */
@@ -155,20 +155,24 @@ export default function MovieCard({ movie }) {
   /**
    * 트레일러 모달 배경 클릭 시 닫기.
    * 이벤트 버블링으로 iframe 위 클릭은 전파되지 않으므로 자연스럽게 동작한다.
+   *
+   * 2026-04-08 — useCallback 제거. React Compiler 가 컴포넌트 단위로 자동 memoize 하므로
+   * 수동 useCallback 은 오히려 "Existing memoization could not be preserved" 경고를 발생시킨다.
    */
-  const handleOverlayClick = useCallback((e) => {
+  const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
       setShowTrailer(false);
     }
-  }, []);
+  };
 
-  /* Phase 2: 카드 호버 시작 — 시각 기록 */
-  const handleMouseEnter = useCallback(() => {
+  /* Phase 2: 카드 호버 시작 — 시각 기록 (useCallback 제거: React Compiler 위임) */
+  const handleMouseEnter = () => {
     hoverStartRef.current = Date.now();
-  }, []);
+  };
 
   /* Phase 2: 카드 호버 종료 — 300ms 이상이면 이벤트 전송 */
-  const handleMouseLeave = useCallback(() => {
+  /* useCallback 제거 — React Compiler 자동 memoize 위임 */
+  const handleMouseLeave = () => {
     if (hoverStartRef.current) {
       const durationMs = Date.now() - hoverStartRef.current;
       if (durationMs >= 300) {
@@ -178,19 +182,19 @@ export default function MovieCard({ movie }) {
       }
       hoverStartRef.current = null;
     }
-  }, [movie.id, rank]);
+  };
 
-  /* Phase 2: 트레일러 재생 이벤트 */
-  const handleTrailerClick = useCallback(() => {
+  /* Phase 2: 트레일러 재생 이벤트 — useCallback 제거 (React Compiler 위임) */
+  const handleTrailerClick = () => {
     trackEvent('trailer_play', movie.id, { rank, source: 'chat' });
     setShowTrailer(true);
-  }, [movie.id, rank]);
+  };
 
-  /* Phase 5-1: "관심 없음" 클릭 핸들러 — fade-out + 이벤트 전송 */
-  const handleNotInterested = useCallback(() => {
+  /* Phase 5-1: "관심 없음" 클릭 핸들러 — fade-out + 이벤트 전송 (useCallback 제거: React Compiler 위임) */
+  const handleNotInterested = () => {
     setDismissed(true);
     trackEvent('not_interested', movie.id, { rank, source: 'chat' });
-  }, [movie.id, rank]);
+  };
 
   return (
     <CardFadeWrapper $dismissed={dismissed}>

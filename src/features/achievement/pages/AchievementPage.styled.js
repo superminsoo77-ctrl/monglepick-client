@@ -11,11 +11,6 @@ const fadeInUp = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const shimmer = keyframes`
-  0% { background-position: -200px 0; }
-  100% { background-position: 200px 0; }
-`;
-
 /** 페이지 컨테이너 */
 export const Container = styled.div`
   max-width: 900px;

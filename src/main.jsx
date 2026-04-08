@@ -29,7 +29,11 @@ import App from './app/App.jsx';
  *
  * useThemeStore의 mode를 구독하여 테마 객체를 선택한다.
  * Zustand 셀렉터로 mode만 구독하므로 다른 스토어 변경에는 반응하지 않는다.
+ *
+ * react-refresh/only-export-components 룰 disable: main.jsx 는 진입점 파일이므로
+ * Fast Refresh 대상이 아니다. Root 컴포넌트는 export 없이 createRoot 에 직접 사용된다.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 function Root() {
   /* 현재 테마 모드 구독 ('dark' | 'light') */
   const mode = useThemeStore((s) => s.mode);

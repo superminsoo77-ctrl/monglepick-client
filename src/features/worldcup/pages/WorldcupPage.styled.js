@@ -4,7 +4,7 @@
  * 영화 이상형 월드컵: 설정 → 대결 → 결과 3단계 UI.
  */
 
-import styled, { css, keyframes } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 const fadeInUp = keyframes`
   from { opacity: 0; transform: translateY(20px); }
