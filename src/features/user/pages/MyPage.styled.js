@@ -452,6 +452,134 @@ export const PreferencesTags = styled.div`
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
+/* ─────────────────────────────────────────────────────────────
+ * 시청 이력 탭 (2026-04-08 재도입)
+ * user_watch_history 테이블 기반 — Kaggle 시드와 분리된 운영 도메인
+ * ───────────────────────────────────────────────────────────── */
+
+/**
+ * 시청 이력 리스트 외곽 카드 — glass-card 스타일.
+ */
+export const WatchHistoryCard = styled.div`
+  background: ${({ theme }) => theme.glass.bg};
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  padding: ${({ theme }) => theme.spacing.lg};
+`;
+
+/**
+ * 시청 이력 항목 ul.
+ */
+export const WatchHistoryList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 시청 이력 항목 li — 좌측 정보 / 우측 메타+삭제 가로 배치.
+ * 모바일에서는 세로 스택으로 전환된다.
+ */
+export const WatchHistoryItem = styled.li`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  background: ${({ theme }) => theme.colors.surfaceAlt || theme.colors.surface};
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  transition: background ${({ theme }) => theme.motion?.fast || '0.15s'} ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceHover || theme.colors.surface};
+  }
+
+  ${mediaMobile} {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`;
+
+/**
+ * 시청 이력 항목 좌측 메인 — movieId / 시청 일시 등.
+ */
+export const WatchHistoryItemMain = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  flex: 1 1 auto;
+  min-width: 0;
+`;
+
+/**
+ * 시청한 영화 ID (또는 영화 제목 — 추후 영화 메타 join 시).
+ */
+export const WatchHistoryMovieId = styled.span`
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+/**
+ * 시청 일시 / 평점 / 시청 경로 등 메타 정보 묶음.
+ */
+export const WatchHistoryMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.sm};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
+/**
+ * 메타 정보 배지 1개 (시청일/평점/경로 등).
+ */
+export const WatchHistoryBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.surfaceMuted || theme.colors.surface};
+  color: ${({ theme }) => theme.colors.textSecondary || theme.colors.textMuted};
+`;
+
+/**
+ * 시청 기록 삭제 버튼 — 본인 소유만 삭제 가능.
+ */
+export const WatchHistoryDeleteBtn = styled.button`
+  flex-shrink: 0;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.danger || '#ef4444'};
+  color: ${({ theme }) => theme.colors.danger || '#ef4444'};
+  background: transparent;
+  border-radius: ${({ theme }) => theme.radius.md};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: background ${({ theme }) => theme.motion?.fast || '0.15s'} ease,
+              color ${({ theme }) => theme.motion?.fast || '0.15s'} ease;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.danger || '#ef4444'};
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 /* ── 프로필 수정 모달 ── */
 
 export const ModalOverlay = styled.div`

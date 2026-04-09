@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../../shared/stores/useAuthStore';
-import { getProfile, getWishlist, updateProfile } from '../api/userApi';
+import {
+  getProfile,
+  getWishlist,
+  updateProfile,
+  getMyWatchHistory,
+  deleteWatchHistory,
+} from '../api/userApi';
 import { ROUTES } from '../../../shared/constants/routes';
 import MovieList from '../../../shared/components/MovieList/MovieList';
 import Loading from '../../../shared/components/Loading/Loading';
@@ -10,9 +16,32 @@ import * as S from './MyPage.styled';
 
 const TABS = [
   { id: 'profile', label: '프로필' },
+  { id: 'watch-history', label: '시청 이력' },
   { id: 'wishlist', label: '위시리스트' },
   { id: 'preferences', label: '선호 설정' },
 ];
+
+/**
+ * 시청 이력 항목의 시청 일시를 사람이 읽기 쉬운 한국어로 포맷한다.
+ *
+ * @param {string} isoString - ISO 8601 시청 일시
+ * @returns {string} 예: "2026-04-08 21:00"
+ */
+function formatWatchedAt(isoString) {
+  if (!isoString) return '-';
+  try {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+  } catch {
+    return isoString;
+  }
+}
 
 /* ── 프로필 수정 모달 ── */
 function EditProfileModal({ profile, onClose, onSaved }) {
@@ -233,6 +262,15 @@ export default function MyPagePage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [profile, setProfile] = useState(null);
   const [wishlist, setWishlist] = useState([]);
+  /**
+   * 시청 이력 항목 배열.
+   * Backend Page<UserWatchHistoryResponse> 응답의 content[] 가 들어간다.
+   * 각 항목은 { userWatchHistoryId, movieId, watchedAt, rating, watchSource,
+   *           watchDurationSeconds, completionStatus, createdAt } 구조.
+   */
+  const [watchHistory, setWatchHistory] = useState([]);
+  /** 시청 이력 삭제 진행 중인 항목 ID 집합 — 중복 클릭 방지용 */
+  const [deletingIds, setDeletingIds] = useState(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -256,6 +294,16 @@ export default function MyPagePage() {
             setProfile(profileData);
             break;
           }
+          case 'watch-history': {
+            /**
+             * 시청 이력 조회 — Spring Data Page 응답 구조.
+             * 응답 형태: { content: [], totalElements, totalPages, number, size, ... }
+             * page=0 size=20 으로 첫 페이지만 우선 로드. 추후 무한 스크롤/페이지네이션 추가 가능.
+             */
+            const pageData = await getMyWatchHistory({ page: 0, size: 20 });
+            setWatchHistory(pageData?.content || []);
+            break;
+          }
           case 'wishlist': {
             const wishlistData = await getWishlist();
             setWishlist(wishlistData?.wishlist || []);
@@ -273,6 +321,40 @@ export default function MyPagePage() {
 
     loadTabData();
   }, [activeTab, isAuthenticated]);
+
+  /**
+   * 시청 이력 단건 삭제 핸들러.
+   *
+   * 본인 소유만 삭제 가능 (Backend 가 1쿼리로 검증).
+   * 삭제 성공 시 로컬 state 에서 즉시 제거하여 재조회 없이 UI 갱신.
+   *
+   * @param {number|string} id - 삭제할 user_watch_history_id
+   */
+  const handleDeleteWatchHistory = useCallback(async (id) => {
+    if (!id) return;
+
+    /* 중복 클릭 방지 — 진행 중인 삭제는 다시 실행하지 않음 */
+    setDeletingIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
+    try {
+      await deleteWatchHistory(id);
+      /* 로컬 state 에서 즉시 제거 — 재조회 없이 UI 반영 */
+      setWatchHistory((prev) => prev.filter((item) => item.userWatchHistoryId !== id));
+    } catch (err) {
+      setError(err.message || '시청 기록 삭제에 실패했습니다.');
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, []);
 
   function handleProfileSaved(updated) {
     setProfile(updated);
@@ -353,6 +435,73 @@ export default function MyPagePage() {
                     <S.ProfileValue>{profile?.createdAt || '-'}</S.ProfileValue>
                   </S.ProfileField>
                 </S.ProfileCard>
+              )}
+            </div>
+          )}
+
+          {/* 시청 이력 탭 (2026-04-08 재도입) */}
+          {activeTab === 'watch-history' && (
+            <div>
+              {isLoading ? (
+                <Loading message="시청 이력 로딩 중..." />
+              ) : watchHistory.length === 0 ? (
+                <EmptyState
+                  icon="🎬"
+                  title="아직 시청 기록이 없습니다"
+                  description="영화를 보고 '봤어요'를 눌러 기록을 남겨보세요"
+                  actionLabel="영화 둘러보기"
+                  onAction={() => navigate(ROUTES.SEARCH)}
+                />
+              ) : (
+                <S.WatchHistoryCard>
+                  <S.WatchHistoryList>
+                    {watchHistory.map((item) => {
+                      const id = item.userWatchHistoryId;
+                      const isDeleting = deletingIds.has(id);
+                      return (
+                        <S.WatchHistoryItem key={id}>
+                          <S.WatchHistoryItemMain>
+                            <S.WatchHistoryMovieId title={item.movieId}>
+                              🎞️ {item.movieId}
+                            </S.WatchHistoryMovieId>
+                            <S.WatchHistoryMeta>
+                              <S.WatchHistoryBadge>
+                                📅 {formatWatchedAt(item.watchedAt)}
+                              </S.WatchHistoryBadge>
+                              {item.rating != null && (
+                                <S.WatchHistoryBadge>
+                                  ⭐ {item.rating.toFixed(1)}
+                                </S.WatchHistoryBadge>
+                              )}
+                              {item.watchSource && (
+                                <S.WatchHistoryBadge>
+                                  📍 {item.watchSource}
+                                </S.WatchHistoryBadge>
+                              )}
+                              {item.completionStatus && (
+                                <S.WatchHistoryBadge>
+                                  {item.completionStatus === 'COMPLETED'
+                                    ? '✅ 완주'
+                                    : item.completionStatus === 'ABANDONED'
+                                      ? '⏹️ 중단'
+                                      : '⏳ 시청 중'}
+                                </S.WatchHistoryBadge>
+                              )}
+                            </S.WatchHistoryMeta>
+                          </S.WatchHistoryItemMain>
+                          <S.WatchHistoryDeleteBtn
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteWatchHistory(id)}
+                            aria-label="시청 기록 삭제"
+                          >
+                            {isDeleting ? '삭제 중...' : '🗑️ 삭제'}
+                          </S.WatchHistoryDeleteBtn>
+                        </S.WatchHistoryItem>
+                      );
+                    })}
+                  </S.WatchHistoryList>
+                </S.WatchHistoryCard>
               )}
             </div>
           )}

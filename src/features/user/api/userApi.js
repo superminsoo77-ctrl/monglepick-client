@@ -11,7 +11,7 @@
 /* 공용 axios 인스턴스 + 인증 필수 가드 */
 import api, { requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
-import { MYPAGE_ENDPOINTS } from '../../../shared/constants/api';
+import { MYPAGE_ENDPOINTS, WATCH_HISTORY_ENDPOINTS } from '../../../shared/constants/api';
 
 // ── 프로필 ──
 
@@ -76,6 +76,79 @@ export async function addToWishlist(movieId) {
 export async function removeFromWishlist(movieId) {
   requireAuth();
   return api.delete(MYPAGE_ENDPOINTS.TOGGLE_WISHLIST(movieId));
+}
+
+// ── 시청 이력 ──
+
+/**
+ * 사용자의 시청 이력을 페이징 조회한다 (마이페이지 통합 경로).
+ *
+ * Backend: GET /api/v1/users/me/watch-history → 200 OK + Page<UserWatchHistoryResponse>
+ *
+ * Spring Data Pageable 응답 구조이므로 응답에는 content[], totalElements, totalPages,
+ * number(현재 페이지), size 가 포함된다. 정렬 기본값은 watchedAt DESC (최신순).
+ *
+ * @param {Object} [options={}] - 조회 파라미터
+ * @param {number} [options.page=0] - 페이지 번호 (0부터 시작 — Spring 표준)
+ * @param {number} [options.size=20] - 페이지 크기
+ * @returns {Promise<Object>} 페이지 응답 ({ content, totalElements, totalPages, ... })
+ */
+export async function getMyWatchHistory({ page = 0, size = 20 } = {}) {
+  requireAuth();
+  return api.get(MYPAGE_ENDPOINTS.WATCH_HISTORY_ME, { params: { page, size } });
+}
+
+/**
+ * 시청 기록을 추가한다.
+ *
+ * Backend: POST /api/v1/watch-history → 201 Created + UserWatchHistoryResponse
+ *
+ * 동일 영화를 여러 번 시청한 경우 매번 새 레코드로 저장된다(중복 허용).
+ * 재관람 횟수 추적을 위한 의도적 설계이며, watchedAt 미입력 시 서버 시각이 자동 채워진다.
+ *
+ * @param {Object} payload - 시청 기록 요청
+ * @param {string} payload.movieId - 영화 ID (필수)
+ * @param {string} [payload.watchedAt] - ISO 8601 시청 일시 (선택, 미입력 시 서버 시각)
+ * @param {number} [payload.rating] - 평점 1.0 ~ 5.0 (선택)
+ * @param {string} [payload.watchSource] - 시청 경로 (recommendation/search/wishlist/home/match/direct)
+ * @param {number} [payload.watchDurationSeconds] - 실제 시청 시간 초 단위 (선택)
+ * @param {string} [payload.completionStatus] - COMPLETED / ABANDONED / IN_PROGRESS (선택)
+ * @returns {Promise<Object>} 저장된 시청 이력 응답 DTO
+ */
+export async function addWatchHistory(payload) {
+  requireAuth();
+  return api.post(WATCH_HISTORY_ENDPOINTS.ADD, payload);
+}
+
+/**
+ * 특정 시청 기록을 삭제한다 (본인 소유만 가능).
+ *
+ * Backend: DELETE /api/v1/watch-history/{id} → 204 No Content
+ *
+ * 본인 소유가 아니거나 존재하지 않는 ID 는 동일하게 400 으로 응답된다 (enumeration attack 방지).
+ *
+ * @param {number|string} id - 삭제할 시청 이력 PK (user_watch_history_id)
+ * @returns {Promise<void>}
+ */
+export async function deleteWatchHistory(id) {
+  requireAuth();
+  return api.delete(WATCH_HISTORY_ENDPOINTS.DELETE(id));
+}
+
+/**
+ * 특정 영화의 재관람 횟수를 조회한다.
+ *
+ * Backend: GET /api/v1/watch-history/movies/{movieId}/count → 200 OK + { movieId, count }
+ *
+ * 시청 기록이 없으면 count 는 0 으로 반환된다. 영화 상세 화면의
+ * "이 영화를 N 번 봤어요" 표시 등에 사용한다.
+ *
+ * @param {string} movieId - 조회 대상 영화 ID
+ * @returns {Promise<{ movieId: string, count: number }>}
+ */
+export async function getRewatchCount(movieId) {
+  requireAuth();
+  return api.get(WATCH_HISTORY_ENDPOINTS.REWATCH_COUNT(movieId));
 }
 
 // ── 선호 설정 ──

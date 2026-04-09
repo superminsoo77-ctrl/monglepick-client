@@ -115,10 +115,13 @@ export const COMMUNITY_ENDPOINTS = {
 
 /**
  * 마이페이지(MyPage) 관련 엔드포인트.
- * 사용자 프로필, 위시리스트, 선호 설정을 처리한다.
+ * 사용자 프로필, 시청 이력, 위시리스트, 선호 설정을 처리한다.
  *
- * 시청 이력 엔드포인트는 폐기되었으며 (2026-04-08), "리뷰 작성 = 시청 완료" 단일 진실
- * 원본 원칙에 따라 reviews API로 통합되었다.
+ * <h3>시청 이력 도메인 재도입 (2026-04-08)</h3>
+ * user_watch_history 테이블 신설 + UserWatchHistory 도메인 부활. Kaggle MovieLens 시드인
+ * kaggle_watch_history (Agent 전용 read-only)와는 완전히 분리된 운영 도메인이다.
+ * 추천 학습의 단일 진실 원본은 여전히 reviews 이며, 본 엔드포인트는 유저 대면 UX
+ * (시청 이력 탭, 재관람 카운트, "봤어요" 원터치 체크)를 담당한다.
  */
 export const MYPAGE_ENDPOINTS = {
   /** 프로필 조회 - GET (Backend: /api/v1/users/me/profile) */
@@ -131,6 +134,31 @@ export const MYPAGE_ENDPOINTS = {
   TOGGLE_WISHLIST: (movieId) => `${API_VERSION}/users/me/wishlist/${movieId}`,
   /** 선호 장르/분위기 설정 - GET/PUT */
   PREFERENCES: `${API_VERSION}/users/me/preferences`,
+  /**
+   * 시청 이력 조회 (마이페이지 통합 경로) - GET
+   * Backend: /api/v1/users/me/watch-history (UserController)
+   */
+  WATCH_HISTORY_ME: `${API_VERSION}/users/me/watch-history`,
+};
+
+/**
+ * 시청 이력(WatchHistory) 독립 경로 엔드포인트.
+ *
+ * 마이페이지 통합 조회는 MYPAGE_ENDPOINTS.WATCH_HISTORY_ME 사용.
+ * 본 엔드포인트는 추가/삭제/재관람 카운트 등 운영 액션 전용이다.
+ *
+ * Backend 구현: domain/userwatchhistory/controller/UserWatchHistoryController
+ * 테이블 분리: user_watch_history (운영) ⟷ kaggle_watch_history (Kaggle 시드, Agent 전용)
+ */
+export const WATCH_HISTORY_ENDPOINTS = {
+  /** 시청 이력 페이징 조회 - GET (독립 경로) */
+  LIST: `${API_VERSION}/watch-history`,
+  /** 시청 기록 추가 - POST (중복 허용, 재관람 카운트 가능) */
+  ADD: `${API_VERSION}/watch-history`,
+  /** 시청 기록 삭제 - DELETE (본인 소유만, id 파라미터 필요) */
+  DELETE: (id) => `${API_VERSION}/watch-history/${id}`,
+  /** 특정 영화 재관람 카운트 - GET (movieId 파라미터 필요) */
+  REWATCH_COUNT: (movieId) => `${API_VERSION}/watch-history/movies/${movieId}/count`,
 };
 
 /**
