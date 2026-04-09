@@ -45,6 +45,25 @@ const GENRE_FILTERS = [
   '공포', '애니메이션', '판타지', '범죄', '다큐멘터리', '가족',
 ];
 
+/**
+ * 장르 발견형 검색에서 기본으로 먼저 노출할 주 장르 목록.
+ * 사용자가 가장 자주 탐색할 장르를 상단에 고정해 세부 장르 펼침 전에도 빠르게 선택할 수 있게 한다.
+ */
+const PRIMARY_SEARCH_GENRE_LABELS = [
+  '액션',
+  '드라마',
+  '애니메이션',
+  '로맨스',
+  '공포',
+  '스릴러',
+  '코미디',
+  '판타지',
+  'SF',
+  '범죄',
+  '가족',
+  '다큐멘터리',
+];
+
 /** 정렬 옵션 */
 const SORT_OPTIONS = [
   { value: 'relevance', label: '관련도순' },
@@ -67,6 +86,32 @@ function createInitialRecentPagination() {
     has_more: false,
     next_offset: null,
   };
+}
+
+function createInitialMovieDataset() {
+  return {
+    signature: '',
+    movies: [],
+    totalCount: 0,
+    currentPage: 0,
+    hasMore: false,
+    baseSort: 'relevance',
+  };
+}
+
+function splitSearchGenreOptions(options) {
+  const optionMap = new Map(options.map((item) => [item.label, item]));
+  const primaryOptions = PRIMARY_SEARCH_GENRE_LABELS
+    .map((label) => optionMap.get(label))
+    .filter(Boolean);
+  const primaryLabelSet = new Set(primaryOptions.map((item) => item.label));
+  const detailOptions = options.filter((item) => !primaryLabelSet.has(item.label));
+
+  return { primaryOptions, detailOptions };
+}
+
+function hasSelectedDetailGenres(selectedGenres) {
+  return selectedGenres.some((label) => !PRIMARY_SEARCH_GENRE_LABELS.includes(label));
 }
 
 /**
@@ -116,6 +161,39 @@ function buildSearchCacheKey({ query, searchType, genre, sort, selectedGenres = 
   });
 }
 
+function buildSearchSignature({ query, searchType, genre, selectedGenres = [] }) {
+  return JSON.stringify({
+    query: query || '',
+    searchType: searchType || 'all',
+    genre: genre || '전체',
+    selectedGenres,
+  });
+}
+
+function buildSearchParams({ query, searchType, genre, sort, selectedGenres = [] }) {
+  const params = new URLSearchParams();
+
+  if (query) {
+    params.set('q', query);
+    if (searchType && searchType !== 'all') {
+      params.set('searchType', searchType);
+    }
+    if (genre && genre !== '전체') {
+      params.set('genre', genre);
+    }
+  }
+
+  if (!query && selectedGenres.length > 0) {
+    params.set('genres', selectedGenres.join(','));
+  }
+
+  if (sort && sort !== 'relevance') {
+    params.set('sort', sort);
+  }
+
+  return params;
+}
+
 /**
  * 최근 검색 기록 필터의 서버 정렬값을 검색 페이지 정렬값으로 변환한다.
  */
@@ -127,6 +205,49 @@ function normalizeHistorySort(sortBy) {
     return 'date';
   }
   return 'relevance';
+}
+
+function getMovieReleaseTimestamp(movie) {
+  if (movie?.release_date) {
+    const parsed = Date.parse(movie.release_date);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  if (movie?.releaseYear) {
+    return new Date(movie.releaseYear, 0, 1).getTime();
+  }
+
+  return 0;
+}
+
+function sortMoviesForDisplay(movieList, sortValue) {
+  if (!Array.isArray(movieList) || movieList.length === 0) {
+    return [];
+  }
+
+  const normalizedMovies = [...movieList];
+
+  if (sortValue === 'date') {
+    // 최신순은 현재까지 받아온 결과를 개봉일 기준으로 프론트에서 빠르게 재정렬합니다.
+    return normalizedMovies.sort((left, right) => (
+      getMovieReleaseTimestamp(right) - getMovieReleaseTimestamp(left)
+      || (right.rating || 0) - (left.rating || 0)
+      || (right.vote_count || 0) - (left.vote_count || 0)
+    ));
+  }
+
+  if (sortValue === 'rating') {
+    return normalizedMovies.sort((left, right) => (
+      (right.rating || 0) - (left.rating || 0)
+      || (right.vote_count || 0) - (left.vote_count || 0)
+      || getMovieReleaseTimestamp(right) - getMovieReleaseTimestamp(left)
+    ));
+  }
+
+  // 관련도순은 서버가 내려준 기본 검색 순서를 그대로 유지합니다.
+  return normalizedMovies;
 }
 
 function readSearchCache() {
@@ -167,6 +288,8 @@ export default function SearchPage() {
   const [searchGenreOptions, setSearchGenreOptions] = useState([]);
   const [isSearchGenreOptionsLoading, setIsSearchGenreOptionsLoading] = useState(false);
   const [selectedSearchGenres, setSelectedSearchGenres] = useState(initialSelectedGenres);
+  const [isDetailGenresExpanded, setIsDetailGenresExpanded] = useState(false);
+  const [baseMovieDataset, setBaseMovieDataset] = useState(createInitialMovieDataset);
   const [movies, setMovies]       = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -187,10 +310,24 @@ export default function SearchPage() {
   const [isRecentModalOpen, setIsRecentModalOpen] = useState(false);
   const loadMoreRef = useRef(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
+  const { primaryOptions: primarySearchGenreOptions, detailOptions: detailSearchGenreOptions } = (
+    splitSearchGenreOptions(searchGenreOptions)
+  );
 
   const restoreSearchSnapshot = useCallback((snapshot) => {
     if (!snapshot) return;
 
+    const fallbackDataset = {
+      ...createInitialMovieDataset(),
+      movies: snapshot.movies || [],
+      totalCount: snapshot.totalCount || 0,
+      currentPage: snapshot.currentPage || 1,
+      hasMore: Boolean(snapshot.hasMore),
+      baseSort: snapshot.lastSearchContext?.baseSort || snapshot.lastSearchContext?.sort || 'relevance',
+    };
+
+    // 예전 캐시 구조와의 호환을 위해 dataset 정보가 없으면 현재 표시 목록을 fallback으로 사용합니다.
+    setBaseMovieDataset(snapshot.baseMovieDataset || fallbackDataset);
     setMovies(snapshot.movies || []);
     setTotalCount(snapshot.totalCount || 0);
     setCurrentPage(snapshot.currentPage || 1);
@@ -198,6 +335,9 @@ export default function SearchPage() {
     setHasSearched(Boolean(snapshot.hasSearched));
     setLastSearchContext(snapshot.lastSearchContext || null);
     setSelectedSearchGenres(snapshot.lastSearchContext?.discoveryGenres || []);
+    setIsDetailGenresExpanded(
+      hasSelectedDetailGenres(snapshot.lastSearchContext?.discoveryGenres || [])
+    );
     setIsLoading(false);
     setIsFetchingMore(false);
   }, []);
@@ -214,14 +354,24 @@ export default function SearchPage() {
     page = 1,
     append = false,
     discoveryGenres = selectedSearchGenres,
+    baseSortOverride,
   ) => {
     const queryText = searchQuery.trim();
     const normalizedDiscoveryGenres = queryText ? [] : discoveryGenres.filter(Boolean);
     const isGenreDiscoverySearch = !queryText && normalizedDiscoveryGenres.length > 0;
     const effectiveSort = searchSort;
+    const searchSignature = buildSearchSignature({
+      query: queryText,
+      searchType: currentSearchType,
+      genre: queryText ? searchGenre : '전체',
+      selectedGenres: normalizedDiscoveryGenres,
+    });
+    // 검색 버튼을 누른 시점의 정렬값을 이번 검색의 기준 정렬로 유지합니다.
+    const baseSort = baseSortOverride || effectiveSort;
 
     /* 텍스트 검색어도, 선택 장르도 없으면 검색을 실행하지 않음 */
     if (!queryText && !isGenreDiscoverySearch) {
+      setBaseMovieDataset(createInitialMovieDataset());
       setMovies([]);
       setHasSearched(false);
       setTotalCount(0);
@@ -244,16 +394,13 @@ export default function SearchPage() {
 
     if (!append) {
       /* URL 쿼리 파라미터 업데이트 */
-      const params = new URLSearchParams();
-      if (queryText) {
-        params.set('q', queryText);
-        if (currentSearchType !== 'all') params.set('searchType', currentSearchType);
-        if (searchGenre !== '전체') params.set('genre', searchGenre);
-      }
-      if (isGenreDiscoverySearch) {
-        params.set('genres', normalizedDiscoveryGenres.join(','));
-      }
-      if (effectiveSort !== 'relevance') params.set('sort', effectiveSort);
+      const params = buildSearchParams({
+        query: queryText,
+        searchType: currentSearchType,
+        genre: queryText ? searchGenre : '전체',
+        sort: effectiveSort,
+        selectedGenres: normalizedDiscoveryGenres,
+      });
       setSearchParams(params, { replace: true });
     }
 
@@ -263,26 +410,44 @@ export default function SearchPage() {
         searchType: currentSearchType,
         genre: queryText && searchGenre !== '전체' ? searchGenre : '',
         genres: isGenreDiscoverySearch ? normalizedDiscoveryGenres : [],
-        sort: effectiveSort,
+        // 기준 정렬은 검색 시점에만 서버에 전달하고, 이후 토글 변경은 프론트 재정렬로 처리합니다.
+        sort: baseSort,
         page,
         size: PAGE_SIZE,
       });
 
       const nextMovies = result?.movies || [];
       const nextTotal = result?.total || 0;
+      const isSameBaseDataset = baseMovieDataset.signature === searchSignature;
+      const previousBaseDataset = isSameBaseDataset
+        ? baseMovieDataset
+        : createInitialMovieDataset();
+      const nextBaseMovieDataset = {
+        signature: searchSignature,
+        movies: append
+          ? [...previousBaseDataset.movies, ...nextMovies]
+          : nextMovies,
+        totalCount: nextTotal,
+        currentPage: page,
+        hasMore: page * PAGE_SIZE < nextTotal,
+        baseSort,
+      };
+      const visibleMovies = sortMoviesForDisplay(nextBaseMovieDataset.movies, effectiveSort);
 
-      setMovies((prev) => (append ? [...prev, ...nextMovies] : nextMovies));
-      setTotalCount(nextTotal);
-      setCurrentPage(page);
-      setHasMore(page * PAGE_SIZE < nextTotal);
+      setBaseMovieDataset(nextBaseMovieDataset);
+      setMovies(visibleMovies);
+      setTotalCount(nextBaseMovieDataset.totalCount);
+      setCurrentPage(nextBaseMovieDataset.currentPage || 1);
+      setHasMore(Boolean(nextBaseMovieDataset.hasMore));
       setLastSearchContext({
         query: queryText,
         searchType: currentSearchType,
         genre: queryText ? searchGenre : '전체',
         sort: effectiveSort,
+        baseSort,
         discoveryGenres: normalizedDiscoveryGenres,
         searchMode: isGenreDiscoverySearch ? 'genre_discovery' : 'keyword',
-        resultCount: nextTotal,
+        resultCount: nextBaseMovieDataset.totalCount,
       });
 
       /* Phase 2: 검색 실행 이벤트 (첫 페이지만 기록) */
@@ -297,6 +462,7 @@ export default function SearchPage() {
       }
     } catch {
       if (!append) {
+        setBaseMovieDataset(createInitialMovieDataset());
         setMovies([]);
         setTotalCount(0);
         setCurrentPage(1);
@@ -311,7 +477,7 @@ export default function SearchPage() {
         setIsLoading(false);
       }
     }
-  }, [selectedSearchGenres, setSearchParams]);
+  }, [baseMovieDataset, selectedSearchGenres, setSearchParams]);
 
   /**
    * URL 파라미터에 검색어가 있으면 마운트 시 1회 자동 검색 실행.
@@ -334,6 +500,7 @@ export default function SearchPage() {
       setGenre(urlGenre);
       setSort(urlSort);
       setSelectedSearchGenres(urlSelectedGenres);
+      setIsDetailGenresExpanded(hasSelectedDetailGenres(urlSelectedGenres));
 
       const cacheKey = buildSearchCacheKey({
         query: urlQuery || '',
@@ -549,6 +716,7 @@ export default function SearchPage() {
         selectedGenres: lastSearchContext.discoveryGenres || [],
       }),
       snapshot: {
+        baseMovieDataset,
         movies,
         totalCount,
         currentPage,
@@ -563,6 +731,7 @@ export default function SearchPage() {
     hasSearched,
     lastSearchContext,
     movies,
+    baseMovieDataset,
     totalCount,
   ]);
 
@@ -586,6 +755,14 @@ export default function SearchPage() {
         ? prev.filter((item) => item !== genreLabel)
         : [...prev, genreLabel]
     ));
+  }, []);
+
+  /**
+   * 세부 장르 영역을 펼치거나 닫는다.
+   * 토글 텍스트를 클릭해 세부 장르 목록 노출 여부를 바로 전환할 수 있다.
+   */
+  const handleToggleDetailGenres = useCallback(() => {
+    setIsDetailGenresExpanded((prev) => !prev);
   }, []);
 
   /**
@@ -699,6 +876,7 @@ export default function SearchPage() {
       setGenre('전체');
       setSort(restoredSort);
       setSelectedSearchGenres(historyGenres);
+      setIsDetailGenresExpanded(hasSelectedDetailGenres(historyGenres));
       setIsRecentModalOpen(false);
       executeSearch('', 'all', '전체', restoredSort, 1, false, historyGenres);
       return;
@@ -740,22 +918,32 @@ export default function SearchPage() {
    */
   const handleSortChange = (selectedSort) => {
     setSort(selectedSort);
-    if (query.trim()) {
-      executeSearch(query, searchType, genre, selectedSort, 1, false, selectedSearchGenres);
+    if (!hasSearched) {
       return;
     }
 
-    if (hasSearched && lastSearchContext?.discoveryGenres?.length) {
-      executeSearch(
-        '',
-        'all',
-        '전체',
-        selectedSort,
-        1,
-        false,
-        lastSearchContext.discoveryGenres,
-      );
-    }
+    const queryText = (lastSearchContext?.query || query).trim();
+    const normalizedDiscoveryGenres = (
+      lastSearchContext?.discoveryGenres || selectedSearchGenres
+    );
+    setMovies(sortMoviesForDisplay(baseMovieDataset.movies, selectedSort));
+    setTotalCount(baseMovieDataset.totalCount);
+    setCurrentPage(baseMovieDataset.currentPage || 1);
+    setHasMore(Boolean(baseMovieDataset.hasMore));
+    setLastSearchContext((prev) => (
+      prev ? {
+        ...prev,
+        sort: selectedSort,
+        resultCount: baseMovieDataset.totalCount,
+      } : prev
+    ));
+    setSearchParams(buildSearchParams({
+      query: queryText,
+      searchType: lastSearchContext?.searchType || searchType,
+      genre: queryText ? (lastSearchContext?.genre || genre) : '전체',
+      sort: selectedSort,
+      selectedGenres: queryText ? [] : normalizedDiscoveryGenres,
+    }), { replace: true });
   };
 
   /**
@@ -770,6 +958,7 @@ export default function SearchPage() {
     const pagedSearchType = lastSearchContext?.searchType || searchType;
     const pagedGenre = lastSearchContext?.genre || genre;
     const pagedSort = lastSearchContext?.sort || sort;
+    const pagedBaseSort = lastSearchContext?.baseSort || pagedSort;
     const pagedDiscoveryGenres = lastSearchContext?.discoveryGenres || selectedSearchGenres;
 
     executeSearch(
@@ -780,6 +969,7 @@ export default function SearchPage() {
       currentPage + 1,
       true,
       pagedDiscoveryGenres,
+      pagedBaseSort,
     );
   }, [
     currentPage,
@@ -794,6 +984,7 @@ export default function SearchPage() {
     lastSearchContext?.genre,
     lastSearchContext?.query,
     lastSearchContext?.sort,
+    lastSearchContext?.baseSort,
     query,
     selectedSearchGenres,
     searchType,
@@ -943,18 +1134,46 @@ export default function SearchPage() {
             )}
 
             {!isSearchGenreOptionsLoading && searchGenreOptions.length > 0 && (
-              <S.SearchGenreGrid>
-                {searchGenreOptions.map((item) => (
-                  <S.SearchGenreToggle
-                    key={item.label}
-                    type="button"
-                    $active={selectedSearchGenres.includes(item.label)}
-                    onClick={() => handleSearchGenreToggle(item.label)}
-                  >
-                    {item.label}
-                  </S.SearchGenreToggle>
-                ))}
-              </S.SearchGenreGrid>
+              <S.SearchGenreGroups>
+                <S.SearchGenreGrid>
+                  {primarySearchGenreOptions.map((item) => (
+                    <S.SearchGenreToggle
+                      key={item.label}
+                      type="button"
+                      $active={selectedSearchGenres.includes(item.label)}
+                      onClick={() => handleSearchGenreToggle(item.label)}
+                    >
+                      {item.label}
+                    </S.SearchGenreToggle>
+                  ))}
+                </S.SearchGenreGrid>
+
+                {detailSearchGenreOptions.length > 0 && (
+                  <S.SearchGenreDetailSection>
+                    <S.SearchGenreDetailToggle
+                      type="button"
+                      onClick={handleToggleDetailGenres}
+                    >
+                      {isDetailGenresExpanded ? '세부 장르 닫기' : '세부 장르 펼치기'}
+                    </S.SearchGenreDetailToggle>
+
+                    {isDetailGenresExpanded && (
+                      <S.SearchGenreGrid>
+                        {detailSearchGenreOptions.map((item) => (
+                          <S.SearchGenreToggle
+                            key={item.label}
+                            type="button"
+                            $active={selectedSearchGenres.includes(item.label)}
+                            onClick={() => handleSearchGenreToggle(item.label)}
+                          >
+                            {item.label}
+                          </S.SearchGenreToggle>
+                        ))}
+                      </S.SearchGenreGrid>
+                    )}
+                  </S.SearchGenreDetailSection>
+                )}
+              </S.SearchGenreGroups>
             )}
           </S.SearchGenreSection>
         )}

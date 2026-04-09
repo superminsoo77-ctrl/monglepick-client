@@ -642,6 +642,16 @@ export const SearchGenreEmpty = styled.p`
 `;
 
 /**
+ * 장르 발견형 검색 블록 내부 묶음.
+ * 주 장르와 세부 장르 영역을 같은 카드 안에서 자연스럽게 구분한다.
+ */
+export const SearchGenreGroups = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+/**
  * 장르 발견형 검색 토글 목록.
  * CSV 기준 장르 수가 많아 여러 줄로 자연스럽게 감싼다.
  */
@@ -685,6 +695,38 @@ export const SearchGenreToggle = styled.button`
       color: white;
       box-shadow: ${theme.glows.primary};
     `}
+`;
+
+/**
+ * 세부 장르 영역.
+ * 구분선 아래에 토글 텍스트와 세부 장르 목록이 이어지도록 묶는다.
+ */
+export const SearchGenreDetailSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+  padding-top: ${({ theme }) => theme.spacing.xs};
+  border-top: 1px solid ${({ theme }) => theme.colors.borderLight};
+`;
+
+/**
+ * 세부 장르 토글 텍스트.
+ * 구분선 바로 아래의 문구 자체를 클릭해 펼침/닫기를 전환한다.
+ */
+export const SearchGenreDetailToggle = styled.button`
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 /**
