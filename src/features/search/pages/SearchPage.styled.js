@@ -211,6 +211,482 @@ export const SearchButton = styled.button`
   }
 `;
 
+export const RecentSection = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.md};
+  background: transparent;
+  backdrop-filter: ${({ theme }) => theme.glass.blur};
+  -webkit-backdrop-filter: ${({ theme }) => theme.glass.blur};
+  border: 1px solid transparent;
+  border-radius: ${({ theme }) => theme.radius.xl};
+`;
+
+export const RecentHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.sm};
+  flex-wrap: wrap;
+`;
+
+export const RecentTitle = styled.h2`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+/**
+ * 최근 검색 기록 모달을 여는 액션 버튼.
+ * 인라인 목록 대신 별도 팝업으로 전체 기록을 열어 본다.
+ */
+export const RecentActionButton = styled.button`
+  padding: 8px 14px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    background-color: ${({ theme }) => theme.colors.bgTertiary};
+  }
+`;
+
+/**
+ * 검색창 아래에 보여주는 최근 검색 기록 미리보기 빈 상태.
+ */
+export const RecentPreviewEmpty = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
+/**
+ * 최근 검색 기록 미리보기 목록.
+ * 전체보기 전에는 최대 5개만 칩 형태로 보여준다.
+ */
+export const RecentPreviewList = styled.ul`
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 최근 검색 기록 미리보기 개별 항목.
+ */
+export const RecentPreviewItem = styled.li`
+  min-width: 0;
+`;
+
+/**
+ * 최근 검색 기록 미리보기 버튼.
+ * 검색창 아래에서 빠르게 재검색할 수 있도록 칩 스타일을 사용한다.
+ */
+export const RecentPreviewButton = styled.button`
+  max-width: 160px;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+    transform: translateY(-1px);
+  }
+`;
+
+/**
+ * 최근 검색 기록 미리보기 키워드.
+ */
+export const RecentPreviewKeyword = styled.span`
+  display: block;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+/**
+ * 최근 검색 기록 모달 오버레이.
+ * 배경 클릭으로 모달을 닫을 수 있다.
+ */
+export const RecentModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.bgOverlay};
+  z-index: ${({ theme }) => theme.zIndex.modalBackdrop};
+`;
+
+/**
+ * 최근 검색 기록 모달 컨테이너.
+ * 모바일에서도 자연스럽게 보이도록 너비와 높이를 제한한다.
+ */
+export const RecentModalContainer = styled.div`
+  width: min(720px, 100%);
+  max-height: min(78vh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.xl};
+  overflow: hidden;
+  z-index: ${({ theme }) => theme.zIndex.modal};
+`;
+
+/**
+ * 최근 검색 기록 모달 상단 헤더.
+ * 제목과 닫기 버튼을 양 끝에 배치한다.
+ */
+export const RecentModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 최근 검색 기록 모달 우측 액션 영역.
+ * 전체삭제와 닫기 버튼을 한 줄로 정렬한다.
+ */
+export const RecentModalActions = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 최근 검색 기록 모달 제목.
+ */
+export const RecentModalTitle = styled.h3`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+/**
+ * 최근 검색 기록 모달 닫기 버튼.
+ */
+export const RecentModalCloseButton = styled.button`
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              background-color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    background: ${({ theme }) => theme.colors.bgTertiary};
+  }
+`;
+
+/**
+ * 최근 검색 기록 전체삭제 버튼.
+ * 파괴적 액션이므로 경고 계열 색을 사용한다.
+ */
+export const RecentModalDangerButton = styled.button`
+  padding: 8px 14px;
+  border: 1px solid ${({ theme }) => theme.colors.error};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.errorBg};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: opacity ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+/**
+ * 최근 검색 기록 모달 안내 문구.
+ */
+export const RecentModalDescription = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
+/**
+ * 최근 검색 기록 모달 본문.
+ * 내부 스크롤로 30개 단위 추가 로드를 트리거한다.
+ */
+export const RecentModalBody = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding-right: ${({ theme }) => theme.spacing.xs};
+`;
+
+/**
+ * 최근 검색 기록의 공통 빈 상태/로딩 텍스트.
+ */
+export const RecentEmpty = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  text-align: center;
+`;
+
+/**
+ * 최근 검색 기록 모달 목록.
+ * 한 줄에 검색어 1개씩 세로로 배치한다.
+ */
+export const RecentModalList = styled.ul`
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 최근 검색 기록 모달 개별 항목.
+ */
+export const RecentModalItem = styled.li`
+  min-width: 0;
+`;
+
+/**
+ * 최근 검색 기록 모달 한 줄 레이아웃.
+ * 왼쪽은 검색어/시간, 오른쪽은 삭제 버튼을 배치한다.
+ */
+export const RecentModalRow = styled.div`
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgCard};
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+  }
+`;
+
+/**
+ * 최근 검색 기록 모달 왼쪽 정보 버튼.
+ * 클릭 시 해당 키워드로 즉시 재검색한다.
+ */
+export const RecentModalKeywordButton = styled.button`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+`;
+
+/**
+ * 최근 검색 기록 모달의 메인 키워드 텍스트.
+ */
+export const RecentModalKeyword = styled.span`
+  width: 100%;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+/**
+ * 최근 검색 기록 모달의 검색 시각 텍스트.
+ * 키워드 바로 아래에 작은 보조 텍스트로 표시한다.
+ */
+export const RecentModalMeta = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textXs};
+`;
+
+/**
+ * 최근 검색 기록 개별 삭제 버튼.
+ * 행의 오른쪽에 고정해 한 건만 빠르게 제거할 수 있게 한다.
+ */
+export const RecentDeleteButton = styled.button`
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    border-color: ${({ theme }) => theme.colors.error};
+    color: ${({ theme }) => theme.colors.error};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+/**
+ * 최근 검색 기록 모달 하단 상태 문구.
+ * 추가 로딩 중이거나 마지막 페이지 도달 시 안내 메시지를 보여준다.
+ */
+export const RecentStatus = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  text-align: center;
+`;
+
+/**
+ * 텍스트 검색 없이 장르만 선택할 때 사용하는 전용 섹션.
+ * 기존 단일 장르 필터와 다른 역할이라 시각적으로 분리한다.
+ */
+export const SearchGenreSection = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  background: ${({ theme }) => theme.colors.bgCard};
+`;
+
+/**
+ * 장르 발견형 검색 섹션 제목.
+ */
+export const SearchGenreTitle = styled.h2`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+/**
+ * 장르 발견형 검색 섹션 안내 문구.
+ */
+export const SearchGenreDescription = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+/**
+ * 장르 발견형 검색의 빈 상태/로딩 문구.
+ */
+export const SearchGenreEmpty = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+/**
+ * 장르 발견형 검색 토글 목록.
+ * CSV 기준 장르 수가 많아 여러 줄로 자연스럽게 감싼다.
+ */
+export const SearchGenreGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+/**
+ * 장르 발견형 검색 토글 버튼.
+ * 여러 개를 동시에 선택할 수 있어 기존 단일 장르 필터와 다른 시각 언어를 사용한다.
+ *
+ * @prop {boolean} $active - 선택 여부
+ */
+export const SearchGenreToggle = styled.button`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              background-color ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    transform: translateY(-1px);
+  }
+
+  ${({ $active, theme }) =>
+    $active &&
+    css`
+      background: ${theme.gradients.primary};
+      border-color: transparent;
+      color: white;
+      box-shadow: ${theme.glows.primary};
+    `}
+`;
+
 /**
  * 필터 영역 (장르 + 정렬) — space-between 가로 배치, flex-wrap.
  */
@@ -220,6 +696,15 @@ export const Filters = styled.div`
   justify-content: space-between;
   gap: ${({ theme }) => theme.spacing.md};
   flex-wrap: wrap;
+`;
+
+/**
+ * 텍스트 검색이 없을 때 필터 영역의 좌측 자리를 차지하는 공간.
+ * 정렬 셀렉트가 오른쪽에 안정적으로 붙도록 유지한다.
+ */
+export const FilterSpacer = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
 /**

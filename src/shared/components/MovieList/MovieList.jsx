@@ -39,7 +39,7 @@ function parseGenres(genres) {
   return [];
 }
 
-export default function MovieList({ movies = [], title, loading = false }) {
+export default function MovieList({ movies = [], title, loading = false, onMovieClick }) {
   // 로딩 중 — Skeleton 카드 6개 표시
   if (loading) {
     return (
@@ -77,6 +77,11 @@ export default function MovieList({ movies = [], title, loading = false }) {
             key={movie.id || movie.movieId}
             to={buildPath(ROUTES.MOVIE_DETAIL, { id: movie.id || movie.movieId })}
             $index={index}
+            onClick={() => {
+              if (onMovieClick) {
+                void onMovieClick(movie);
+              }
+            }}
           >
             {/* 포스터 이미지 */}
             <S.Poster>

@@ -415,6 +415,27 @@ export const TermsLabel = styled.span`
   user-select: none;
 `;
 
+/**
+ * 약관 내용 "보기" 버튼 — 인라인 텍스트 스타일.
+ * 체크박스/라벨과 같은 행에 위치하며, 배지 왼쪽에 배치한다.
+ */
+export const TermsViewButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  text-decoration: underline;
+  flex-shrink: 0;
+  transition: color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primaryHover ?? theme.colors.primary};
+    opacity: 0.8;
+  }
+`;
+
 /** 필수/선택 배지. */
 export const TermsBadge = styled.span`
   font-size: ${({ theme }) => theme.typography.textXs};

@@ -294,6 +294,59 @@ export const SocialButton = styled.button`
     `}
 `;
 
+/**
+ * 비밀번호 찾기 링크 — 비밀번호 필드 아래 우측 정렬 작은 링크.
+ */
+export const ForgotPasswordButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: right;
+  align-self: flex-end;
+  transition: opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    opacity: 0.75;
+  }
+`;
+
+/**
+ * 뒤로가기 버튼 — 비밀번호 찾기 스텝에서 로그인으로 돌아갈 때 사용.
+ */
+export const BackButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  transition: color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+`;
+
+/**
+ * 성공 배너 — 비밀번호 변경 완료 안내.
+ */
+export const SuccessBanner = styled.div`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  background-color: rgba(6, 214, 160, 0.12);
+  border: 1px solid rgba(6, 214, 160, 0.35);
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.success ?? '#06d6a0'};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  text-align: center;
+`;
+
 /** 하단 안내 텍스트 (회원가입 링크 등). */
 export const Footer = styled.p`
   font-size: ${({ theme }) => theme.typography.textSm};

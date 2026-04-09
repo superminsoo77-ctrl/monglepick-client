@@ -13,6 +13,7 @@
 
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import TermsModal from './TermsModal';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 회원가입 API — 같은 feature 내의 authApi에서 가져옴 */
@@ -77,6 +78,8 @@ export default function SignUpForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   /* 서버 에러 메시지 */
   const [serverError,  setServerError]  = useState('');
+  /* 약관 모달 — null이면 닫힘, 'service'|'privacy'|'marketing'이면 해당 약관 표시 */
+  const [termsModal,   setTermsModal]   = useState(null);
 
   /* 전체 동의 여부 */
   const allChecked = requiredTerm && optionTerm && marketingAgreed;
@@ -178,6 +181,10 @@ export default function SignUpForm() {
   };
 
   return (
+    <>
+    {termsModal && (
+      <TermsModal type={termsModal} onClose={() => setTermsModal(null)} />
+    )}
     <S.Form onSubmit={handleSubmit} noValidate>
       {/* 폼 제목 */}
       <S.Title>회원가입</S.Title>
@@ -281,6 +288,9 @@ export default function SignUpForm() {
             <S.TermsLabel onClick={() => setRequiredTerm((v) => !v)}>
               서비스 이용약관
             </S.TermsLabel>
+            <S.TermsViewButton type="button" onClick={() => setTermsModal('service')}>
+              보기
+            </S.TermsViewButton>
             <S.TermsBadge $required>필수</S.TermsBadge>
           </S.TermsRow>
 
@@ -293,6 +303,9 @@ export default function SignUpForm() {
             <S.TermsLabel onClick={() => setOptionTerm((v) => !v)}>
               개인정보 수집 및 이용 동의
             </S.TermsLabel>
+            <S.TermsViewButton type="button" onClick={() => setTermsModal('privacy')}>
+              보기
+            </S.TermsViewButton>
             <S.TermsBadge>선택</S.TermsBadge>
           </S.TermsRow>
 
@@ -305,6 +318,9 @@ export default function SignUpForm() {
             <S.TermsLabel onClick={() => setMarketingAgreed((v) => !v)}>
               마케팅 정보 수신 동의
             </S.TermsLabel>
+            <S.TermsViewButton type="button" onClick={() => setTermsModal('marketing')}>
+              보기
+            </S.TermsViewButton>
             <S.TermsBadge>선택</S.TermsBadge>
           </S.TermsRow>
         </S.TermsList>
@@ -356,5 +372,6 @@ export default function SignUpForm() {
         <S.TextLink as={Link} to={ROUTES.LOGIN}>로그인</S.TextLink>
       </S.Footer>
     </S.Form>
+    </>
   );
 }

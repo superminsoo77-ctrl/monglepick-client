@@ -46,6 +46,16 @@ function normalizeSearchMovie(movie) {
 }
 
 /**
+ * 검색 페이지에서 사용할 장르 선택 옵션을 조회한다.
+ *
+ * @returns {Promise<Array<{label: string, aliases: Array<string>, contents_count: number}>>}
+ */
+export async function getSearchGenres() {
+  const data = await recommendApi.get(SEARCH_ENDPOINTS.GENRES);
+  return data?.genres || [];
+}
+
+/**
  * 영화를 검색한다.
  * 키워드, 장르, 정렬 등의 필터를 지원한다.
  *
@@ -53,6 +63,7 @@ function normalizeSearchMovie(movie) {
  * @param {string} params.query - 검색 키워드
  * @param {string} [params.searchType='all'] - 검색 대상 (all, title, director, actor)
  * @param {string} [params.genre] - 장르 필터
+ * @param {Array<string>} [params.genres] - 장르만 검색용 다중 선택 장르 목록
  * @param {string} [params.sort='relevance'] - 정렬 기준 (relevance, rating, date)
  * @param {number} [params.page=1] - 페이지 번호
  * @param {number} [params.size=20] - 페이지 크기
@@ -62,6 +73,7 @@ export async function searchMovies({
   query,
   searchType = 'all',
   genre,
+  genres = [],
   sort = 'relevance',
   page = 1,
   size = 20,
@@ -70,7 +82,11 @@ export async function searchMovies({
   const params = { page, size, search_type: searchType };
   if (query) params.q = query;
   if (genre) params.genre = genre;
-  if (sort === 'rating') {
+  if (genres.length > 0) params.genres = genres.join(',');
+  if (sort === 'relevance') {
+    params.sort_by = 'relevance';
+    params.sort_order = 'desc';
+  } else if (sort === 'rating') {
     params.sort_by = 'rating';
     params.sort_order = 'desc';
   } else if (sort === 'date') {
@@ -84,6 +100,75 @@ export async function searchMovies({
     total: data?.pagination?.total || 0,
     movies: (data?.movies || []).map(normalizeSearchMovie),
   };
+}
+
+/**
+ * 로그인 사용자의 최근 검색 기록을 조회한다.
+ *
+ * Recommend API는 중복 제거된 최근 검색어를 최신순으로 페이지 단위 반환한다.
+ *
+ * @param {Object} [params] - 조회 파라미터
+ * @param {number} [params.offset=0] - 중복 제거된 목록 기준 시작 위치
+ * @param {number} [params.limit=30] - 페이지당 조회 개수
+ * @returns {Promise<{searches: Array, pagination: Object}>}
+ */
+export async function getRecentSearches({ offset = 0, limit = 30 } = {}) {
+  const data = await recommendApi.get(SEARCH_ENDPOINTS.RECENT, {
+    params: { offset, limit },
+  });
+
+  return {
+    searches: data?.searches || [],
+    pagination: data?.pagination || {
+      offset,
+      limit,
+      has_more: false,
+      next_offset: null,
+    },
+  };
+}
+
+/**
+ * 로그인 사용자의 특정 최근 검색어를 삭제한다.
+ *
+ * @param {string} keyword - 삭제할 검색 키워드
+ * @returns {Promise<Object>} 삭제 결과
+ */
+export async function deleteRecentSearchKeyword(keyword) {
+  return recommendApi.delete(SEARCH_ENDPOINTS.RECENT_KEYWORD(keyword));
+}
+
+/**
+ * 로그인 사용자의 최근 검색 기록을 전체 삭제한다.
+ *
+ * @returns {Promise<Object>} 삭제 결과
+ */
+export async function deleteAllRecentSearches() {
+  return recommendApi.delete(SEARCH_ENDPOINTS.RECENT);
+}
+
+/**
+ * 검색 결과 클릭 로그를 저장한다.
+ *
+ * @param {Object} params - 클릭 로그 파라미터
+ * @param {string} params.keyword - 검색 키워드
+ * @param {string} params.clickedMovieId - 클릭한 영화 ID
+ * @param {number} params.resultCount - 검색 결과 수
+ * @param {Object} [params.filters] - 검색 필터 정보
+ * @returns {Promise<Object>} 저장 결과
+ */
+export async function logSearchResultClick({
+  keyword,
+  clickedMovieId,
+  resultCount,
+  filters,
+}) {
+  return recommendApi.post(SEARCH_ENDPOINTS.CLICK_LOG, {
+    keyword,
+    clicked_movie_id: clickedMovieId,
+    result_count: resultCount,
+    filters,
+  });
 }
 
 /**

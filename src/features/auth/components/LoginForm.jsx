@@ -4,97 +4,77 @@
  * 이메일과 비밀번호를 입력받아 로그인 API를 호출한다.
  * 로그인 성공 시 AuthContext를 통해 인증 상태를 업데이트하고,
  * 이전 페이지 또는 홈으로 리다이렉트한다.
+ *
+ * 비밀번호 찾기 플로우 (이메일 인증 없음):
+ *   step 'login'        — 기본 로그인 폼
+ *   step 'email-check'  — 이메일 입력 → POST /api/v1/auth/password/check
+ *   step 'reset'        — 새 비밀번호 입력 → POST /api/v1/auth/password/reset
  */
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-/* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
-/* 로그인 API — 같은 feature 내의 authApi에서 가져옴 */
-import { login as loginAPI } from '../api/authApi';
-/* 유효성 검사 유틸 — shared/utils에서 가져옴 */
-/* 로그인 폼은 비밀번호 입력 여부만 확인하므로 validatePassword는 사용하지 않음 */
-import { validateEmail } from '../../../shared/utils/validators';
-/* 라우트 경로 상수 — shared/constants에서 가져옴 */
+import { login as loginAPI, checkEmailExists, resetPassword } from '../api/authApi';
+import { validateEmail, validatePassword, validatePasswordConfirm } from '../../../shared/utils/validators';
 import { ROUTES } from '../../../shared/constants/routes';
-/* OAuth URL 생성 유틸 — shared/constants에서 가져옴 */
 import { getOAuth2AuthorizationUrl } from '../../../shared/constants/oauth';
 import * as S from './LoginForm.styled';
 
 export default function LoginForm() {
-  /* 폼 입력값 상태 */
+  /* ── 로그인 상태 ── */
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  /* 필드별 에러 메시지 상태 */
-  const [errors, setErrors]           = useState({});
-  /* API 호출 중 상태 */
+  const [errors, setErrors]     = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  /* 서버 에러 메시지 */
   const [serverError, setServerError]   = useState('');
 
-  /* 인증 Context에서 login 함수 가져오기 */
+  /* ── 비밀번호 찾기 플로우 ── */
+  /** 'login' | 'email-check' | 'reset' */
+  const [step, setStep] = useState('login');
+
+  /* email-check 스텝 */
+  const [fpEmail, setFpEmail]           = useState('');
+  const [fpEmailError, setFpEmailError] = useState('');
+
+  /* reset 스텝 */
+  const [fpNewPassword,     setFpNewPassword]     = useState('');
+  const [fpConfirmPassword, setFpConfirmPassword] = useState('');
+  const [fpPasswordErrors,  setFpPasswordErrors]  = useState({});
+  const [fpSuccess,         setFpSuccess]         = useState(false);
+
   const login    = useAuthStore((s) => s.login);
-  /* 페이지 이동용 navigate */
   const navigate = useNavigate();
 
-  /**
-   * 폼 전체의 유효성을 검사한다.
-   *
-   * @returns {boolean} 모든 필드가 유효하면 true
-   */
-  const validateForm = () => {
+  /* ── 로그인 폼 유효성 검사 ── */
+  const validateLoginForm = () => {
     const newErrors = {};
-
-    /* 이메일 검증 */
     const emailResult = validateEmail(email);
-    if (!emailResult.isValid) {
-      newErrors.email = emailResult.message;
-    }
-
-    /* 비밀번호 검증 (로그인은 최소 입력 여부만 확인) */
-    if (!password) {
-      newErrors.password = '비밀번호를 입력해주세요.';
-    }
-
+    if (!emailResult.isValid) newErrors.email = emailResult.message;
+    if (!password) newErrors.password = '비밀번호를 입력해주세요.';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * 폼 제출 핸들러.
-   * 유효성 검사 → API 호출 → 인증 상태 업데이트 → 리다이렉트.
-   *
-   * @param {Event} e - 폼 제출 이벤트
-   */
+  /* ── 로그인 제출 ── */
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    /* 클라이언트 유효성 검사 */
-    if (!validateForm()) return;
+    if (!validateLoginForm()) return;
 
     setIsSubmitting(true);
     setServerError('');
 
     try {
-      /* 로그인 API 호출 */
       const response = await loginAPI({ email, password });
-
-      /* AuthContext에 인증 정보 저장 */
       login({
         accessToken:  response.accessToken,
         refreshToken: response.refreshToken,
         user:         response.user,
       });
-
-      /* 홈 페이지로 리다이렉트 */
       navigate(ROUTES.HOME);
     } catch (err) {
-      /* 에러 코드별 사용자 친화적 메시지 분기 */
       if (err.code === 'A003') {
-        /* 미가입 또는 비밀번호 불일치 — 회원가입 안내 포함 */
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
       } else if (err.code === 'A007') {
-        /* 소셜 로그인으로 가입된 이메일 */
         setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
       } else {
         setServerError(err.message || '로그인에 실패했습니다. 다시 시도해주세요.');
@@ -104,10 +84,7 @@ export default function LoginForm() {
     }
   };
 
-  /**
-   * 테스트 유저 로그인 핸들러.
-   * 개발/테스트 환경에서 고정된 테스트 계정으로 로그인한다.
-   */
+  /* ── 테스트 유저 로그인 ── */
   const handleTestLogin = async () => {
     setIsSubmitting(true);
     setServerError('');
@@ -123,7 +100,6 @@ export default function LoginForm() {
       });
       navigate(ROUTES.HOME);
     } catch (err) {
-      /* 에러 코드별 사용자 친화적 메시지 분기 */
       if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
       } else {
@@ -134,16 +110,191 @@ export default function LoginForm() {
     }
   };
 
+  /* ── 비밀번호 찾기: 이메일 확인 ── */
+  const handleCheckEmail = async (e) => {
+    e.preventDefault();
+    const emailResult = validateEmail(fpEmail);
+    if (!emailResult.isValid) {
+      setFpEmailError(emailResult.message);
+      return;
+    }
+    setFpEmailError('');
+    setIsSubmitting(true);
+    setServerError('');
+
+    try {
+      await checkEmailExists(fpEmail);
+      /* 200 OK → 비밀번호 재설정 스텝으로 */
+      setStep('reset');
+    } catch (err) {
+      if (err.status === 404 || err.code === 'U001') {
+        setFpEmailError('해당 이메일로 가입된 계정이 없습니다.');
+      } else {
+        setServerError(err.message || '이메일 확인 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /* ── 비밀번호 찾기: 비밀번호 재설정 ── */
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    const newErrors = {};
+    const pwResult = validatePassword(fpNewPassword);
+    if (!pwResult.isValid) newErrors.newPassword = pwResult.message;
+    const confirmResult = validatePasswordConfirm(fpNewPassword, fpConfirmPassword);
+    if (!confirmResult.isValid) newErrors.confirmPassword = confirmResult.message;
+    setFpPasswordErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    setIsSubmitting(true);
+    setServerError('');
+
+    try {
+      await resetPassword(fpEmail, fpNewPassword);
+      setFpSuccess(true);
+    } catch (err) {
+      if (err.status === 404 || err.code === 'U001') {
+        setServerError('계정을 찾을 수 없습니다. 처음부터 다시 시도해주세요.');
+      } else {
+        setServerError(err.message || '비밀번호 변경 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /* ── 비밀번호 찾기 초기화 후 로그인으로 돌아가기 ── */
+  const handleBackToLogin = () => {
+    setStep('login');
+    setFpEmail('');
+    setFpEmailError('');
+    setFpNewPassword('');
+    setFpConfirmPassword('');
+    setFpPasswordErrors({});
+    setFpSuccess(false);
+    setServerError('');
+  };
+
+  /* ──────────────────────────────────────────── */
+  /* step: 'email-check' — 이메일 입력 화면       */
+  /* ──────────────────────────────────────────── */
+  if (step === 'email-check') {
+    return (
+      <S.Form onSubmit={handleCheckEmail} noValidate>
+        <S.BackButton type="button" onClick={handleBackToLogin}>
+          ← 로그인으로 돌아가기
+        </S.BackButton>
+
+        <S.Title>비밀번호 찾기</S.Title>
+        <S.Subtitle>가입 시 사용한 이메일을 입력해주세요</S.Subtitle>
+
+        {serverError && <S.ErrorBanner>{serverError}</S.ErrorBanner>}
+
+        <S.Field>
+          <S.Label htmlFor="fp-email">이메일</S.Label>
+          <S.Input
+            id="fp-email"
+            type="email"
+            $error={!!fpEmailError}
+            value={fpEmail}
+            onChange={(e) => setFpEmail(e.target.value)}
+            placeholder="example@email.com"
+            autoComplete="email"
+            disabled={isSubmitting}
+          />
+          {fpEmailError && <S.FieldError>{fpEmailError}</S.FieldError>}
+        </S.Field>
+
+        <S.SubmitButton type="submit" disabled={isSubmitting}>
+          {isSubmitting ? '확인 중...' : '이메일 확인하기'}
+        </S.SubmitButton>
+      </S.Form>
+    );
+  }
+
+  /* ──────────────────────────────────────────── */
+  /* step: 'reset' — 새 비밀번호 입력 화면         */
+  /* ──────────────────────────────────────────── */
+  if (step === 'reset') {
+    /* 성공 상태 */
+    if (fpSuccess) {
+      return (
+        <S.Form as="div">
+          <S.Title>비밀번호 변경 완료</S.Title>
+          <S.SuccessBanner>
+            비밀번호가 성공적으로 변경되었습니다.
+          </S.SuccessBanner>
+          <S.SubmitButton type="button" onClick={handleBackToLogin}>
+            로그인하러 가기
+          </S.SubmitButton>
+        </S.Form>
+      );
+    }
+
+    return (
+      <S.Form onSubmit={handleResetPassword} noValidate>
+        <S.BackButton type="button" onClick={() => setStep('email-check')}>
+          ← 이메일 입력으로 돌아가기
+        </S.BackButton>
+
+        <S.Title>새 비밀번호 설정</S.Title>
+        <S.Subtitle>{fpEmail}의 새 비밀번호를 입력해주세요</S.Subtitle>
+
+        {serverError && <S.ErrorBanner>{serverError}</S.ErrorBanner>}
+
+        <S.Field>
+          <S.Label htmlFor="fp-new-password">새 비밀번호</S.Label>
+          <S.Input
+            id="fp-new-password"
+            type="password"
+            $error={!!fpPasswordErrors.newPassword}
+            value={fpNewPassword}
+            onChange={(e) => setFpNewPassword(e.target.value)}
+            placeholder="8자 이상, 영문+숫자 조합"
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+          {fpPasswordErrors.newPassword && (
+            <S.FieldError>{fpPasswordErrors.newPassword}</S.FieldError>
+          )}
+        </S.Field>
+
+        <S.Field>
+          <S.Label htmlFor="fp-confirm-password">새 비밀번호 확인</S.Label>
+          <S.Input
+            id="fp-confirm-password"
+            type="password"
+            $error={!!fpPasswordErrors.confirmPassword}
+            value={fpConfirmPassword}
+            onChange={(e) => setFpConfirmPassword(e.target.value)}
+            placeholder="비밀번호를 다시 입력하세요"
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+          {fpPasswordErrors.confirmPassword && (
+            <S.FieldError>{fpPasswordErrors.confirmPassword}</S.FieldError>
+          )}
+        </S.Field>
+
+        <S.SubmitButton type="submit" disabled={isSubmitting}>
+          {isSubmitting ? '변경 중...' : '비밀번호 변경하기'}
+        </S.SubmitButton>
+      </S.Form>
+    );
+  }
+
+  /* ──────────────────────────────────────────── */
+  /* step: 'login' — 기본 로그인 폼               */
+  /* ──────────────────────────────────────────── */
   return (
     <S.Form onSubmit={handleSubmit} noValidate>
-      {/* 폼 제목 */}
       <S.Title>로그인</S.Title>
       <S.Subtitle>몽글픽에 오신 것을 환영합니다</S.Subtitle>
 
-      {/* 서버 에러 메시지 */}
       {serverError && <S.ErrorBanner>{serverError}</S.ErrorBanner>}
 
-      {/* 이메일 입력 필드 */}
       <S.Field>
         <S.Label htmlFor="login-email">이메일</S.Label>
         <S.Input
@@ -159,7 +310,6 @@ export default function LoginForm() {
         {errors.email && <S.FieldError>{errors.email}</S.FieldError>}
       </S.Field>
 
-      {/* 비밀번호 입력 필드 */}
       <S.Field>
         <S.Label htmlFor="login-password">비밀번호</S.Label>
         <S.Input
@@ -173,14 +323,19 @@ export default function LoginForm() {
           disabled={isSubmitting}
         />
         {errors.password && <S.FieldError>{errors.password}</S.FieldError>}
+        <S.ForgotPasswordButton
+          type="button"
+          onClick={() => setStep('email-check')}
+          disabled={isSubmitting}
+        >
+          비밀번호를 잊으셨나요?
+        </S.ForgotPasswordButton>
       </S.Field>
 
-      {/* 로그인 버튼 */}
       <S.SubmitButton type="submit" disabled={isSubmitting}>
         {isSubmitting ? '로그인 중...' : '로그인'}
       </S.SubmitButton>
 
-      {/* 테스트 유저 로그인 버튼 — 개발/테스트 환경용 */}
       <S.TestLoginButton
         type="button"
         disabled={isSubmitting}
@@ -189,10 +344,8 @@ export default function LoginForm() {
         테스트 유저로 로그인
       </S.TestLoginButton>
 
-      {/* 소셜 로그인 구분선 */}
       <S.Divider><span>또는</span></S.Divider>
 
-      {/* 소셜 로그인 버튼 */}
       <S.SocialList>
         <S.SocialButton
           type="button"
@@ -220,7 +373,6 @@ export default function LoginForm() {
         </S.SocialButton>
       </S.SocialList>
 
-      {/* 회원가입 링크 — as={Link}로 react-router-dom 라우팅 유지 */}
       <S.Footer>
         계정이 없으신가요?{' '}
         <S.TextLink as={Link} to={ROUTES.SIGNUP}>회원가입</S.TextLink>

@@ -97,6 +97,29 @@ export async function logoutAPI() {
 }
 
 /**
+ * 비밀번호 찾기 — 이메일 존재 확인.
+ * LOCAL 계정으로 가입된 이메일인지 확인한다.
+ *
+ * @param {string} email - 확인할 이메일
+ * @returns {Promise<void>} 존재하면 200, 없으면 404 예외
+ */
+export async function checkEmailExists(email) {
+  return api.post(AUTH_ENDPOINTS.PASSWORD_CHECK, { email });
+}
+
+/**
+ * 비밀번호 재설정.
+ * LOCAL 계정의 비밀번호를 새 비밀번호로 변경한다.
+ *
+ * @param {string} email - 이메일
+ * @param {string} newPassword - 새 비밀번호
+ * @returns {Promise<void>}
+ */
+export async function resetPassword(email, newPassword) {
+  return api.post(AUTH_ENDPOINTS.PASSWORD_RESET, { email, newPassword });
+}
+
+/**
  * OAuth 소셜 로그인 API 호출 (구 방식 — 인가 코드 직접 전달).
  * OAuth 제공자로부터 받은 인가 코드를 백엔드에 전달하여 토큰을 발급받는다.
  *
