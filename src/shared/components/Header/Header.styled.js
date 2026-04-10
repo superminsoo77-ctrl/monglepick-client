@@ -86,6 +86,8 @@ export const Nav = styled.nav`
     left: 0;
     right: 0;
     bottom: 0;
+    /* 모바일 메뉴가 페이지 콘텐츠 위에 오도록 z-index 설정 */
+    z-index: ${({ theme }) => theme.zIndex.modal};
     flex-direction: column;
     padding: ${({ theme }) => theme.spacing.lg};
     background-color: ${({ theme }) => theme.header.mobileBg};

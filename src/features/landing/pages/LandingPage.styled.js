@@ -174,6 +174,12 @@ const BgOrbBase = styled.div`
   opacity: 0.25;
   pointer-events: none;
   z-index: 0;
+
+  /* 모바일 — 오브 축소하여 화면 밖 넘침 방지 */
+  @media (max-width: 600px) {
+    opacity: 0.15;
+    transform: scale(0.5);
+  }
 `;
 
 /** 배경 오브 1 — 보라, 좌상단 */
@@ -253,6 +259,11 @@ export const Nav = styled.nav`
   @media (max-width: 900px) {
     padding: 12px 20px;
   }
+
+  /* 모바일 */
+  @media (max-width: 600px) {
+    padding: 10px 16px;
+  }
 `;
 
 /** 네비게이션 로고 영역 */
@@ -320,6 +331,11 @@ export const NavLinks = styled.div`
     gap: 14px;
     a { font-size: 0.78rem; }
   }
+
+  /* 모바일 — 햄버거 메뉴로 전환 시 숨김 (NavMobileMenu로 대체) */
+  @media (max-width: 600px) {
+    display: none;
+  }
 `;
 
 /** 네비게이션 CTA 버튼 */
@@ -341,6 +357,93 @@ export const NavCta = styled.a`
   /* 언더라인 숨김 */
   &::after {
     display: none !important;
+  }
+`;
+
+/* ── 랜딩 모바일 햄버거 메뉴 (600px 이하) ── */
+
+/** 모바일 햄버거 버튼 — 600px 이하에서만 노출 */
+export const NavMobileToggle = styled.button`
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+
+  span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background-color: ${({ theme }) => theme.landing.textSecondary};
+    border-radius: 1px;
+    transition: all 0.3s ease;
+  }
+
+  /* 햄버거 → X 변환 */
+  ${({ $isOpen }) =>
+    $isOpen &&
+    css`
+      span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+      }
+      span:nth-child(2) {
+        opacity: 0;
+      }
+      span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
+      }
+    `}
+
+  @media (max-width: 600px) {
+    display: flex;
+  }
+`;
+
+/** 모바일 메뉴 오버레이 — position fixed 전체 화면 */
+export const NavMobileMenu = styled.div`
+  display: none;
+
+  @media (max-width: 600px) {
+    display: ${({ $isOpen }) => ($isOpen ? 'flex' : 'none')};
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    flex-direction: column;
+    padding: 24px;
+    gap: 8px;
+    background: ${({ theme }) => theme.header.mobileBg};
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid ${({ theme }) => theme.landing.border};
+    overflow-y: auto;
+
+    a {
+      display: block;
+      padding: 14px 16px;
+      font-size: 1rem;
+      font-weight: 500;
+      color: ${({ theme }) => theme.landing.textSecondary};
+      border-radius: 12px;
+      transition: all 0.2s;
+
+      &:hover {
+        color: ${({ theme }) => theme.landing.textPrimary};
+        background: rgba(124, 108, 240, 0.08);
+      }
+
+      /* 호버 언더라인 해제 (NavLinks 상속 제거) */
+      &::after {
+        display: none;
+      }
+    }
   }
 `;
 
@@ -443,6 +546,12 @@ export const Hero = styled(SectionBase)`
   align-items: center;
   padding: 120px 24px 80px;
   overflow: hidden;
+
+  /* 모바일 — 상단 패딩 축소 */
+  @media (max-width: 600px) {
+    padding: 80px 16px 60px;
+    min-height: auto;
+  }
 `;
 
 /** 히어로 배경 그리드 오버레이 */
@@ -734,6 +843,10 @@ export const MovieFloatYear = styled.span`
 /** 채팅 데모 섹션 */
 export const ChatDemo = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 채팅 데모 2컬럼 레이아웃 */
@@ -884,6 +997,10 @@ export const ChatRecoCardOtt = styled.span`
 /** 핵심 기능 섹션 */
 export const Features = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 핵심 기능 헤더 */
@@ -949,6 +1066,14 @@ export const FeatureDisplay = styled.div`
   gap: 36px;
   transition: all 0.4s ease;
   margin-bottom: 24px;
+
+  /* 모바일 — 세로 배치 + 패딩 축소 */
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 28px 20px;
+    gap: 20px;
+  }
 `;
 
 /** 피처 상세 아이콘 */
@@ -1050,6 +1175,10 @@ export const FeatureMiniTitle = styled.div`
 /** 사용 방법 섹션 */
 export const HowTo = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 사용 방법 헤더 */
@@ -1230,6 +1359,10 @@ export const DiffItemSub = styled.div`
 /** 팀 소개 섹션 */
 export const Team = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 팀 소개 헤더 */
@@ -1454,6 +1587,10 @@ export const TeamCardReq = styled.div`
 /** 기술 스택 섹션 */
 export const Tech = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 기술 스택 헤더 */
@@ -1530,6 +1667,10 @@ export const TechItemDot = styled.span`
 /** 데이터 규모 섹션 */
 export const Data = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 데이터 헤더 */
@@ -1594,6 +1735,10 @@ export const DataCardSub = styled.div`
 /** 타임라인 섹션 */
 export const Timeline = styled(SectionBase)`
   padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
 `;
 
 /** 타임라인 헤더 */

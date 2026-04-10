@@ -67,6 +67,8 @@ export default function LandingPage() {
   /* ── 피처 자동 순환 상태 ── */
   const [activeFeature, setActiveFeature] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+  /* 모바일 햄버거 메뉴 열림/닫힘 상태 */
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const particlesRef = useRef(null);
   const featureTimerRef = useRef(null);
 
@@ -76,6 +78,12 @@ export default function LandingPage() {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  /* 모바일 메뉴 열릴 때 body 스크롤 잠금 */
+  useEffect(() => {
+    document.body.style.overflow = isMobileNavOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobileNavOpen]);
 
   /* 파티클 생성 — 마운트 시 1회 */
   useEffect(() => {
@@ -135,9 +143,10 @@ export default function LandingPage() {
     return () => observer.disconnect();
   }, []);
 
-  /* 부드러운 앵커 스크롤 핸들러 */
+  /* 부드러운 앵커 스크롤 핸들러 — 모바일 메뉴도 닫음 */
   const scrollTo = (e, id) => {
     e.preventDefault();
+    setIsMobileNavOpen(false);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -157,16 +166,37 @@ export default function LandingPage() {
           <S.NavLogoImg src="/mongle-transparent.png" alt="몽글픽" />
           <span>MONGLEPICK</span>
         </S.NavLogo>
+        {/* 데스크톱/태블릿 — 가로 링크 (600px 이하에서 숨김) */}
         <S.NavLinks>
           <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
           <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
           <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
           <a href="#lp-tech" onClick={e => scrollTo(e, 'lp-tech')}>기술</a>
           <a href="#lp-progress" onClick={e => scrollTo(e, 'lp-progress')}>진행현황</a>
-          {/* NavCta를 Link로 렌더링 — as prop 활용 */}
           <S.NavCta as={Link} to={ROUTES.HOME}>시작하기</S.NavCta>
         </S.NavLinks>
+        {/* 모바일 햄버거 버튼 (600px 이하에서만 노출) */}
+        <S.NavMobileToggle
+          $isOpen={isMobileNavOpen}
+          onClick={() => setIsMobileNavOpen(prev => !prev)}
+          aria-label="메뉴 열기/닫기"
+        >
+          <span />
+          <span />
+          <span />
+        </S.NavMobileToggle>
       </S.Nav>
+      {/* 모바일 전체화면 메뉴 오버레이 */}
+      <S.NavMobileMenu $isOpen={isMobileNavOpen}>
+        <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
+        <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
+        <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
+        <a href="#lp-tech" onClick={e => scrollTo(e, 'lp-tech')}>기술</a>
+        <a href="#lp-progress" onClick={e => scrollTo(e, 'lp-progress')}>진행현황</a>
+        <S.NavCta as={Link} to={ROUTES.HOME} onClick={() => setIsMobileNavOpen(false)}>
+          시작하기
+        </S.NavCta>
+      </S.NavMobileMenu>
 
       {/* ── 히어로 ── */}
       <S.Hero id="lp-hero">
