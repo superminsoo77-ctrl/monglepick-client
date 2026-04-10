@@ -9,9 +9,50 @@
  */
 
 /* 공용 axios 인스턴스 + 인증 필수 가드 */
-import api, { requireAuth } from '../../../shared/api/axiosInstance';
+import api, { recommendApi, requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
-import { MYPAGE_ENDPOINTS, WATCH_HISTORY_ENDPOINTS } from '../../../shared/constants/api';
+import {
+  MYPAGE_ENDPOINTS,
+  RECOMMEND_USER_ENDPOINTS,
+  WATCH_HISTORY_ENDPOINTS,
+} from '../../../shared/constants/api';
+
+function normalizeWishlistMovie(movie) {
+  if (!movie) {
+    return null;
+  }
+
+  return {
+    ...movie,
+    id: movie.movie_id || movie.movieId,
+    posterUrl: movie.poster_url || movie.posterUrl,
+    releaseYear: movie.release_year || movie.releaseYear,
+  };
+}
+
+function normalizeReview(review) {
+  if (!review) {
+    return null;
+  }
+
+  return {
+    id: review.id,
+    movieId: review.movie_id || review.movieId,
+    movieTitle: review.movie_title || review.movieTitle || null,
+    posterUrl: review.poster_url || review.posterUrl || null,
+    rating: review.rating,
+    content: review.content,
+    author: {
+      nickname: review.author?.nickname || '익명',
+    },
+    isSpoiler: Boolean(review.is_spoiler ?? review.isSpoiler),
+    isMine: Boolean(review.is_mine ?? review.isMine),
+    reviewSource: review.review_source || review.reviewSource || null,
+    reviewCategoryCode: review.review_category_code || review.reviewCategoryCode || null,
+    createdAt: review.created_at || review.createdAt,
+    likeCount: review.like_count ?? review.likeCount ?? 0,
+  };
+}
 
 // ── 프로필 ──
 
@@ -51,7 +92,46 @@ export async function updateProfile(profileData) {
  */
 export async function getWishlist({ page = 1, size = 20 } = {}) {
   requireAuth();
-  return api.get(MYPAGE_ENDPOINTS.WISHLIST, { params: { page, size } });
+  const result = await recommendApi.get(RECOMMEND_USER_ENDPOINTS.WISHLIST, {
+    params: { page, size },
+  });
+
+  return {
+    wishlist: (result?.wishlist || []).map((item) => ({
+      wishlistId: item.wishlist_id || item.wishlistId,
+      movieId: item.movie_id || item.movieId,
+      createdAt: item.created_at || item.createdAt,
+      movie: normalizeWishlistMovie(item.movie),
+    })),
+    total: result?.total || 0,
+  };
+}
+
+/**
+ * 사용자가 작성한 리뷰를 최신순으로 페이징 조회한다.
+ *
+ * 마이페이지의 시청 이력 탭은 이제 watch_history 대신 이 응답을 사용한다.
+ *
+ * @param {Object} [options={}] - 조회 파라미터
+ * @param {number} [options.page=1] - 페이지 번호 (1부터 시작)
+ * @param {number} [options.size=20] - 페이지 크기
+ * @returns {Promise<Object>} 내 리뷰 목록 ({ reviews, pagination })
+ */
+export async function getMyReviews({ page = 1, size = 20 } = {}) {
+  requireAuth();
+  const result = await recommendApi.get(RECOMMEND_USER_ENDPOINTS.MY_REVIEWS, {
+    params: { page, size },
+  });
+
+  return {
+    reviews: (result?.reviews || []).map(normalizeReview),
+    pagination: {
+      page: result?.pagination?.page || page,
+      size: result?.pagination?.size || size,
+      total: result?.pagination?.total || 0,
+      totalPages: result?.pagination?.total_pages || result?.pagination?.totalPages || 0,
+    },
+  };
 }
 
 /**
@@ -63,7 +143,7 @@ export async function getWishlist({ page = 1, size = 20 } = {}) {
  */
 export async function addToWishlist(movieId) {
   requireAuth();
-  return api.post(MYPAGE_ENDPOINTS.TOGGLE_WISHLIST(movieId));
+  return recommendApi.post(RECOMMEND_USER_ENDPOINTS.TOGGLE_WISHLIST(movieId));
 }
 
 /**
@@ -75,7 +155,20 @@ export async function addToWishlist(movieId) {
  */
 export async function removeFromWishlist(movieId) {
   requireAuth();
-  return api.delete(MYPAGE_ENDPOINTS.TOGGLE_WISHLIST(movieId));
+  return recommendApi.delete(RECOMMEND_USER_ENDPOINTS.TOGGLE_WISHLIST(movieId));
+}
+
+/**
+ * 특정 영화가 현재 사용자의 위시리스트에 포함되어 있는지 조회한다.
+ *
+ * 영화 상세 진입 시 버튼 초기 상태를 맞추는 용도다.
+ *
+ * @param {string} movieId - 영화 ID
+ * @returns {Promise<{wishlisted: boolean}>}
+ */
+export async function getWishlistStatus(movieId) {
+  requireAuth();
+  return recommendApi.get(RECOMMEND_USER_ENDPOINTS.WISHLIST_STATUS(movieId));
 }
 
 // ── 시청 이력 ──

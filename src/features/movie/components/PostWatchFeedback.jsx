@@ -95,6 +95,20 @@ const CommentInput = styled.textarea`
   }
 `;
 
+const SpoilerToggleRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 0.85rem;
+  cursor: pointer;
+`;
+
+const SpoilerToggleInput = styled.input`
+  margin: 0;
+`;
+
 const ButtonRow = styled.div`
   display: flex;
   gap: 10px;
@@ -132,22 +146,29 @@ export default function PostWatchFeedback({ isOpen, movieTitle, movieId, onSubmi
   const [rating, setRating] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [comment, setComment] = useState('');
+  const [isSpoiler, setIsSpoiler] = useState(false);
 
   /** 제출 핸들러 */
   const handleSubmit = useCallback(() => {
     if (rating === 0) return;
-    trackEvent('post_watch_rating', movieId, { rating, has_comment: comment.trim().length > 0 });
-    onSubmit(rating, comment.trim() || null);
+    trackEvent('post_watch_rating', movieId, {
+      rating,
+      has_comment: comment.trim().length > 0,
+      is_spoiler: isSpoiler,
+    });
+    onSubmit(rating, comment.trim() || null, isSpoiler);
     // 상태 초기화
     setRating(0);
     setComment('');
-  }, [rating, comment, movieId, onSubmit]);
+    setIsSpoiler(false);
+  }, [rating, comment, isSpoiler, movieId, onSubmit]);
 
   /** 건너뛰기 핸들러 */
   const handleSkip = useCallback(() => {
     trackEvent('post_watch_skip', movieId);
     setRating(0);
     setComment('');
+    setIsSpoiler(false);
     onClose();
   }, [movieId, onClose]);
 
@@ -185,8 +206,17 @@ export default function PostWatchFeedback({ isOpen, movieTitle, movieId, onSubmi
           placeholder="한줄 감상을 남겨주세요 (선택)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          maxLength={200}
         />
+
+        {/* 스포일러 여부는 사용자가 직접 체크해서 저장한다. */}
+        <SpoilerToggleRow>
+          <SpoilerToggleInput
+            type="checkbox"
+            checked={isSpoiler}
+            onChange={(e) => setIsSpoiler(e.target.checked)}
+          />
+          <span>스포일러가 포함된 리뷰입니다</span>
+        </SpoilerToggleRow>
 
         {/* 버튼 */}
         <ButtonRow>

@@ -28,6 +28,8 @@ const C = {
 };
 
 const FONT = "'Noto Sans KR', 'Inter', sans-serif";
+const AGENT_NODE_W = 140;
+const AGENT_NODE_H = 34;
 
 /** 다이어그램 공통 래퍼 — 스크롤 가능 + 글래스 배경 */
 const Wrap = styled.div`
@@ -62,6 +64,45 @@ function Defs() {
         <polygon points="0 0, 8 3, 0 6" fill={C.yellow} />
       </marker>
     </defs>
+  );
+}
+
+/**
+ * Agent 흐름 다이어그램의 공통 노드.
+ *
+ * react-hooks/static-components 규칙에 맞춰 render 바깥에서 선언한다.
+ */
+function AgentNode({ x, y, label, color = C.primary, w = AGENT_NODE_W }) {
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={AGENT_NODE_H} rx={8}
+        fill={C.cardBg} stroke={color} strokeWidth="1.3" />
+      <text x={x + w / 2} y={y + AGENT_NODE_H / 2 + 4} textAnchor="middle"
+        fill={C.text} fontSize="9" fontWeight="500" fontFamily={FONT}>{label}</text>
+    </g>
+  );
+}
+
+/**
+ * Agent 흐름 다이어그램의 결정 노드.
+ *
+ * 다이아몬드 대신 라운드형 분기 노드로 표시한다.
+ */
+function AgentDecision({ x, y, label, color = C.yellow, w = AGENT_NODE_W }) {
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={AGENT_NODE_H} rx={AGENT_NODE_H / 2}
+        fill="rgba(255,209,102,0.1)" stroke={color} strokeWidth="1.3" strokeDasharray="4 2" />
+      <text x={x + w / 2} y={y + AGENT_NODE_H / 2 + 4} textAnchor="middle"
+        fill={color} fontSize="9" fontWeight="600" fontFamily={FONT}>{label}</text>
+    </g>
+  );
+}
+
+/** Agent 흐름 다이어그램의 수직 화살표 */
+function AgentVArrow({ x, y1, y2 }) {
+  return (
+    <line x1={x} y1={y1} x2={x} y2={y2} stroke={C.line} strokeWidth="1.5" markerEnd="url(#arr)" />
   );
 }
 
@@ -391,41 +432,6 @@ export function CodeStructDiagram() {
    ================================================================ */
 
 export function AgentFlowDiagram() {
-  /* 노드 크기 상수 */
-  const NW = 140;  /* 노드 너비 */
-  const NH = 34;   /* 노드 높이 */
-
-  /** 노드 렌더 헬퍼 */
-  const Node = ({ x, y, label, color = C.primary, w = NW }) => (
-    <g>
-      <rect x={x} y={y} width={w} height={NH} rx={8}
-        fill={C.cardBg} stroke={color} strokeWidth="1.3" />
-      <text x={x + w / 2} y={y + NH / 2 + 4} textAnchor="middle"
-        fill={C.text} fontSize="9" fontWeight="500" fontFamily={FONT}>{label}</text>
-    </g>
-  );
-
-  /** 결정 노드(다이아몬드 모양 대체 — 양각 사각형) */
-  const Decision = ({ x, y, label, color = C.yellow, w = NW }) => (
-    <g>
-      <rect x={x} y={y} width={w} height={NH} rx={NH / 2}
-        fill="rgba(255,209,102,0.1)" stroke={color} strokeWidth="1.3" strokeDasharray="4 2" />
-      <text x={x + w / 2} y={y + NH / 2 + 4} textAnchor="middle"
-        fill={color} fontSize="9" fontWeight="600" fontFamily={FONT}>{label}</text>
-    </g>
-  );
-
-  /** 화살표 (수직) */
-  const VArr = ({ x, y1, y2 }) => (
-    <line x1={x} y1={y1} x2={x} y2={y2} stroke={C.line} strokeWidth="1.5" markerEnd="url(#arr)" />
-  );
-
-  /** 화살표 (수평) */
-  const HArr = ({ y, x1, x2, color }) => (
-    <line x1={x1} y1={y} x2={x2} y2={y}
-      stroke={color || C.line} strokeWidth="1.5" markerEnd={color ? 'url(#arr-c)' : 'url(#arr)'} />
-  );
-
   return (
     <Wrap>
       <svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg">
@@ -439,20 +445,20 @@ export function AgentFlowDiagram() {
         <rect x="400" y="40" width="60" height="28" rx="14"
           fill={C.cyan} stroke="none" />
         <text x="430" y="58" textAnchor="middle" fill="#0a0a14" fontSize="10" fontWeight="700" fontFamily={FONT}>START</text>
-        <VArr x={430} y1={68} y2={85} />
+        <AgentVArrow x={430} y1={68} y2={85} />
 
         {/* context_loader */}
-        <Node x={360} y={88} label="context_loader" />
-        <VArr x={430} y1={122} y2={138} />
+        <AgentNode x={360} y={88} label="context_loader" />
+        <AgentVArrow x={430} y1={122} y2={138} />
 
         {/* route_has_image (decision) */}
-        <Decision x={340} y={140} label="route_has_image" w={180} />
+        <AgentDecision x={340} y={140} label="route_has_image" w={180} />
 
         {/* image path (left) */}
         <line x1="340" y1="157" x2="220" y2="157" stroke={C.line} strokeWidth="1.2" />
-        <VArr x={220} y1={157} y2={180} />
+        <AgentVArrow x={220} y1={157} y2={180} />
         <text x="275" y="152" fill={C.dim} fontSize="8" fontFamily={FONT}>이미지 있음</text>
-        <Node x={150} y={183} label="image_analyzer" color={C.purple} />
+        <AgentNode x={150} y={183} label="image_analyzer" color={C.purple} />
 
         {/* no image path label */}
         <text x="535" y="152" fill={C.dim} fontSize="8" fontFamily={FONT}>없음</text>
@@ -463,15 +469,15 @@ export function AgentFlowDiagram() {
         <line x1="520" y1="157" x2="560" y2="157" stroke={C.line} strokeWidth="1.2" />
         <line x1="560" y1="157" x2="560" y2="240" stroke={C.line} strokeWidth="1.2" />
         <line x1="560" y1="240" x2="430" y2="240" stroke={C.line} strokeWidth="1.2" />
-        <VArr x={430} y1={240} y2={255} />
+        <AgentVArrow x={430} y1={240} y2={255} />
 
         {/* ── 분류 레이어 ── */}
         <rect x="10" y="248" width="880" height="52" rx="12" fill="rgba(239,71,111,0.04)" stroke="rgba(239,71,111,0.08)" strokeWidth="1" />
-        <Node x={330} y={258} label="intent_emotion_classifier" color={C.pink} w={200} />
+        <AgentNode x={330} y={258} label="intent_emotion_classifier" color={C.pink} w={200} />
 
         {/* route_after_intent */}
-        <VArr x={430} y1={292} y2={318} />
-        <Decision x={330} y={320} label="route_after_intent" w={200} />
+        <AgentVArrow x={430} y1={292} y2={318} />
+        <AgentDecision x={330} y={320} label="route_after_intent" w={200} />
 
         {/* ── 4개 분기 ── */}
         {/* 분기 라벨 배경 */}
@@ -489,27 +495,27 @@ export function AgentFlowDiagram() {
 
         {/* ── Branch 1: recommend/search (가장 긴 경로) ── */}
         <text x="100" y="404" textAnchor="middle" fill={C.cyan} fontSize="8" fontWeight="600" fontFamily={FONT}>recommend</text>
-        <Node x={30} y={412} label="preference_refiner" color={C.cyan} />
-        <VArr x={100} y1={446} y2={462} />
-        <Node x={30} y={465} label="query_builder" color={C.cyan} />
-        <VArr x={100} y1={499} y2={515} />
-        <Node x={30} y={518} label="rag_retriever" color={C.cyan} />
-        <VArr x={100} y1={552} y2={568} />
-        <Node x={15} y={571} label="llm_reranker → ranker" color={C.cyan} w={170} />
+        <AgentNode x={30} y={412} label="preference_refiner" color={C.cyan} />
+        <AgentVArrow x={100} y1={446} y2={462} />
+        <AgentNode x={30} y={465} label="query_builder" color={C.cyan} />
+        <AgentVArrow x={100} y1={499} y2={515} />
+        <AgentNode x={30} y={518} label="rag_retriever" color={C.cyan} />
+        <AgentVArrow x={100} y1={552} y2={568} />
+        <AgentNode x={15} y={571} label="llm_reranker → ranker" color={C.cyan} w={170} />
 
         {/* ── Branch 2: relation ── */}
         <text x="430" y="404" textAnchor="middle" fill={C.blue} fontSize="8" fontWeight="600" fontFamily={FONT}>relation</text>
-        <Node x={360} y={412} label="graph_traversal" color={C.blue} />
-        <VArr x={430} y1={446} y2={462} />
-        <Node x={345} y={465} label="recommendation_ranker" color={C.blue} w={170} />
+        <AgentNode x={360} y={412} label="graph_traversal" color={C.blue} />
+        <AgentVArrow x={430} y1={446} y2={462} />
+        <AgentNode x={345} y={465} label="recommendation_ranker" color={C.blue} w={170} />
 
         {/* ── Branch 3: general ── */}
         <text x="610" y="404" textAnchor="middle" fill={C.orange} fontSize="8" fontWeight="600" fontFamily={FONT}>general</text>
-        <Node x={540} y={412} label="general_responder" color={C.orange} />
+        <AgentNode x={540} y={412} label="general_responder" color={C.orange} />
 
         {/* ── Branch 4: info/theater/tool ── */}
         <text x="800" y="404" textAnchor="middle" fill={C.yellow} fontSize="8" fontWeight="600" fontFamily={FONT}>info / tool</text>
-        <Node x={730} y={412} label="tool_executor" color={C.yellow} />
+        <AgentNode x={730} y={412} label="tool_executor" color={C.yellow} />
 
         {/* ── 출력 레이어 ── */}
         <rect x="10" y="645" width="880" height="48" rx="12" fill="rgba(124,108,240,0.04)" stroke="rgba(124,108,240,0.1)" strokeWidth="1" />
@@ -520,13 +526,13 @@ export function AgentFlowDiagram() {
           <line key={x} x1={x} y1={x === 100 ? 605 : 446} x2={x} y2={640} stroke={C.line} strokeWidth="1" strokeDasharray="3 2" />
         ))}
         <line x1="100" y1="640" x2="800" y2="640" stroke={C.line} strokeWidth="1.2" />
-        <VArr x={450} y1={640} y2={652} />
+        <AgentVArrow x={450} y1={640} y2={652} />
 
         {/* explanation_generator + response_formatter */}
-        <Node x={310} y={657} label="explanation → response_formatter" w={260} />
+        <AgentNode x={310} y={657} label="explanation → response_formatter" w={260} />
 
         {/* END */}
-        <VArr x={440} y1={691} y2={696} />
+        <AgentVArrow x={440} y1={691} y2={696} />
         <rect x="410" y="696" width="60" height="0" rx="0" fill="none" />
       </svg>
     </Wrap>
