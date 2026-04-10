@@ -4,15 +4,18 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import {
   getProfile,
   getWishlist,
+  getMyReviews,
   updateProfile,
-  getMyWatchHistory,
-  deleteWatchHistory,
 } from '../api/userApi';
 import { ROUTES } from '../../../shared/constants/routes';
 import MovieList from '../../../shared/components/MovieList/MovieList';
 import Loading from '../../../shared/components/Loading/Loading';
 import EmptyState from '../../../shared/components/EmptyState/EmptyState';
+import ReviewList from '../../review/components/ReviewList';
 import * as S from './MyPage.styled';
+
+const REVIEW_PAGE_SIZE = 20;
+const PAGE_GROUP_SIZE = 10;
 
 const TABS = [
   { id: 'profile', label: '프로필' },
@@ -20,28 +23,6 @@ const TABS = [
   { id: 'wishlist', label: '위시리스트' },
   { id: 'preferences', label: '선호 설정' },
 ];
-
-/**
- * 시청 이력 항목의 시청 일시를 사람이 읽기 쉬운 한국어로 포맷한다.
- *
- * @param {string} isoString - ISO 8601 시청 일시
- * @returns {string} 예: "2026-04-08 21:00"
- */
-function formatWatchedAt(isoString) {
-  if (!isoString) return '-';
-  try {
-    const d = new Date(isoString);
-    if (Number.isNaN(d.getTime())) return isoString;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
-  } catch {
-    return isoString;
-  }
-}
 
 /* ── 프로필 수정 모달 ── */
 function EditProfileModal({ profile, onClose, onSaved }) {
@@ -262,15 +243,15 @@ export default function MyPagePage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [profile, setProfile] = useState(null);
   const [wishlist, setWishlist] = useState([]);
-  /**
-   * 시청 이력 항목 배열.
-   * Backend Page<UserWatchHistoryResponse> 응답의 content[] 가 들어간다.
-   * 각 항목은 { userWatchHistoryId, movieId, watchedAt, rating, watchSource,
-   *           watchDurationSeconds, completionStatus, createdAt } 구조.
-   */
-  const [watchHistory, setWatchHistory] = useState([]);
-  /** 시청 이력 삭제 진행 중인 항목 ID 집합 — 중복 클릭 방지용 */
-  const [deletingIds, setDeletingIds] = useState(new Set());
+  /** 시청 이력 탭은 이제 사용자가 작성한 리뷰 목록을 의미한다. */
+  const [myReviews, setMyReviews] = useState([]);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewPagination, setReviewPagination] = useState({
+    page: 1,
+    size: REVIEW_PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -280,6 +261,23 @@ export default function MyPagePage() {
   const updateUser = useAuthStore((s) => s.updateUser);
   const authLoading = useAuthStore((s) => s.isLoading);
   const navigate = useNavigate();
+
+  /**
+   * 내 리뷰 목록을 페이지 단위로 불러온다.
+   *
+   * 마이페이지 하단 번호형 페이지네이션과 맞추기 위해
+   * 현재 페이지 / 총 페이지 수를 함께 로컬 state로 저장한다.
+   */
+  const loadMyReviews = useCallback(async (page = 1) => {
+    const reviewData = await getMyReviews({ page, size: REVIEW_PAGE_SIZE });
+    setMyReviews(reviewData?.reviews || []);
+    setReviewPagination({
+      page: reviewData?.pagination?.page || page,
+      size: reviewData?.pagination?.size || REVIEW_PAGE_SIZE,
+      total: reviewData?.pagination?.total || 0,
+      totalPages: reviewData?.pagination?.totalPages || 0,
+    });
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -295,13 +293,7 @@ export default function MyPagePage() {
             break;
           }
           case 'watch-history': {
-            /**
-             * 시청 이력 조회 — Spring Data Page 응답 구조.
-             * 응답 형태: { content: [], totalElements, totalPages, number, size, ... }
-             * page=0 size=20 으로 첫 페이지만 우선 로드. 추후 무한 스크롤/페이지네이션 추가 가능.
-             */
-            const pageData = await getMyWatchHistory({ page: 0, size: 20 });
-            setWatchHistory(pageData?.content || []);
+            await loadMyReviews(reviewPage);
             break;
           }
           case 'wishlist': {
@@ -320,41 +312,54 @@ export default function MyPagePage() {
     }
 
     loadTabData();
-  }, [activeTab, isAuthenticated]);
+  }, [activeTab, isAuthenticated, loadMyReviews, reviewPage]);
 
   /**
-   * 시청 이력 단건 삭제 핸들러.
-   *
-   * 본인 소유만 삭제 가능 (Backend 가 1쿼리로 검증).
-   * 삭제 성공 시 로컬 state 에서 즉시 제거하여 재조회 없이 UI 갱신.
-   *
-   * @param {number|string} id - 삭제할 user_watch_history_id
+   * 리뷰 수정/삭제 후에도 마이페이지 페이지네이션 숫자를 맞추기 위해
+   * 상위에서 목록과 total 값을 함께 보정한다.
    */
-  const handleDeleteWatchHistory = useCallback(async (id) => {
-    if (!id) return;
+  const handleMyReviewsChange = useCallback((updater) => {
+    setMyReviews((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      const removedCount = Math.max(0, prev.length - next.length);
 
-    /* 중복 클릭 방지 — 진행 중인 삭제는 다시 실행하지 않음 */
-    setDeletingIds((prev) => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
+      if (removedCount > 0) {
+        setReviewPagination((prevPagination) => {
+          const nextTotal = Math.max(0, prevPagination.total - removedCount);
+          const nextTotalPages = nextTotal > 0
+            ? Math.ceil(nextTotal / prevPagination.size)
+            : 0;
+          const fallbackPage = nextTotalPages > 0
+            ? Math.min(prevPagination.page, nextTotalPages)
+            : 1;
+
+          if (next.length === 0 && fallbackPage !== prevPagination.page) {
+            setReviewPage(fallbackPage);
+          }
+
+          return {
+            ...prevPagination,
+            total: nextTotal,
+            totalPages: nextTotalPages,
+            page: fallbackPage,
+          };
+        });
+      }
+
       return next;
     });
-
-    try {
-      await deleteWatchHistory(id);
-      /* 로컬 state 에서 즉시 제거 — 재조회 없이 UI 반영 */
-      setWatchHistory((prev) => prev.filter((item) => item.userWatchHistoryId !== id));
-    } catch (err) {
-      setError(err.message || '시청 기록 삭제에 실패했습니다.');
-    } finally {
-      setDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
   }, []);
+
+  /* 페이지 번호는 10개 단위 묶음으로 표시한다. */
+  const pageGroupStart = Math.floor((reviewPagination.page - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
+  const pageGroupEnd = Math.min(
+    pageGroupStart + PAGE_GROUP_SIZE - 1,
+    reviewPagination.totalPages,
+  );
+  const pageNumbers = Array.from(
+    { length: Math.max(0, pageGroupEnd - pageGroupStart + 1) },
+    (_, index) => pageGroupStart + index,
+  );
 
   function handleProfileSaved(updated) {
     setProfile(updated);
@@ -439,69 +444,60 @@ export default function MyPagePage() {
             </div>
           )}
 
-          {/* 시청 이력 탭 (2026-04-08 재도입) */}
+          {/* 시청 이력 탭 — watch_history 대신 내가 작성한 리뷰 목록을 노출한다. */}
           {activeTab === 'watch-history' && (
             <div>
               {isLoading ? (
-                <Loading message="시청 이력 로딩 중..." />
-              ) : watchHistory.length === 0 ? (
+                <Loading message="작성한 리뷰 로딩 중..." />
+              ) : myReviews.length === 0 ? (
                 <EmptyState
-                  icon="🎬"
-                  title="아직 시청 기록이 없습니다"
-                  description="영화를 보고 '봤어요'를 눌러 기록을 남겨보세요"
+                  icon="✍️"
+                  title="아직 작성한 리뷰가 없습니다"
+                  description="영화 상세 페이지에서 첫 리뷰를 남겨보세요"
                   actionLabel="영화 둘러보기"
                   onAction={() => navigate(ROUTES.SEARCH)}
                 />
               ) : (
-                <S.WatchHistoryCard>
-                  <S.WatchHistoryList>
-                    {watchHistory.map((item) => {
-                      const id = item.userWatchHistoryId;
-                      const isDeleting = deletingIds.has(id);
-                      return (
-                        <S.WatchHistoryItem key={id}>
-                          <S.WatchHistoryItemMain>
-                            <S.WatchHistoryMovieId title={item.movieId}>
-                              🎞️ {item.movieId}
-                            </S.WatchHistoryMovieId>
-                            <S.WatchHistoryMeta>
-                              <S.WatchHistoryBadge>
-                                📅 {formatWatchedAt(item.watchedAt)}
-                              </S.WatchHistoryBadge>
-                              {item.rating != null && (
-                                <S.WatchHistoryBadge>
-                                  ⭐ {item.rating.toFixed(1)}
-                                </S.WatchHistoryBadge>
-                              )}
-                              {item.watchSource && (
-                                <S.WatchHistoryBadge>
-                                  📍 {item.watchSource}
-                                </S.WatchHistoryBadge>
-                              )}
-                              {item.completionStatus && (
-                                <S.WatchHistoryBadge>
-                                  {item.completionStatus === 'COMPLETED'
-                                    ? '✅ 완주'
-                                    : item.completionStatus === 'ABANDONED'
-                                      ? '⏹️ 중단'
-                                      : '⏳ 시청 중'}
-                                </S.WatchHistoryBadge>
-                              )}
-                            </S.WatchHistoryMeta>
-                          </S.WatchHistoryItemMain>
-                          <S.WatchHistoryDeleteBtn
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => handleDeleteWatchHistory(id)}
-                            aria-label="시청 기록 삭제"
-                          >
-                            {isDeleting ? '삭제 중...' : '🗑️ 삭제'}
-                          </S.WatchHistoryDeleteBtn>
-                        </S.WatchHistoryItem>
-                      );
-                    })}
-                  </S.WatchHistoryList>
-                </S.WatchHistoryCard>
+                <S.MyReviewsSection>
+                  <ReviewList
+                    reviews={myReviews}
+                    onReviewsChange={handleMyReviewsChange}
+                    showMovieLink
+                  />
+
+                  {reviewPagination.totalPages > 1 && (
+                    <S.PaginationBar>
+                      {pageGroupStart > 1 && (
+                        <S.PageJumpButton
+                          type="button"
+                          onClick={() => setReviewPage(pageGroupStart - PAGE_GROUP_SIZE)}
+                        >
+                          &lt;&lt;
+                        </S.PageJumpButton>
+                      )}
+
+                      {pageNumbers.map((pageNumber) => (
+                        <S.PageButton
+                          key={pageNumber}
+                          type="button"
+                          $active={pageNumber === reviewPagination.page}
+                          onClick={() => setReviewPage(pageNumber)}
+                        >
+                          {pageNumber}
+                        </S.PageButton>
+                      ))}
+
+                      {pageGroupEnd < reviewPagination.totalPages && (
+                        <S.PageJumpButton
+                          type="button"
+                          onClick={() => setReviewPage(pageGroupStart + PAGE_GROUP_SIZE)}
+                        >
+                          &gt;&gt;
+                        </S.PageJumpButton>
+                      )}
+                    </S.PaginationBar>
+                  )}
+                </S.MyReviewsSection>
               )}
             </div>
           )}

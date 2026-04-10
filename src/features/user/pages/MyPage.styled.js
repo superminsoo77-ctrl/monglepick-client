@@ -453,130 +453,78 @@ export const PreferencesTags = styled.div`
 `;
 
 /* ─────────────────────────────────────────────────────────────
- * 시청 이력 탭 (2026-04-08 재도입)
- * user_watch_history 테이블 기반 — Kaggle 시드와 분리된 운영 도메인
+ * 시청 이력 탭 → 내가 작성한 리뷰 목록
+ * 영화 상세 페이지의 ReviewList 블록을 그대로 감싸는 래퍼 + 페이지네이션 UI
  * ───────────────────────────────────────────────────────────── */
 
 /**
- * 시청 이력 리스트 외곽 카드 — glass-card 스타일.
+ * 내 리뷰 목록 래퍼.
+ * 리뷰 블록 하단에 번호형 페이지네이션을 자연스럽게 이어 붙인다.
  */
-export const WatchHistoryCard = styled.div`
-  background: ${({ theme }) => theme.glass.bg};
-  backdrop-filter: blur(8px) saturate(1.4);
-  -webkit-backdrop-filter: blur(8px) saturate(1.4);
-  border: 1px solid ${({ theme }) => theme.glass.border};
-  border-radius: ${({ theme }) => theme.radius.xl};
-  padding: ${({ theme }) => theme.spacing.lg};
-`;
-
-/**
- * 시청 이력 항목 ul.
- */
-export const WatchHistoryList = styled.ul`
-  list-style: none;
-  margin: 0;
-  padding: 0;
+export const MyReviewsSection = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.sm};
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 /**
- * 시청 이력 항목 li — 좌측 정보 / 우측 메타+삭제 가로 배치.
- * 모바일에서는 세로 스택으로 전환된다.
+ * 페이지 번호 바 — 10개 단위 페이지 묶음을 중앙에 정렬한다.
  */
-export const WatchHistoryItem = styled.li`
+export const PaginationBar = styled.div`
   display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  justify-content: center;
   align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.spacing.md};
-  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
-  border-radius: ${({ theme }) => theme.radius.lg};
-  background: ${({ theme }) => theme.colors.surfaceAlt || theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.glass.border};
-  transition: background ${({ theme }) => theme.motion?.fast || '0.15s'} ease;
+  flex-wrap: wrap;
+`;
+
+/**
+ * 개별 페이지 번호 버튼.
+ * 현재 페이지는 primary 배경으로 강조한다.
+ */
+export const PageButton = styled.button`
+  min-width: 40px;
+  height: 40px;
+  padding: 0 ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme, $active }) =>
+    $active ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ theme, $active }) =>
+    $active ? theme.colors.primary : 'transparent'};
+  color: ${({ theme, $active }) =>
+    $active ? (theme.colors.onPrimary || '#fff') : theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
 
   &:hover {
-    background: ${({ theme }) => theme.colors.surfaceHover || theme.colors.surface};
-  }
-
-  ${mediaMobile} {
-    flex-direction: column;
-    align-items: flex-start;
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme, $active }) =>
+      $active ? (theme.colors.onPrimary || '#fff') : theme.colors.primary};
   }
 `;
 
 /**
- * 시청 이력 항목 좌측 메인 — movieId / 시청 일시 등.
+ * 페이지 묶음 이동 버튼.
+ * 1~10 다음의 11~20 묶음처럼 더 큰 단위 이동에 사용한다.
  */
-export const WatchHistoryItemMain = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.xs};
-  flex: 1 1 auto;
-  min-width: 0;
-`;
-
-/**
- * 시청한 영화 ID (또는 영화 제목 — 추후 영화 메타 join 시).
- */
-export const WatchHistoryMovieId = styled.span`
-  font-size: ${({ theme }) => theme.typography.textBase};
-  font-weight: ${({ theme }) => theme.typography.fontSemibold};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-/**
- * 시청 일시 / 평점 / 시청 경로 등 메타 정보 묶음.
- */
-export const WatchHistoryMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.spacing.sm};
-  font-size: ${({ theme }) => theme.typography.textSm};
-  color: ${({ theme }) => theme.colors.textMuted};
-`;
-
-/**
- * 메타 정보 배지 1개 (시청일/평점/경로 등).
- */
-export const WatchHistoryBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: ${({ theme }) => theme.radius.sm};
-  background: ${({ theme }) => theme.colors.surfaceMuted || theme.colors.surface};
-  color: ${({ theme }) => theme.colors.textSecondary || theme.colors.textMuted};
-`;
-
-/**
- * 시청 기록 삭제 버튼 — 본인 소유만 삭제 가능.
- */
-export const WatchHistoryDeleteBtn = styled.button`
-  flex-shrink: 0;
-  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.md};
-  border: 1px solid ${({ theme }) => theme.colors.danger || '#ef4444'};
-  color: ${({ theme }) => theme.colors.danger || '#ef4444'};
+export const PageJumpButton = styled.button`
+  min-width: 48px;
+  height: 40px;
+  padding: 0 ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
   background: transparent;
-  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textSecondary};
   font-size: ${({ theme }) => theme.typography.textSm};
-  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
   cursor: pointer;
-  transition: background ${({ theme }) => theme.motion?.fast || '0.15s'} ease,
-              color ${({ theme }) => theme.motion?.fast || '0.15s'} ease;
+  transition: all ${({ theme }) => theme.transitions.fast};
 
-  &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.danger || '#ef4444'};
-    color: #fff;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
   }
 `;
 

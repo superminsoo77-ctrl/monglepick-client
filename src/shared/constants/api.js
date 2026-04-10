@@ -96,6 +96,34 @@ export const RECOMMEND_MOVIE_ENDPOINTS = {
 };
 
 /**
+ * Recommend v2 리뷰 엔드포인트.
+ * 영화 상세의 리뷰 조회/작성/수정/삭제/좋아요 토글을 담당한다.
+ */
+export const RECOMMEND_REVIEW_ENDPOINTS = {
+  /** 리뷰 목록 조회 / 작성 - GET, POST */
+  REVIEWS: (movieId) => `${API_V2_VERSION}/movies/${movieId}/reviews`,
+  /** 리뷰 수정 / 삭제 - PUT, DELETE */
+  REVIEW_DETAIL: (movieId, reviewId) => `${API_V2_VERSION}/movies/${movieId}/reviews/${reviewId}`,
+  /** 리뷰 좋아요 토글 - POST */
+  REVIEW_LIKE: (movieId, reviewId) => `${API_V2_VERSION}/movies/${movieId}/reviews/${reviewId}/like`,
+};
+
+/**
+ * Recommend v2 사용자 위시리스트 엔드포인트.
+ * 마이페이지 위시리스트와 영화 상세의 찜 버튼이 이 경로를 사용한다.
+ */
+export const RECOMMEND_USER_ENDPOINTS = {
+  /** 내 위시리스트 목록 조회 - GET */
+  WISHLIST: `${API_V2_VERSION}/users/me/wishlist`,
+  /** 내 리뷰 목록 조회 - GET */
+  MY_REVIEWS: `${API_V2_VERSION}/users/me/reviews`,
+  /** 특정 영화 위시리스트 상태 조회 - GET */
+  WISHLIST_STATUS: (movieId) => `${API_V2_VERSION}/users/me/wishlist/${movieId}`,
+  /** 위시리스트 추가 - POST / 삭제 - DELETE */
+  TOGGLE_WISHLIST: (movieId) => `${API_V2_VERSION}/users/me/wishlist/${movieId}`,
+};
+
+/**
  * 커뮤니티(Posts) 관련 엔드포인트.
  * 게시글 및 리뷰 CRUD를 처리한다.
  */

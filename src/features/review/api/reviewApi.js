@@ -5,10 +5,36 @@
  * communityApi에서 분리된 리뷰 전용 모듈이다.
  */
 
-/* 공용 axios 인스턴스 — JWT 자동 주입 + 401 갱신 */
-import api from '../../../shared/api/axiosInstance';
+/* Recommend axios 인스턴스 — JWT Bearer 주입 */
+import { recommendApi, requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
-import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
+import { RECOMMEND_REVIEW_ENDPOINTS } from '../../../shared/constants/api';
+
+function normalizeReview(review) {
+  if (!review) {
+    return null;
+  }
+
+  // Recommend 응답은 작성자 정보를 중첩 author 객체로 내려주므로
+  // 화면에서는 항상 review.author.nickname 형태로 안전하게 접근할 수 있게 맞춘다.
+  return {
+    id: review.id,
+    movieId: review.movie_id || review.movieId,
+    movieTitle: review.movie_title || review.movieTitle || null,
+    posterUrl: review.poster_url || review.posterUrl || null,
+    rating: review.rating,
+    content: review.content,
+    author: {
+      nickname: review.author?.nickname || '익명',
+    },
+    isSpoiler: Boolean(review.is_spoiler ?? review.isSpoiler),
+    isMine: Boolean(review.is_mine ?? review.isMine),
+    reviewSource: review.review_source || review.reviewSource || null,
+    reviewCategoryCode: review.review_category_code || review.reviewCategoryCode || null,
+    createdAt: review.created_at || review.createdAt,
+    likeCount: review.like_count ?? review.likeCount ?? 0,
+  };
+}
 
 // ── 리뷰 (Reviews) ──
 
@@ -23,7 +49,14 @@ import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
  * @returns {Promise<Object>} 리뷰 목록 ({ reviews: [], total: number })
  */
 export async function getReviews(movieId, { page = 1, size = 10, sort = 'latest' } = {}) {
-  return api.get(COMMUNITY_ENDPOINTS.REVIEWS(movieId), { params: { page, size, sort } });
+  const result = await recommendApi.get(RECOMMEND_REVIEW_ENDPOINTS.REVIEWS(movieId), {
+    params: { page, size, sort },
+  });
+
+  return {
+    reviews: (result?.reviews || []).map(normalizeReview),
+    total: result?.total || 0,
+  };
 }
 
 /**
@@ -49,15 +82,18 @@ export async function getReviews(movieId, { page = 1, size = 10, sort = 'latest'
  */
 export async function createReview(
   movieId,
-  { content, rating, reviewSource, reviewCategoryCode } = {},
+  { content, rating, isSpoiler = false, reviewSource, reviewCategoryCode } = {},
 ) {
-  return api.post(COMMUNITY_ENDPOINTS.CREATE_REVIEW(movieId), {
-    movieId,
+  requireAuth();
+  const result = await recommendApi.post(RECOMMEND_REVIEW_ENDPOINTS.REVIEWS(movieId), {
+    movie_id: movieId,
     content,
     rating,
-    reviewSource,
-    reviewCategoryCode,
+    is_spoiler: isSpoiler,
+    review_source: reviewSource,
+    review_category_code: reviewCategoryCode,
   });
+  return normalizeReview(result);
 }
 
 /**
@@ -74,8 +110,17 @@ export async function createReview(
  * @param {number} reviewData.rating - 평점 (0.5 ~ 5.0)
  * @returns {Promise<Object>} 수정된 리뷰 정보
  */
-export async function updateReview(movieId, reviewId, { content, rating }) {
-  return api.put(COMMUNITY_ENDPOINTS.REVIEW_DETAIL(movieId, reviewId), { content, rating });
+export async function updateReview(movieId, reviewId, { content, rating, isSpoiler = false }) {
+  requireAuth();
+  const result = await recommendApi.put(
+    RECOMMEND_REVIEW_ENDPOINTS.REVIEW_DETAIL(movieId, reviewId),
+    {
+      content,
+      rating,
+      is_spoiler: isSpoiler,
+    },
+  );
+  return normalizeReview(result);
 }
 
 /**
@@ -87,7 +132,8 @@ export async function updateReview(movieId, reviewId, { content, rating }) {
  * @returns {Promise<void>}
  */
 export async function deleteReview(movieId, reviewId) {
-  return api.delete(COMMUNITY_ENDPOINTS.REVIEW_DETAIL(movieId, reviewId));
+  requireAuth();
+  return recommendApi.delete(RECOMMEND_REVIEW_ENDPOINTS.REVIEW_DETAIL(movieId, reviewId));
 }
 
 /**
@@ -100,5 +146,6 @@ export async function deleteReview(movieId, reviewId) {
  * @returns {Promise<{liked: boolean, likeCount: number}>} 토글 후 좋아요 상태
  */
 export async function toggleReviewLike(movieId, reviewId) {
-  return api.post(COMMUNITY_ENDPOINTS.REVIEW_LIKE(movieId, reviewId));
+  requireAuth();
+  return recommendApi.post(RECOMMEND_REVIEW_ENDPOINTS.REVIEW_LIKE(movieId, reviewId));
 }

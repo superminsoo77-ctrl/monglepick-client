@@ -22,11 +22,9 @@ import {
   toggleMovieLike,
 } from '../api/movieApi';
 /* 리뷰 API — features/review에서 가져옴 */
-import { getReviews } from '../../review/api/reviewApi';
+import { createReview, getReviews } from '../../review/api/reviewApi';
 /* 위시리스트 API — features/user에서 가져옴 */
-import { addToWishlist, removeFromWishlist } from '../../user/api/userApi';
-/* Phase 5-2: 시청 기록 저장용 Backend API */
-import { backendApi } from '../../../shared/api/axiosInstance';
+import { addToWishlist, getWishlistStatus, removeFromWishlist } from '../../user/api/userApi';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 영화 상세 카드 — 같은 feature 내의 components에서 가져옴 */
@@ -111,6 +109,16 @@ export default function MovieDetailPage() {
         // 위시리스트 상태 (영화 데이터에 포함된 경우)
         if (movieData.isWishlisted !== undefined) {
           setIsWishlisted(movieData.isWishlisted);
+        }
+
+        // 위시리스트 상태는 recommend v2 전용 status API로 동기화한다.
+        if (isAuthenticated) {
+          try {
+            const wishlistStatus = await getWishlistStatus(id);
+            setIsWishlisted(Boolean(wishlistStatus?.wishlisted));
+          } catch {
+            // 위시리스트 상태 조회 실패는 상세 렌더링을 막지 않음
+          }
         }
 
         // 리뷰 목록 조회 (별도 API, 실패해도 영화 정보는 표시)
@@ -258,12 +266,13 @@ export default function MovieDetailPage() {
    *
    * 중복 리뷰(이미 리뷰 작성한 영화)는 서버 409로 거부되지만 UX를 차단하지 않고 조용히 무시한다.
    */
-  const handleFeedbackSubmit = async (rating, content) => {
+  const handleFeedbackSubmit = async (rating, content, isSpoiler) => {
     try {
-      const result = await backendApi.post(`/api/v1/movies/${id}/reviews`, {
+      const result = await createReview(id, {
         movieId: id,
         rating,
         content: content || null,
+        isSpoiler,
         reviewSource: 'detail',
         reviewCategoryCode: 'AI_RECOMMEND',
       });
@@ -271,6 +280,10 @@ export default function MovieDetailPage() {
       if (result?.rewardPoints > 0) {
         showReward(result.rewardPoints, '리뷰 작성');
       }
+
+      // 리뷰 작성 직후 최신 목록을 다시 받아 하단 리뷰 섹션을 즉시 갱신한다.
+      const reviewData = await getReviews(id);
+      setReviews(reviewData?.reviews || []);
     } catch {
       // 중복 리뷰(409) 포함 모든 오류: UX 차단하지 않음
     }
@@ -333,7 +346,7 @@ export default function MovieDetailPage() {
             리뷰 {reviews.length > 0 && <span>({reviews.length})</span>}
           </S.SectionTitle>
           {/* movieId를 전달해야 리뷰 좋아요 토글 API를 호출할 수 있다 */}
-          <ReviewList reviews={reviews} movieId={id} />
+          <ReviewList reviews={reviews} movieId={id} onReviewsChange={setReviews} />
         </S.ReviewsSection>
       </S.InnerContainer>
     </S.MovieDetailPageWrapper>

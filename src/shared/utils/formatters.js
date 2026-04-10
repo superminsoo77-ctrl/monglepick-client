@@ -114,7 +114,7 @@ export function formatRatingStars(rating) {
   if (!rating && rating !== 0) return '☆☆☆☆☆';
 
   // 10점 만점을 5점 만점으로 변환
-  const stars = Math.round(Number(rating) / 2);
+  const stars = rating;
   const filled = Math.min(Math.max(stars, 0), 5);
 
   return '★'.repeat(filled) + '☆'.repeat(5 - filled);
