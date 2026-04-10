@@ -13,9 +13,9 @@ const fadeInUp = keyframes`
 
 /** 페이지 컨테이너 */
 export const Container = styled.div`
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: ${({ theme }) => theme.spacing.lg}px ${({ theme }) => theme.spacing.md}px;
+  padding: 48px 32px 32px;
   animation: ${fadeInUp} 0.4s ease;
 `;
 
@@ -24,7 +24,7 @@ export const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: ${({ theme }) => theme.spacing.lg}px;
+  margin-bottom: 32px;
   gap: 12px;
   flex-wrap: wrap;
 `;
@@ -58,8 +58,8 @@ export const CreateBtn = styled.button`
 /** 플레이리스트 그리드 */
 export const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
 
   @media (max-width: 480px) {
     grid-template-columns: 1fr;
@@ -68,7 +68,7 @@ export const Grid = styled.div`
 
 /** 플레이리스트 카드 */
 export const Card = styled.div`
-  padding: 20px;
+  padding: 28px 24px;
   border-radius: ${({ theme }) => theme.radius.lg};
   background: ${({ theme }) => theme.colors.bgSecondary};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
@@ -76,7 +76,8 @@ export const Card = styled.div`
   transition: all ${({ theme }) => theme.transitions.base};
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  min-height: 140px;
 
   &:hover {
     border-color: ${({ theme }) => theme.colors.primary};
@@ -146,12 +147,9 @@ export const SmallBtn = styled.button`
 /** 모달 폼 오버레이 */
 export const FormOverlay = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: ${({ theme }) => theme.zIndex.modalBackdrop};
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,14 +158,15 @@ export const FormOverlay = styled.div`
 
 /** 모달 폼 패널 */
 export const FormPanel = styled.div`
-  background: ${({ theme }) => theme.colors.bg};
+  background: ${({ theme }) => theme.colors.bgCard || theme.colors.bgSecondary};
   border-radius: ${({ theme }) => theme.radius.xl};
-  padding: 24px;
+  padding: 28px 24px;
   width: 100%;
   max-width: 440px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 `;
 
 /** 폼 제목 */
@@ -216,6 +215,46 @@ export const FormTextarea = styled.textarea`
   }
 `;
 
+/** 공개/비공개 토글 행 */
+export const ToggleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+`;
+
+export const ToggleLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const ToggleSwitch = styled.button`
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: ${({ $on, theme }) => $on ? theme.colors.primary : theme.colors.borderDefault};
+  cursor: pointer;
+  transition: background ${({ theme }) => theme.transitions.fast};
+  flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: ${({ $on }) => $on ? '23px' : '3px'};
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left ${({ theme }) => theme.transitions.fast};
+  }
+`;
+
 /** 폼 버튼 그룹 */
 export const FormButtons = styled.div`
   display: flex;
@@ -253,7 +292,7 @@ export const BackLink = styled.button`
   color: ${({ theme }) => theme.colors.textSecondary};
   font-size: ${({ theme }) => theme.typography.textSm};
   cursor: pointer;
-  margin-bottom: ${({ theme }) => theme.spacing.md}px;
+  margin-bottom: 16px;
 
   &:hover { color: ${({ theme }) => theme.colors.primary}; }
 `;
@@ -263,7 +302,7 @@ export const MovieList = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;
-  margin-top: ${({ theme }) => theme.spacing.md}px;
+  margin-top: 16px;
 `;
 
 /** 상세 영화 카드 */
@@ -363,6 +402,95 @@ export const EmptyText = styled.p`
   font-size: ${({ theme }) => theme.typography.textSm};
   margin: 0;
   line-height: 1.5;
+`;
+
+/** 영화 검색 결과 그리드 */
+export const SearchResultGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.borderDefault};
+    border-radius: 4px;
+  }
+`;
+
+/** 영화 검색 결과 카드 */
+export const SearchMovieCard = styled.div`
+  position: relative;
+  border-radius: ${({ theme }) => theme.radius.md};
+  overflow: hidden;
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    transform: translateY(-2px);
+  }
+
+  &.added {
+    opacity: 0.5;
+    cursor: default;
+    &:hover { transform: none; border-color: ${({ theme }) => theme.colors.borderDefault}; }
+  }
+`;
+
+/** 검색 결과 영화 포스터 */
+export const SearchMoviePoster = styled.img`
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  display: block;
+`;
+
+/** 검색 결과 포스터 플레이스홀더 */
+export const SearchMoviePlaceholder = styled.div`
+  width: 100%;
+  aspect-ratio: 2/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  background: ${({ theme }) => theme.colors.bgElevated};
+`;
+
+/** 검색 결과 영화 제목 */
+export const SearchMovieTitle = styled.div`
+  padding: 6px;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+/** 추가됨 뱃지 */
+export const AddedBadge = styled.div`
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 6px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
+  font-size: 10px;
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+/** 검색 안내 텍스트 */
+export const SearchHint = styled.p`
+  text-align: center;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  margin: 20px 0;
 `;
 
 /** 스켈레톤 카드 */

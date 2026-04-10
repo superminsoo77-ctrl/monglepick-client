@@ -11,6 +11,28 @@ import api from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
 import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
 
+// ── 정규화 헬퍼 ──
+
+/**
+ * 백엔드 게시글 응답을 프론트 표시 형식으로 정규화한다.
+ *
+ * 백엔드가 평면 필드(authorNickname, userNickname 등)로 반환하는 경우에도
+ * author.nickname 으로 일관되게 접근할 수 있도록 보장한다.
+ */
+function normalizePost(post) {
+  if (!post) return post;
+  const nickname =
+    post.author?.nickname ||
+    post.authorNickname  ||
+    post.userNickname    ||
+    post.nickname        ||
+    null;
+  return {
+    ...post,
+    author: { ...(post.author ?? {}), nickname },
+  };
+}
+
 // ── 게시글 (Posts) ──
 
 /**
@@ -48,10 +70,14 @@ export async function getPosts({ page = 1, size = 20, sort = 'latest', category 
   const pageData = await api.get(COMMUNITY_ENDPOINTS.POSTS, { params });
 
   /* 호출 측 친화적인 형태로 normalize */
+  /* PLAYLIST_SHARE 는 전용 탭에서만 노출 — 일반 게시글 피드에서 제외 */
+  const filtered = (pageData?.content ?? []).filter(
+    (p) => p.category !== 'PLAYLIST_SHARE'
+  );
   return {
-    posts: pageData?.content ?? [],
+    posts: filtered.map(normalizePost),
     total: pageData?.totalElements ?? 0,
-    page: (pageData?.number ?? 0) + 1,           /* 사용자 시점 1-indexed */
+    page: (pageData?.number ?? 0) + 1,
     totalPages: pageData?.totalPages ?? 0,
   };
 }
@@ -63,7 +89,8 @@ export async function getPosts({ page = 1, size = 20, sort = 'latest', category 
  * @returns {Promise<Object>} 게시글 상세 (id, title, content, author, createdAt, comments 등)
  */
 export async function getPostDetail(postId) {
-  return api.get(COMMUNITY_ENDPOINTS.POST_DETAIL(postId));
+  const data = await api.get(COMMUNITY_ENDPOINTS.POST_DETAIL(postId));
+  return normalizePost(data);
 }
 
 /**
@@ -104,4 +131,53 @@ export async function updatePost(postId, { title, content, category }) {
  */
 export async function deletePost(postId) {
   return api.delete(COMMUNITY_ENDPOINTS.UPDATE_POST(postId));
+}
+
+/**
+ * 게시글 좋아요를 토글한다 (인스타그램 스타일).
+ *
+ * @param {number|string} postId
+ * @returns {Promise<{liked: boolean, likeCount: number}>}
+ */
+export async function togglePostLike(postId) {
+  return api.post(COMMUNITY_ENDPOINTS.POST_LIKE(postId));
+}
+
+/**
+ * 플레이리스트 공유 피드를 조회한다 (비로그인 허용).
+ *
+ * @param {Object} [params]
+ * @param {number} [params.page=1]
+ * @param {number} [params.size=15]
+ * @returns {Promise<{ posts: Array, totalPages: number, total: number, page: number }>}
+ */
+export async function getSharedPlaylists({ page = 1, size = 15 } = {}) {
+  const data = await api.get(COMMUNITY_ENDPOINTS.SHARED_PLAYLISTS, {
+    params: { page: Math.max(0, page - 1), size },
+  });
+  console.log('[getSharedPlaylists] raw data:', data);
+  return {
+    posts: data?.content ?? [],
+    total: data?.totalElements ?? 0,
+    page: (data?.number ?? 0) + 1,
+    totalPages: data?.totalPages ?? 0,
+  };
+}
+
+/**
+ * 내 플레이리스트를 커뮤니티에 공유하는 게시글을 작성한다.
+ *
+ * @param {Object} params
+ * @param {string} params.title - 게시글 제목
+ * @param {string} params.content - 게시글 본문
+ * @param {number} params.playlistId - 공유할 플레이리스트 ID
+ * @returns {Promise<Object>}
+ */
+export async function sharePlaylist({ title, content, playlistId }) {
+  return api.post(COMMUNITY_ENDPOINTS.CREATE_POST, {
+    title,
+    content,
+    category: 'PLAYLIST_SHARE',
+    playlistId,
+  });
 }

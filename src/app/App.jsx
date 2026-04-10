@@ -71,6 +71,7 @@ import MatchPage from '../features/match/pages/MatchPage';
 import RecommendationPage from '../features/recommendation/pages/RecommendationPage';
 /* 플레이리스트 페이지 — features/playlist에서 가져옴 */
 import PlaylistPage from '../features/playlist/pages/PlaylistPage';
+import SharedPlaylistDetailPage from '../features/community/pages/SharedPlaylistDetailPage';
 /* 업적/도장깨기 페이지 — features/achievement에서 가져옴 */
 import AchievementPage from '../features/achievement/pages/AchievementPage';
 /*
@@ -313,6 +314,16 @@ function App() {
                 <PlaylistPage />
               </MainLayout>
             </PrivateRoute>
+          }
+        />
+
+        {/* 커뮤니티 공유 플레이리스트 상세 (읽기 전용, 비로그인 허용) */}
+        <Route
+          path="/community/playlist/:playlistId"
+          element={
+            <MainLayout>
+              <SharedPlaylistDetailPage />
+            </MainLayout>
           }
         />
 

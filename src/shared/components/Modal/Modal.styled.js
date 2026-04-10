@@ -14,7 +14,6 @@
  */
 
 import styled, { css, keyframes } from 'styled-components';
-import { scaleIn } from '../../styles/animations';
 import { media } from '../../styles/media';
 
 /* ── 등장/퇴장 애니메이션 ── */
@@ -29,6 +28,12 @@ const backdropFadeIn = keyframes`
 const backdropFadeOut = keyframes`
   from { opacity: 1; }
   to { opacity: 0; }
+`;
+
+/** 모달 스케일 인 (열릴 때) — translate 포함해야 centering 유지 */
+const modalScaleIn = keyframes`
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 `;
 
 /** 모달 스케일 아웃 (닫힐 때) */
@@ -105,11 +110,11 @@ export const Container = styled.div`
     ${({ theme }) => theme.shadows.xl},
     ${({ theme }) => theme.shadows.glow};
 
-  /* 등장/퇴장 애니메이션 */
+  /* 등장/퇴장 애니메이션 — translate 포함해야 centering 유지 */
   animation: ${({ $closing }) =>
       $closing
         ? css`${scaleOut}`
-        : css`${scaleIn}`}
+        : css`${modalScaleIn}`}
     ${({ $closing }) => ($closing ? '200ms' : '300ms')} ease forwards;
 
   ${media.mobile} {

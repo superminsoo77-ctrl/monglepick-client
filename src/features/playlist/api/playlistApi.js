@@ -20,7 +20,8 @@ import { PLAYLIST_ENDPOINTS } from '../../../shared/constants/api';
  */
 export async function getPlaylists({ page = 0, size = 20 } = {}) {
   requireAuth();
-  return backendApi.get(PLAYLIST_ENDPOINTS.LIST, { params: { page, size } });
+  const res = await backendApi.get(PLAYLIST_ENDPOINTS.LIST, { params: { page, size } });
+  return res?.data ?? res;
 }
 
 /**
@@ -31,7 +32,8 @@ export async function getPlaylists({ page = 0, size = 20 } = {}) {
  */
 export async function getPlaylistDetail(playlistId) {
   requireAuth();
-  return backendApi.get(PLAYLIST_ENDPOINTS.DETAIL(playlistId));
+  const res = await backendApi.get(PLAYLIST_ENDPOINTS.DETAIL(playlistId));
+  return res?.data ?? res;
 }
 
 /**
@@ -42,9 +44,9 @@ export async function getPlaylistDetail(playlistId) {
  * @param {string} [data.description] - 설명
  * @returns {Promise<{id, title, description}>}
  */
-export async function createPlaylist({ title, description }) {
+export async function createPlaylist({ title, description, isPublic = false }) {
   requireAuth();
-  return backendApi.post(PLAYLIST_ENDPOINTS.CREATE, { title, description });
+  return backendApi.post(PLAYLIST_ENDPOINTS.CREATE, { playlistName: title, description, isPublic });
 }
 
 /**
@@ -54,9 +56,9 @@ export async function createPlaylist({ title, description }) {
  * @param {Object} data - {title, description}
  * @returns {Promise<void>}
  */
-export async function updatePlaylist(playlistId, { title, description }) {
+export async function updatePlaylist(playlistId, { title, description, isPublic }) {
   requireAuth();
-  return backendApi.put(PLAYLIST_ENDPOINTS.UPDATE(playlistId), { title, description });
+  return backendApi.put(PLAYLIST_ENDPOINTS.UPDATE(playlistId), { playlistName: title, description, isPublic });
 }
 
 /**
@@ -92,4 +94,32 @@ export async function addMovieToPlaylist(playlistId, movieId) {
 export async function removeMovieFromPlaylist(playlistId, movieId) {
   requireAuth();
   return backendApi.delete(PLAYLIST_ENDPOINTS.REMOVE_MOVIE(playlistId, movieId));
+}
+
+/**
+ * 플레이리스트 좋아요 토글.
+ * 이미 좋아요면 취소(DELETE), 없으면 추가(POST).
+ *
+ * @param {string|number} playlistId
+ * @param {boolean} liked - 현재 좋아요 상태 (true면 취소, false면 추가)
+ * @returns {Promise<void>}
+ */
+export async function togglePlaylistLike(playlistId, liked) {
+  requireAuth();
+  if (liked) {
+    return backendApi.delete(PLAYLIST_ENDPOINTS.LIKE(playlistId));
+  }
+  return backendApi.post(PLAYLIST_ENDPOINTS.LIKE(playlistId));
+}
+
+/**
+ * 공유된 플레이리스트를 내 플레이리스트로 가져오기(복사).
+ *
+ * @param {string|number} playlistId - 원본 플레이리스트 ID
+ * @returns {Promise<{newPlaylistId: number}>}
+ */
+export async function importPlaylist(playlistId) {
+  requireAuth();
+  const res = await backendApi.post(PLAYLIST_ENDPOINTS.IMPORT(playlistId));
+  return res?.data ?? res;
 }

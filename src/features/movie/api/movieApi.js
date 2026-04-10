@@ -56,6 +56,31 @@ export async function getSearchGenres() {
 }
 
 /**
+ * 검색 입력 중 제목 자동완성 후보를 조회한다.
+ *
+ * Recommend API는 Redis 캐시를 우선 활용해 최대 10건까지 빠르게 반환한다.
+ *
+ * @param {Object} params - 자동완성 조회 파라미터
+ * @param {string} params.query - 사용자가 입력 중인 검색어
+ * @param {number} [params.limit=8] - 최대 후보 수
+ * @returns {Promise<Array<string>>} 자동완성 후보 목록
+ */
+export async function getAutocompleteSuggestions({ query, limit = 8 }) {
+  if (!query?.trim()) {
+    return [];
+  }
+
+  const data = await recommendApi.get(SEARCH_ENDPOINTS.AUTOCOMPLETE, {
+    params: {
+      q: query.trim(),
+      limit,
+    },
+  });
+
+  return data?.suggestions || [];
+}
+
+/**
  * 영화를 검색한다.
  * 키워드, 장르, 정렬 등의 필터를 지원한다.
  *

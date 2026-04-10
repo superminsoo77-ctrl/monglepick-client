@@ -39,11 +39,13 @@ import EmptyState from '../../../shared/components/EmptyState/EmptyState';
  * 커뮤니티 카테고리로 이관하기 위한 변경 (2026-04-08).
  */
 import QuizPage from '../../quiz/pages/QuizPage';
+import PlaylistShareFeed from '../components/PlaylistShareFeed';
 import * as S from './CommunityPage.styled';
 
 /** 탭 정의 */
 const TABS = [
   { id: 'posts', label: '게시글' },
+  { id: 'playlist-share', label: '플레이리스트 공유' },
   { id: 'reviews', label: '리뷰' },
   { id: 'quiz', label: '오늘의 퀴즈' },
 ];
@@ -273,6 +275,8 @@ export default function CommunityPage() {
               <PostList posts={posts} loading={isLoading} />
             </>
           )}
+
+          {activeTab === 'playlist-share' && <PlaylistShareFeed />}
 
           {activeTab === 'reviews' && (
             <EmptyState

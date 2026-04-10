@@ -65,6 +65,8 @@ export const ROUTES = {
   PLAYLIST: '/playlist',
   /** 플레이리스트 상세 — 동적 파라미터 :id */
   PLAYLIST_DETAIL: '/playlist/:id',
+  /** 커뮤니티 공유 플레이리스트 상세 (읽기 전용) — 동적 파라미터 :playlistId */
+  SHARED_PLAYLIST_DETAIL: '/community/playlist/:playlistId',
   /** 업적/도장깨기 페이지 — 사용자 업적 및 도장깨기 진행 */
   ACHIEVEMENT: '/achievement',
   /** 퀴즈 페이지 — 오늘의 영화 퀴즈 (비로그인 열람 가능, 제출은 로그인 필수) */

@@ -119,7 +119,7 @@ export default function PostDetailPage() {
           {/* 작성자 */}
           <S.AuthorBar>
             <span>작성자</span>
-            <strong>{post.author?.nickname || post.userId || '익명'}</strong>
+            <strong>{post.author?.nickname || '익명'}</strong>
           </S.AuthorBar>
 
           {/* 본문 */}

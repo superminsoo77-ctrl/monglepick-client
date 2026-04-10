@@ -179,6 +179,77 @@ export const Input = styled.input`
 `;
 
 /**
+ * 자동완성 레이어.
+ * 입력창 바로 아래에 떠서 추천 검색어를 빠르게 고를 수 있게 한다.
+ */
+export const AutocompletePanel = styled.div`
+  position: absolute;
+  top: calc(100% + ${({ theme }) => theme.spacing.xs});
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: ${({ theme }) => theme.spacing.xs};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderLight};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+`;
+
+/**
+ * 자동완성 목록.
+ * 검색어 후보를 세로 리스트로 정렬한다.
+ */
+export const AutocompleteList = styled.ul`
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+`;
+
+/**
+ * 자동완성 개별 항목.
+ */
+export const AutocompleteItem = styled.li`
+  width: 100%;
+`;
+
+/**
+ * 자동완성 선택 버튼.
+ * 키보드/마우스 선택 상태를 모두 같은 시각 언어로 보여준다.
+ *
+ * @prop {boolean} $active - 현재 강조된 후보 여부
+ */
+export const AutocompleteButton = styled.button`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.lg};
+  background: ${({ $active, theme }) => ($active ? theme.colors.bgTertiary : 'transparent')};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  text-align: left;
+  cursor: pointer;
+  transition: background-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgTertiary};
+  }
+`;
+
+/**
+ * 자동완성 안내 문구.
+ * 로딩 중이거나 후보가 없을 때 입력창 아래에 짧게 노출한다.
+ */
+export const AutocompleteMessage = styled.p`
+  margin: 0;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+/**
  * 검색 버튼 — gradient 배경.
  * 640px 이하에서 전체 너비.
  * 비활성(:disabled) 시 opacity 0.6.
@@ -642,6 +713,16 @@ export const SearchGenreEmpty = styled.p`
 `;
 
 /**
+ * 장르 발견형 검색 블록 내부 묶음.
+ * 주 장르와 세부 장르 영역을 같은 카드 안에서 자연스럽게 구분한다.
+ */
+export const SearchGenreGroups = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+/**
  * 장르 발견형 검색 토글 목록.
  * CSV 기준 장르 수가 많아 여러 줄로 자연스럽게 감싼다.
  */
@@ -685,6 +766,38 @@ export const SearchGenreToggle = styled.button`
       color: white;
       box-shadow: ${theme.glows.primary};
     `}
+`;
+
+/**
+ * 세부 장르 영역.
+ * 구분선 아래에 토글 텍스트와 세부 장르 목록이 이어지도록 묶는다.
+ */
+export const SearchGenreDetailSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+  padding-top: ${({ theme }) => theme.spacing.xs};
+  border-top: 1px solid ${({ theme }) => theme.colors.borderLight};
+`;
+
+/**
+ * 세부 장르 토글 텍스트.
+ * 구분선 바로 아래의 문구 자체를 클릭해 펼침/닫기를 전환한다.
+ */
+export const SearchGenreDetailToggle = styled.button`
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 /**

@@ -111,6 +111,8 @@ export const COMMUNITY_ENDPOINTS = {
    * 응답: { liked: boolean, likeCount: number }
    */
   COMMENT_LIKE: (postId, commentId) => `${API_VERSION}/posts/${postId}/comments/${commentId}/like`,
+  /** 플레이리스트 공유 피드 - GET (PLAYLIST_SHARE 카테고리만, 비로그인 허용) */
+  SHARED_PLAYLISTS: `${API_VERSION}/posts/shared-playlists`,
 };
 
 /**
@@ -300,6 +302,10 @@ export const PLAYLIST_ENDPOINTS = {
   ADD_MOVIE: (id) => `${API_VERSION}/playlists/${id}/movies`,
   /** 플레이리스트에서 영화 제거 - DELETE (path: playlistId, movieId) */
   REMOVE_MOVIE: (playlistId, movieId) => `${API_VERSION}/playlists/${playlistId}/movies/${movieId}`,
+  /** 플레이리스트 좋아요 - POST / 취소 - DELETE */
+  LIKE: (id) => `${API_VERSION}/playlists/${id}/like`,
+  /** 플레이리스트 가져오기(복사) - POST */
+  IMPORT: (id) => `${API_VERSION}/playlists/${id}/import`,
 };
 
 /**
