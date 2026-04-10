@@ -13,7 +13,12 @@ import { trackEvent } from '../../../shared/utils/eventTracker';
 /* 커스텀 모달 훅 — window.alert 대체 */
 import { useModal } from '../../../shared/components/Modal';
 /* 영화 API — 같은 feature 내의 movieApi에서 가져옴 */
-import { getMovie, toggleMovieLike, getMovieLikeStatus } from '../api/movieApi';
+import {
+  getMovie,
+  getMovieLikeCount,
+  getMovieLikeStatus,
+  toggleMovieLike,
+} from '../api/movieApi';
 /* 리뷰 API — features/review에서 가져옴 */
 import { getReviews } from '../../review/api/reviewApi';
 /* 위시리스트 API — features/user에서 가져옴 */
@@ -111,6 +116,15 @@ export default function MovieDetailPage() {
         } catch {
           // 리뷰 로드 실패 시 빈 배열
           setReviews([]);
+        }
+
+        // 좋아요 수는 비로그인도 볼 수 있게 공개 카운트 API를 우선 사용한다.
+        // 로그인 상태라면 내 좋아요 여부까지 함께 내려주는 상태 API로 덮어쓴다.
+        try {
+          const publicLikeCount = await getMovieLikeCount(id);
+          setLikeCount(publicLikeCount.likeCount || 0);
+        } catch {
+          // 공개 카운트 조회 실패는 무시 — 기본값(0) 유지
         }
 
         // 로그인한 경우 좋아요 상태 로드 (실패해도 영화 정보는 표시)

@@ -167,7 +167,7 @@ export default function MovieDetailCard({
                 onClick={() => onWishlistToggle(movie.id)}
                 disabled={wishlistLoading}
               >
-                {isWishlisted ? '♥ 위시리스트에 추가됨' : '♡ 위시리스트에 추가'}
+                {isWishlisted ? '★ 위시리스트에 추가됨' : '✩ 위시리스트에 추가'}
               </S.WishlistBtn>
             )}
 

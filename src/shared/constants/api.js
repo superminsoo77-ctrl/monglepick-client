@@ -13,6 +13,8 @@
 
 /** API 버전 접두사 */
 export const API_VERSION = '/api/v1';
+/** Recommend v2 API 버전 접두사 */
+export const API_V2_VERSION = '/api/v2';
 
 /**
  * 인증(Authentication) 관련 엔드포인트.
@@ -78,6 +80,19 @@ export const MOVIE_ENDPOINTS = {
    * 응답: { liked: false, likeCount: number }
    */
   LIKE_COUNT: (id) => `${API_VERSION}/movies/${id}/like/count`,
+};
+
+/**
+ * Recommend v2 영화 좋아요 엔드포인트.
+ * recommend(FastAPI)의 Redis 하이브리드 캐시 구현을 직접 호출한다.
+ */
+export const RECOMMEND_MOVIE_ENDPOINTS = {
+  /** 영화 좋아요 토글 - POST (id 파라미터 필요, JWT 필요) */
+  LIKE: (id) => `${API_V2_VERSION}/movies/${id}/like`,
+  /** 내 영화 좋아요 상태 조회 - GET (id 파라미터 필요, JWT 필요) */
+  LIKE_STATUS: (id) => `${API_V2_VERSION}/movies/${id}/like`,
+  /** 영화 좋아요 수 조회 - GET (id 파라미터 필요, 공개 API) */
+  LIKE_COUNT: (id) => `${API_V2_VERSION}/movies/${id}/like/count`,
 };
 
 /**

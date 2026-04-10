@@ -41,6 +41,7 @@ const RECENT_HISTORY_SCROLL_THRESHOLD = 80;
 const SEARCH_CACHE_STORAGE_KEY = 'monglepick_search_page_cache';
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 const AUTOCOMPLETE_LIMIT = 8;
+const RATING_SORT_MIN_VOTE_COUNT = 100;
 
 /** 장르 필터 옵션 */
 const GENRE_FILTERS = [
@@ -225,12 +226,19 @@ function getMovieReleaseTimestamp(movie) {
   return 0;
 }
 
-function sortMoviesForDisplay(movieList, sortValue) {
+function shouldApplyGenreDiscoveryRatingFilter(searchMode, sortValue) {
+  return searchMode === 'genre_discovery' && sortValue === 'rating';
+}
+
+function sortMoviesForDisplay(movieList, sortValue, searchMode = 'keyword') {
   if (!Array.isArray(movieList) || movieList.length === 0) {
     return [];
   }
 
-  const normalizedMovies = [...movieList];
+  // 장르 탐색 검색의 평점순은 서버와 동일하게 최소 평점 참여 인원 수 조건을 유지합니다.
+  const normalizedMovies = shouldApplyGenreDiscoveryRatingFilter(searchMode, sortValue)
+    ? movieList.filter((movie) => (movie?.vote_count || 0) >= RATING_SORT_MIN_VOTE_COUNT)
+    : [...movieList];
 
   if (sortValue === 'date') {
     // 최신순은 현재까지 받아온 결과를 개봉일 기준으로 프론트에서 빠르게 재정렬합니다.
@@ -452,7 +460,11 @@ export default function SearchPage() {
         hasMore: page * PAGE_SIZE < nextTotal,
         baseSort,
       };
-      const visibleMovies = sortMoviesForDisplay(nextBaseMovieDataset.movies, effectiveSort);
+      const visibleMovies = sortMoviesForDisplay(
+        nextBaseMovieDataset.movies,
+        effectiveSort,
+        isGenreDiscoverySearch ? 'genre_discovery' : 'keyword',
+      );
 
       setBaseMovieDataset(nextBaseMovieDataset);
       setMovies(visibleMovies);
@@ -1090,7 +1102,39 @@ export default function SearchPage() {
     const normalizedDiscoveryGenres = (
       lastSearchContext?.discoveryGenres || selectedSearchGenres
     );
-    setMovies(sortMoviesForDisplay(baseMovieDataset.movies, selectedSort));
+    const isGenreDiscoverySearch = lastSearchContext?.searchMode === 'genre_discovery';
+    const currentBaseSort = lastSearchContext?.baseSort || baseMovieDataset.baseSort || 'relevance';
+    const locallySortedMovies = sortMoviesForDisplay(
+      baseMovieDataset.movies,
+      selectedSort,
+      lastSearchContext?.searchMode || 'keyword',
+    );
+    const needsGenreDiscoveryRefetch = (
+      isGenreDiscoverySearch
+      && selectedSort !== currentBaseSort
+      && locallySortedMovies.length === 0
+      && baseMovieDataset.movies.length > 0
+      && (selectedSort === 'rating' || currentBaseSort === 'rating')
+    );
+
+    // 장르 탐색 검색은 평점순에서만 결과 집합에 vote_count 조건이 추가됩니다.
+    // 우선 프런트에서 재정렬하고, 그 결과가 비어 있을 때만
+    // 선택한 정렬을 기준으로 검색을 다시 실행해 부족한 결과 집합을 보완합니다.
+    if (needsGenreDiscoveryRefetch) {
+      executeSearch(
+        queryText,
+        lastSearchContext?.searchType || searchType,
+        queryText ? (lastSearchContext?.genre || genre) : '전체',
+        selectedSort,
+        1,
+        false,
+        normalizedDiscoveryGenres,
+        selectedSort,
+      );
+      return;
+    }
+
+    setMovies(locallySortedMovies);
     setTotalCount(baseMovieDataset.totalCount);
     setCurrentPage(baseMovieDataset.currentPage || 1);
     setHasMore(Boolean(baseMovieDataset.hasMore));
