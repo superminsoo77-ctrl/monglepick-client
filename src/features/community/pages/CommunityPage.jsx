@@ -44,9 +44,9 @@ import * as S from './CommunityPage.styled';
 
 /** 탭 정의 */
 const TABS = [
-  { id: 'posts', label: '게시글' },
+  { id: 'posts', label: '영화' },
   { id: 'playlist-share', label: '플레이리스트 공유' },
-  { id: 'reviews', label: '리뷰' },
+  { id: 'reviews', label: '실관람인증' },
   { id: 'quiz', label: '오늘의 퀴즈' },
 ];
 
