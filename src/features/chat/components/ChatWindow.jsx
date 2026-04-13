@@ -70,6 +70,7 @@ export default function ChatWindow() {
     sessions,
     isLoading: isHistoryLoading,
     hasMore,
+    loadError: historyLoadError,
     loadSessions,
     loadMoreSessions,
     loadSessionMessages,
@@ -376,6 +377,8 @@ export default function ChatWindow() {
         isLoading={isHistoryLoading}
         hasMore={hasMore}
         onLoadMore={loadMoreSessions}
+        loadError={historyLoadError}
+        onRetry={() => loadSessions(true)}
       />
 
       {/* ── 헤더 ── */}

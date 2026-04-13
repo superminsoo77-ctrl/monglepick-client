@@ -14,7 +14,8 @@
  * - OTT 플랫폼
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { trackEvent } from '../../../shared/utils/eventTracker';
 
 /* styled-components 기반 스타일 — theme 토큰으로 다크/라이트 모드 자동 대응 */
@@ -151,6 +152,24 @@ export default function MovieCard({ movie }) {
 
   /* Phase 2: 호버 시작 시각 추적용 ref */
   const hoverStartRef = useRef(null);
+
+  /* 트레일러 모달 열림 시: ESC 키 닫기 + body 스크롤 잠금 */
+  useEffect(() => {
+    if (!showTrailer) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setShowTrailer(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTrailer]);
 
   /**
    * 트레일러 모달 배경 클릭 시 닫기.
@@ -302,8 +321,12 @@ export default function MovieCard({ movie }) {
         )}
       </InfoArea>
 
-      {/* YouTube 트레일러 모달 오버레이 */}
-      {showTrailer && embedUrl && (
+    </Card>
+
+      {/* YouTube 트레일러 모달 — createPortal로 body에 직접 렌더링.
+       * Card의 overflow:hidden + transform(hover)이 position:fixed를
+       * 깨뜨리는 문제를 우회한다. */}
+      {showTrailer && embedUrl && createPortal(
         <TrailerModal onClick={handleOverlayClick}>
           <ModalContent>
             {/* 닫기 버튼 */}
@@ -325,9 +348,9 @@ export default function MovieCard({ movie }) {
               />
             </PlayerWrapper>
           </ModalContent>
-        </TrailerModal>
+        </TrailerModal>,
+        document.body,
       )}
-    </Card>
     </CardFadeWrapper>
   );
 }
