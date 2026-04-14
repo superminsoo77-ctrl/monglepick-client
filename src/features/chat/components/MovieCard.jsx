@@ -17,6 +17,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { trackEvent } from '../../../shared/utils/eventTracker';
+import useAuthStore from '../../../shared/stores/useAuthStore';
+import { useModal } from '../../../shared/components/Modal';
+import { useRewardToast } from '../../../shared/components/RewardToast';
+import { createReview } from '../../../features/review/api/reviewApi';
+import PostWatchFeedback from '../../../features/movie/components/PostWatchFeedback';
 
 /* styled-components 기반 스타일 — theme 토큰으로 다크/라이트 모드 자동 대응 */
 import {
@@ -42,7 +47,9 @@ import {
   CloseButton,
   ModalTitle,
   PlayerWrapper,
+  ActionRow,
   NotInterestedButton,
+  ReviewButton,
   CardFadeWrapper,
 } from './MovieCard.styled';
 
@@ -121,8 +128,9 @@ function getYouTubeEmbedUrl(url) {
  * @param {string} [props.movie.certification] - 관람등급
  * @param {string} [props.movie.trailer_url] - 트레일러 URL
  * @param {string} [props.movie.explanation] - 추천 이유
+ * @param {string} [props.sessionId] - 현재 채팅 세션 ID (리뷰 작성 시 reviewSource 로 기록)
  */
-export default function MovieCard({ movie }) {
+export default function MovieCard({ movie, sessionId }) {
   const {
     rank,
     title,
@@ -146,6 +154,20 @@ export default function MovieCard({ movie }) {
 
   /* Phase 5-1: "관심 없음" 클릭 시 fade-out */
   const [dismissed, setDismissed] = useState(false);
+
+  /* 리뷰 작성 모달 표시 상태 */
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  /* 리뷰 작성 완료 여부 — true 일 때 "리뷰 작성" 버튼이 "✓ 리뷰 작성됨" 으로 잠김 */
+  const [reviewed, setReviewed] = useState(false);
+
+  /* 리뷰 전송 중 중복 제출 방지 플래그 */
+  const [submitting, setSubmitting] = useState(false);
+
+  /* 인증/토스트/알림 훅 — 로그인 체크 및 리워드 토스트 표시용 */
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
+  const { showAlert } = useModal();
+  const { showReward } = useRewardToast();
 
   /* YouTube embed URL (YouTube가 아니면 null → 외부 링크 폴백) */
   const embedUrl = getYouTubeEmbedUrl(trailer_url);
@@ -213,6 +235,73 @@ export default function MovieCard({ movie }) {
   const handleNotInterested = () => {
     setDismissed(true);
     trackEvent('not_interested', movie.id, { rank, source: 'chat' });
+  };
+
+  /**
+   * "리뷰 작성" 버튼 클릭 핸들러.
+   * 비로그인 상태면 알럿 안내 후 종료, 이미 작성했다면 아무 동작 없음.
+   * 로그인 상태면 PostWatchFeedback 모달을 연다.
+   *
+   * 설계: "리뷰 작성 = 시청 완료" 단일 신호. reviews 테이블이 추천 학습의 단일 진실 원본이므로
+   *       별도로 /watch-history 를 호출하지 않는다. (CLAUDE.md "봤다 = 리뷰" 원칙)
+   */
+  const handleReviewClick = () => {
+    if (reviewed) return;
+    if (!isAuthenticated) {
+      showAlert({
+        title: '로그인 필요',
+        message: '리뷰를 작성하려면 로그인이 필요합니다.',
+        type: 'warning',
+      });
+      return;
+    }
+    trackEvent('review_open', movie.id, { rank, source: 'chat' });
+    setShowFeedback(true);
+  };
+
+  /**
+   * PostWatchFeedback 모달에서 평점·코멘트를 제출했을 때 호출되는 콜백.
+   * recommendApi 를 통해 Recommend(:8001) /api/v2/movies/{id}/reviews 로 전송한다.
+   *
+   * 엑셀 5번 reviews 정합:
+   *  - reviewSource       : AI 채팅 추천에서 작성한 리뷰이므로 세션 ID 를 참조로 기록 (없으면 'chat')
+   *  - reviewCategoryCode : 진입 경로가 AI 추천이므로 'AI_RECOMMEND' 고정
+   *
+   * 중복 리뷰(409)를 포함한 모든 에러는 UX 를 차단하지 않고 조용히 무시한다.
+   * 성공 시 버튼을 "✓ 리뷰 작성됨" 으로 잠그고, 리워드 포인트가 있으면 토스트로 표시한다.
+   */
+  const handleReviewSubmit = async (ratingValue, content, isSpoiler) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await createReview(movie.id, {
+        movieId: movie.id,
+        rating: ratingValue,
+        content: content || null,
+        isSpoiler,
+        reviewSource: sessionId ? `chat_${sessionId}` : 'chat',
+        reviewCategoryCode: 'AI_RECOMMEND',
+      });
+      setReviewed(true);
+      trackEvent('review_submit', movie.id, {
+        rank, source: 'chat', rating: ratingValue,
+      });
+      /* Recommend 응답에 reward_points 가 포함되면 토스트 표시.
+         ※ 2026-04-14 현재 Recommend schema 에 필드 미반영 — 백엔드 후속 작업 전까지는 no-op */
+      if (result?.rewardPoints > 0) {
+        showReward(result.rewardPoints, '리뷰 작성');
+      }
+    } catch (err) {
+      /* 409 중복 리뷰 — 이미 이 영화에 리뷰를 작성한 상태이므로 버튼을 잠금 처리한다.
+         네트워크/5xx 등 다른 에러는 조용히 무시하여 UX 를 차단하지 않는다.
+         (실패 시 사용자는 나중에 재시도 가능) */
+      if (err?.response?.status === 409) {
+        setReviewed(true);
+      }
+    } finally {
+      setSubmitting(false);
+      setShowFeedback(false);
+    }
   };
 
   return (
@@ -313,15 +402,38 @@ export default function MovieCard({ movie }) {
           )
         )}
 
-        {/* Phase 5-1: "관심 없음" 버튼 */}
+        {/* 하단 액션 버튼 — "리뷰 작성" + "관심 없음" 을 한 줄에 배치.
+            리뷰 작성 완료 시 버튼은 "✓ 리뷰 작성됨" 으로 잠금되며, "관심 없음" 은 사라진다. */}
         {!dismissed && (
-          <NotInterestedButton type="button" onClick={handleNotInterested}>
-            ✕ 관심 없음
-          </NotInterestedButton>
+          <ActionRow>
+            <ReviewButton
+              type="button"
+              onClick={handleReviewClick}
+              disabled={reviewed || submitting}
+              $completed={reviewed}
+              aria-label={reviewed ? '리뷰 작성 완료' : '리뷰 작성'}
+            >
+              {reviewed ? '✓ 리뷰 작성됨' : '✎ 리뷰 작성'}
+            </ReviewButton>
+            {!reviewed && (
+              <NotInterestedButton type="button" onClick={handleNotInterested}>
+                ✕ 관심 없음
+              </NotInterestedButton>
+            )}
+          </ActionRow>
         )}
       </InfoArea>
 
     </Card>
+
+    {/* 리뷰 작성 모달 — 별점 + 한줄 감상 + 스포일러 체크 재사용 (MovieDetailPage 와 동일 컴포넌트) */}
+    <PostWatchFeedback
+      isOpen={showFeedback}
+      movieTitle={title}
+      movieId={movie.id}
+      onSubmit={handleReviewSubmit}
+      onClose={() => setShowFeedback(false)}
+    />
 
       {/* YouTube 트레일러 모달 — createPortal로 body에 직접 렌더링.
        * Card의 overflow:hidden + transform(hover)이 position:fixed를
