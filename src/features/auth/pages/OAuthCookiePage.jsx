@@ -20,12 +20,16 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import { exchangeToken } from '../api/authApi';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
+/* 리워드 토스트 훅 — OAuth 신규 가입 보너스 알림 표시 */
+import { useRewardToast } from '../../../shared/components/RewardToast/RewardToastProvider';
 /* OAuthCallbackPage와 동일한 styled-components 재사용 */
 import * as S from './OAuthCallbackPage.styled';
 
 export default function OAuthCookiePage() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
+  /* 신규 OAuth 가입 보너스 토스트 — SocialSuccessHandler 가 URL 에 ?signupBonus=N 쿼리파람을 붙여 전달 */
+  const { showReward } = useRewardToast();
 
   /* 에러 메시지 상태 */
   const [error, setError] = useState('');
@@ -55,6 +59,19 @@ export default function OAuthCookiePage() {
           accessToken: response.accessToken,
           user: response.user || { nickname: response.userNickname },
         });
+
+        /*
+         * OAuth 신규 가입 보너스 토스트.
+         * Backend SocialSuccessHandler 가 "방금 가입"으로 판단한 경우에 한해
+         * /cookie?signupBonus=200 형태로 쿼리 파라미터를 붙여서 리다이렉트한다.
+         * 기존 사용자의 재로그인에는 쿼리 파라미터가 없으므로 토스트 생략.
+         */
+        const params = new URLSearchParams(window.location.search);
+        const bonusRaw = params.get('signupBonus');
+        const bonus = bonusRaw ? parseInt(bonusRaw, 10) : 0;
+        if (Number.isFinite(bonus) && bonus > 0) {
+          showReward(bonus, '회원가입 보너스');
+        }
 
         // 홈으로 리다이렉트
         navigate(ROUTES.HOME, { replace: true });
