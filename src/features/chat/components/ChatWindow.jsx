@@ -614,7 +614,12 @@ export default function ChatWindow() {
                 </S.MonggleAvatarWrapper>
                 <S.ChatMovieCards>
                   {msg.movies.map((movie, mIdx) => (
-                    <MovieCard key={movie.id || mIdx} movie={movie} />
+                    <MovieCard
+                      key={movie.id || mIdx}
+                      movie={movie}
+                      /* 리뷰 작성 시 reviewSource 로 기록되는 현재 세션 ID. 신규 세션이면 빈 문자열 → 'chat' fallback */
+                      sessionId={currentSessionId}
+                    />
                   ))}
                 </S.ChatMovieCards>
               </S.ChatMsg>

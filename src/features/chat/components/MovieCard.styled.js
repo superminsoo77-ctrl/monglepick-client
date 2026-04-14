@@ -297,6 +297,17 @@ export const PlayerWrapper = styled.div`
 `;
 
 /**
+ * 카드 하단 액션 버튼 영역 — "리뷰 작성"과 "관심 없음"을 한 줄에 배치.
+ * 좁은 카드 폭(260px)에서 버튼이 줄바꿈되지 않도록 gap/flex 로 간격만 유지한다.
+ */
+export const ActionRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+`;
+
+/**
  * Phase 5-1: "관심 없음" 버튼 — 추천 카드 하단에 배치.
  * 클릭 시 카드가 fade-out되며 not_interested 피드백을 전송한다.
  */
@@ -304,7 +315,6 @@ export const NotInterestedButton = styled.button`
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 8px;
   padding: 6px 12px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radius.sm};
@@ -318,6 +328,46 @@ export const NotInterestedButton = styled.button`
     border-color: ${({ theme }) => theme.colors.danger || '#ef4444'};
     color: ${({ theme }) => theme.colors.danger || '#ef4444'};
     background: ${({ theme }) => (theme.colors.danger || '#ef4444') + '10'};
+  }
+`;
+
+/**
+ * "리뷰 작성" 버튼 — 추천 카드 하단에 배치.
+ * 클릭 시 PostWatchFeedback 모달을 열고, 리뷰 저장 성공 시 "봤다" 상태로 전환된다.
+ * 설계 원칙: 리뷰 작성 = 시청 완료 단일 신호 ("봤다 = 리뷰" 원칙, CLAUDE.md 참조).
+ *
+ * $completed=true 일 때는 이미 리뷰를 작성한 상태(disabled 시각 처리).
+ */
+export const ReviewButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid ${({ $completed, theme }) =>
+    $completed ? theme.colors.success : theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ $completed, theme }) =>
+    $completed
+      ? (theme.colors.successBg || theme.colors.primaryLight)
+      : 'transparent'};
+  color: ${({ $completed, theme }) =>
+    $completed ? theme.colors.success : theme.colors.primary};
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: ${({ $completed }) => ($completed ? 'default' : 'pointer')};
+  transition: all 0.2s ease;
+
+  &:hover {
+    /* 리뷰 작성 완료 상태에서는 hover 효과 없음 (disabled 시각 힌트) */
+    background: ${({ $completed, theme }) =>
+      $completed
+        ? (theme.colors.successBg || theme.colors.primaryLight)
+        : theme.colors.primaryLight};
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.9;
   }
 `;
 

@@ -7,7 +7,7 @@
  * 관리 상태:
  * - selectedMovie1 / selectedMovie2: 선택된 두 영화 객체
  * - sharedFeatures: 두 영화의 공통 특성 분석 결과 (shared_features SSE 이벤트)
- * - matchResults: 추천 영화 목록 최대 5편 (match_result SSE 이벤트)
+ * - matchResults: 추천 영화 목록 최대 3편 (match_result SSE 이벤트, Match v3 2026-04-14 5→3)
  * - currentStatus: 현재 처리 단계 메시지 (status SSE 이벤트)
  * - completedPhases: 완료된 처리 단계 목록 (체크마크 표시용)
  * - isLoading: SSE 스트리밍 진행 중 여부
@@ -32,7 +32,7 @@ import { sendMatchRequest } from '../api/matchApi';
  * @returns {Object|null} selectedMovie1 - 첫 번째로 선택된 영화 객체 (null이면 미선택)
  * @returns {Object|null} selectedMovie2 - 두 번째로 선택된 영화 객체 (null이면 미선택)
  * @returns {Object|null} sharedFeatures - 두 영화의 공통 특성 분석 결과 (null이면 미수신)
- * @returns {Object[]} matchResults - 추천 영화 목록 (최대 5편, 초기값 빈 배열)
+ * @returns {Object[]} matchResults - 추천 영화 목록 (최대 3편, 초기값 빈 배열 — Match v3 2026-04-14)
  * @returns {string} currentStatus - 현재 처리 단계 상태 메시지
  * @returns {string[]} completedPhases - 완료된 처리 단계 phase 코드 목록
  * @returns {boolean} isLoading - SSE 스트리밍 진행 중 여부
@@ -57,7 +57,7 @@ export function useMatch({ userId = '' } = {}) {
 
   /** 두 영화의 공통 특성 분석 결과 (shared_features 이벤트) */
   const [sharedFeatures, setSharedFeatures] = useState(null);
-  /** 추천 영화 목록 최대 5편 (match_result 이벤트) */
+  /** 추천 영화 목록 최대 3편 (match_result 이벤트 — Match v3, 2026-04-14 5→3) */
   const [matchResults, setMatchResults] = useState([]);
 
   // ── 진행 상태 ──

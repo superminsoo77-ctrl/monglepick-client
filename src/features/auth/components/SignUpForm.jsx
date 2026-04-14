@@ -29,6 +29,8 @@ import {
 import { ROUTES } from '../../../shared/constants/routes';
 /* OAuth URL 생성 유틸 — shared/constants에서 가져옴 */
 import { buildOAuthUrl } from '../../../shared/constants/oauth';
+/* 리워드 토스트 훅 — 가입 보너스 지급 알림 표시 */
+import { useRewardToast } from '../../../shared/components/RewardToast/RewardToastProvider';
 import * as S from './SignUpForm.styled';
 
 /**
@@ -93,6 +95,8 @@ export default function SignUpForm() {
 
   const login    = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  /* 가입 보너스 토스트 — 백엔드 응답의 signupBonusPoints 를 화면 상단에 표시 */
+  const { showReward } = useRewardToast();
 
   /* 비밀번호 강도 계산 (메모이제이션) */
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
@@ -160,6 +164,16 @@ export default function SignUpForm() {
         refreshToken: response.refreshToken,
         user:         response.user,
       });
+
+      /*
+       * 회원가입 보너스 토스트.
+       * 백엔드 AuthResponseBody.signupBonusPoints (SIGNUP_BONUS 정책 200P) 가
+       * 0보다 크면 화면 상단에 "+200P 회원가입 보너스 리워드 획득!" 토스트 표시.
+       * 트랜잭션 실패/정책 미지급 시에는 서버가 0을 반환하므로 자연스럽게 토스트 생략된다.
+       */
+      if (response.signupBonusPoints && response.signupBonusPoints > 0) {
+        showReward(response.signupBonusPoints, '회원가입 보너스');
+      }
 
       /* 홈 페이지로 리다이렉트 */
       navigate(ROUTES.HOME);

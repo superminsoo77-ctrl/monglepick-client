@@ -27,6 +27,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import useAuthStore from '../shared/stores/useAuthStore';
 /* 메인 레이아웃 — shared/components에서 가져옴 (Header + Content + Footer) */
 import MainLayout from '../shared/components/Layout/MainLayout';
+/* 전역 플로팅 챗봇 위젯 — 우측 하단 고정 FAB/패널 (AI 채팅/고객센터/인증 페이지는 자동 숨김) */
+import SupportChatbotWidget from '../shared/components/SupportChatbotWidget/SupportChatbotWidget';
 
 /* ── 레이아웃 없는 페이지 (인증/랜딩/채팅) ── */
 /* 랜딩 페이지 — features/landing에서 가져옴 */
@@ -416,6 +418,13 @@ function App() {
         {/* 404 — 매칭되지 않는 모든 경로를 Not Found 페이지로 처리 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+
+      {/*
+        전역 플로팅 챗봇 위젯 — BrowserRouter 내부에 위치하여 useLocation 동작을 보장한다.
+        Routes 바깥에 두어야 모든 라우트에서 동일한 위젯 인스턴스가 유지되며(대화 상태 보존),
+        AI 채팅(/chat), 고객센터(/support), 인증 관련 페이지에서는 내부에서 자동 숨김 처리된다.
+      */}
+      <SupportChatbotWidget />
     </BrowserRouter>
   );
 }

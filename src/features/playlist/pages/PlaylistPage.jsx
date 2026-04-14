@@ -44,8 +44,11 @@ export default function PlaylistPage() {
   /* ── 상세 상태 ── */
   const [detail, setDetail] = useState(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  /* 이 플레이리스트의 커뮤니티 게시글 ID (공개 상태일 때) */
-  const [sharedPostId, setSharedPostId] = useState(null);
+  /* 이 플레이리스트의 커뮤니티 게시글 ID (공개 상태일 때).
+   * 현재는 setter 만 호출되고 표시에 사용하지 않는다 — 향후 "커뮤니티에서 보기"
+   * 버튼 구현 시 value 를 읽어 네비게이션에 사용할 예정. 미사용 lint 회피를 위해
+   * 첫 요소를 생략 구조분해로 처리. */
+  const [, setSharedPostId] = useState(null);
   const [isTogglingPublic, setIsTogglingPublic] = useState(false);
 
   /* ── 폼 모달 상태 ── */

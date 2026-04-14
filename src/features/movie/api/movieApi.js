@@ -38,10 +38,35 @@ export async function getMovie(movieId) {
   };
 }
 
+/**
+ * Recommend API 응답의 poster_url(풀 URL)에서 TMDB path fragment(`/abc.jpg`) 를 추출한다.
+ *
+ * Recommend 서버는 DB의 poster_path 에 TMDB_IMAGE_BASE_URL 을 붙인 완성 URL 만 반환하지만,
+ * 프론트엔드(MovieSelector/MatchPage)는 getPosterUrl(posterPath, size) 헬퍼로
+ * 사이즈별(w92/w185/w500)로 URL 을 재조립하므로 path fragment 가 필요하다.
+ *
+ * TMDB URL 형식: https://image.tmdb.org/t/p/{size}/abc.jpg → `/abc.jpg` 추출.
+ *
+ * @param {string|null|undefined} posterUrl - 완성된 TMDB 포스터 URL
+ * @returns {string|null} path fragment (예: '/abc.jpg') 또는 null
+ */
+function extractTmdbPosterPath(posterUrl) {
+  if (!posterUrl || typeof posterUrl !== 'string') return null;
+  // /t/p/{size}/ 뒤의 경로를 캡처 (size 는 w92, w185, w500, original 등)
+  const match = posterUrl.match(/\/t\/p\/[^/]+(\/.+)$/);
+  return match ? match[1] : null;
+}
+
 function normalizeSearchMovie(movie) {
+  // poster_path 를 보존하되, 없으면 poster_url 에서 역추출한다.
+  // 이는 MovieSelector/MatchPage 의 getPosterUrl(poster_path, size) 헬퍼가
+  // path fragment 를 기대하기 때문이다 (둘이 영화 고르기 포스터 렌더링 이슈 수정).
+  const posterPath = movie.poster_path || extractTmdbPosterPath(movie.poster_url);
+
   return {
     ...movie,
     id: movie.movie_id,
+    poster_path: posterPath,
     posterUrl: movie.poster_url,
     trailerUrl: movie.trailer_url,
     releaseYear: movie.release_year,

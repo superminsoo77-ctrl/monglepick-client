@@ -64,6 +64,20 @@ const POINT_PACKS = [
   { id: 'pack_10000', points: 10000, price: 100000, label: '10,000P', bonus: null, best: true },
 ];
 
+/**
+ * Toss Payments 결제수단 코드 (SDK v2 method enum).
+ *
+ * 몽글픽은 결제수단 선택 UI 를 노출하지 않고 `CARD` 단일 값으로 고정한다.
+ * `CARD` 를 지정하면 Toss 결제창이 내부에서 신용/체크카드 + 토스페이·카카오페이
+ * 등 간편결제 옵션까지 함께 노출해주므로 사용자가 별도 선택 단계를 거치지 않아도
+ * 실질 결제수단 커버리지는 충분하다.
+ *
+ * Toss v2 는 영문 enum 만 허용한다 (CARD / TRANSFER / VIRTUAL_ACCOUNT / MOBILE_PHONE 등).
+ * v1 시절의 한글 값('카드' 등) 을 넘기면 "method 파라미터에 사용할 수 없는 enum 값"
+ * 에러가 발생하므로 절대 한글로 되돌리지 말 것.
+ */
+const TOSS_PAYMENT_METHOD = 'CARD';
+
 /** 결제 내역 페이지당 표시 건수 */
 const ORDER_PAGE_SIZE = 10;
 
@@ -250,9 +264,16 @@ export default function PaymentPage() {
     const tossPayments = await loadTossPayments(clientKey);
     const payment = tossPayments.payment({ customerKey: user.id });
 
-    /* 3. 결제 요청 (redirect 방식 — Toss 페이지에서 결제수단 선택 포함) */
+    /*
+     * 3. 결제 요청 (redirect 방식).
+     *
+     * method 는 `TOSS_PAYMENT_METHOD` 상수 (='CARD') 로 고정한다.
+     * Toss 결제창이 CARD 선택 시 내부에서 토스페이·카카오페이 등 간편결제도 함께 노출하므로
+     * 별도의 결제수단 선택 UI 없이도 실질 결제수단 커버리지는 충분하다.
+     * Toss v2 SDK 는 영문 enum(CARD/TRANSFER/...) 만 허용한다 — v1 한글 값('카드') 금지.
+     */
     await payment.requestPayment({
-      method: '카드',
+      method: TOSS_PAYMENT_METHOD,
       amount: { currency: 'KRW', value: amount },
       orderId,
       orderName,

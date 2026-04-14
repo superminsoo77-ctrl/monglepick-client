@@ -652,6 +652,8 @@ function getPosterUrl(path, size = 'w185') {
 const PHASE_LABELS = {
   movie_loader: '영화 정보 로드',
   feature_extractor: '공통점 분석',
+  // Match v3 (2026-04-14): LLM 리랭커 단계 추가 — "AI가 고르는 중" 문구 표시
+  llm_reranker: 'AI 취향 매치',
   query_builder: '검색 쿼리 생성',
   rag_retriever: '비슷한 영화 검색',
   match_scorer: '매치 점수 계산',
