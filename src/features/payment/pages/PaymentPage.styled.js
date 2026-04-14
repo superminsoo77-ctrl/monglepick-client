@@ -666,3 +666,76 @@ export const EmptyMsg = styled.p`
   border-radius: ${({ theme }) => theme.radius.lg};
   margin: 0;
 `;
+
+/* ═══════════════════════════════════
+   현재 구독 요약 배너 (2026-04-14 추가)
+   — 페이지 상단에 표시해 "내가 지금 어떤 구독 중인지" 즉시 확인 가능하게 한다.
+   — hasActiveSubscription 일 때만 렌더된다.
+   ═══════════════════════════════════ */
+
+/** 상단 구독 요약 배너 — 페이드인 + primary 톤 강조 */
+export const CurrentSubscriptionBanner = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  border-left: 4px solid ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
+  animation: ${paymentFadeIn} 0.25s ease both;
+
+  ${media.mobile} {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${({ theme }) => theme.spacing.sm};
+    padding: ${({ theme }) => theme.spacing.md};
+  }
+`;
+
+/** 체크 아이콘 원형 배경 — primary 하이라이트 */
+export const CurrentSubscriptionIcon = styled.div`
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.gradients.primary};
+  color: white;
+  border-radius: 50%;
+  font-size: ${({ theme }) => theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+`;
+
+/** 배너 본문 래퍼 — 제목 + 메타 2줄 세로 스택 */
+export const CurrentSubscriptionBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+`;
+
+/** 배너 제목 — "현재 XXX 이용 중" */
+export const CurrentSubscriptionTitle = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textBase};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+
+  strong {
+    color: ${({ theme }) => theme.colors.primary};
+    font-weight: ${({ theme }) => theme.typography.fontBold};
+  }
+`;
+
+/** 배너 메타 — 만료일/상태 보조 정보 */
+export const CurrentSubscriptionMeta = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  line-height: ${({ theme }) => theme.typography.leadingNormal};
+`;

@@ -330,7 +330,7 @@ function parseMatchSSEBlock(block, callbacks) {
  * Match 이벤트 타입 (5종):
  * - status:          진행 상태 업데이트
  * - shared_features: 두 영화의 공통 특성 분석 결과
- * - match_result:    추천 영화 목록 (최대 3편 — Match v3 2026-04-14 5→3)
+ * - match_result:    추천 영화 목록 (최대 5편 — Match v3 2026-04-14 3→5 복귀)
  * - error:           에러 메시지
  * - done:            완료 신호
  *
@@ -356,7 +356,7 @@ function dispatchMatchEvent(eventType, data, callbacks) {
       onSharedFeatures?.(data);
       break;
 
-    // 추천 영화 목록 — 최대 3편, score_detail 포함 (llm_score/cf_score Match v3 신규)
+    // 추천 영화 목록 — 최대 5편, score_detail 포함 (llm_score/cf_score Match v3 신규)
     case 'match_result':
       onMatchResult?.(data);
       break;

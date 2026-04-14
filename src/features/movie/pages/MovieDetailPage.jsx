@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 /* Phase 2: 사용자 행동 이벤트 추적 */
 import { trackEvent } from '../../../shared/utils/eventTracker';
 /* 커스텀 모달 훅 — window.alert 대체 */
@@ -48,6 +48,25 @@ export default function MovieDetailPage() {
 
   // URL 파라미터에서 영화 ID 추출
   const { id } = useParams();
+  /**
+   * 뒤로가기 네비게이션.
+   *
+   * 2026-04-14 추가: 둘이 영화 고르기(Match)에서 추천 영화 카드를 눌러
+   * 이 페이지로 진입한 뒤 브라우저 뒤로가기를 누르지 않더라도
+   * 화면 상단 버튼으로 이전 화면으로 직접 돌아갈 수 있도록 함.
+   *
+   * navigate(-1) 은 history 스택이 비어있는 경우(직접 URL 진입) 아무
+   * 동작도 하지 않으므로, 그 경우 폴백으로 홈(/) 으로 이동한다.
+   */
+  const navigate = useNavigate();
+  const handleGoBack = () => {
+    // 이전 히스토리가 있으면 뒤로, 없으면 홈으로 폴백
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
   // 영화 상세 정보 상태
   const [movie, setMovie] = useState(null);
   // 리뷰 목록 상태
@@ -319,6 +338,15 @@ export default function MovieDetailPage() {
   return (
     <S.MovieDetailPageWrapper>
       <S.InnerContainer>
+        {/* ← 이전 버튼: Match 결과 / 검색 결과 등 어디서 진입했든 직관적 뒤로가기 제공 */}
+        <S.BackButton onClick={handleGoBack} aria-label="이전 페이지로 돌아가기">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+               strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          <span>이전</span>
+        </S.BackButton>
+
         {/* 영화 상세 카드 */}
         <MovieDetailCard
           movie={movie}

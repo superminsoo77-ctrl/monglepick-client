@@ -288,10 +288,94 @@ export default function PaymentPage() {
    * 구독 상품 결제를 시작한다.
    * Toss Payments SDK v2 결제위젯을 통해 결제 진행.
    *
+   * 2026-04-14 변경 — 플랜 변경(업그레이드/다운그레이드/주기 변경) 허용:
+   *   - 같은 플랜(planCode 동일): 중복 결제 차단 (에러 메시지)
+   *   - 다른 플랜(업그레이드/다운그레이드/주기 변경): 확인 모달 후 결제 진행
+   *     Backend 의 SubscriptionService.createSubscription 이 결제 승인 시점에
+   *     기존 ACTIVE 를 CANCELLED 로 자동 전이하고 새 구독을 생성하는 원자적 흐름이므로,
+   *     프런트에서 별도의 cancel API 호출 없이 결제만 진행하면 된다.
+   *     결제 실패 시에는 Backend 트랜잭션이 롤백되어 기존 ACTIVE 구독이 그대로 보존된다.
+   *
    * @param {Object} plan - 구독 상품 객체
+   * @param {Object} [meta] - SubscriptionCard 에서 전달하는 부가 정보
+   * @param {'upgrade'|'downgrade'|'period'|null} [meta.changeType] - 변경 유형
    */
-  const handleSubscribe = async (plan) => {
+  const handleSubscribe = async (plan, meta = {}) => {
     if (!user?.id || processingId) return;
+
+    /* ── 동일 플랜 중복 결제 차단 ── */
+    if (hasActiveSubscription) {
+      const currentPlanCode = subscriptionStatus?.planCode;
+      const isSamePlan = currentPlanCode && currentPlanCode === plan.planCode;
+      if (isSamePlan) {
+        showMessage(
+          'error',
+          '이미 해당 구독을 이용 중입니다. 만료일까지 중복 결제가 불가합니다.',
+        );
+        return;
+      }
+
+      /* ── 플랜 변경 확인 모달 ── */
+      /*
+       * 변경 유형별 메시지를 다르게 제공한다.
+       *   - upgrade   : 긍정적 톤 (상위 등급)
+       *   - downgrade : 중립 톤 (하위 등급, 손실 가능성 고지)
+       *   - period    : 중립 톤 (주기 변경)
+       *
+       * 공통 고지:
+       *   - 기존 구독은 즉시 해지(CANCELLED) 전이
+       *   - 새 플랜은 결제 완료 즉시 시작
+       *   - 기존 플랜의 잔여 기간은 실질적으로 사용 불가 (QuotaService 가 ACTIVE 단건 조회)
+       */
+      const currentPlanName = subscriptionStatus?.planName || '현재 구독';
+      const ct = meta?.changeType;
+      let modalConfig;
+      if (ct === 'upgrade') {
+        modalConfig = {
+          title: '구독 플랜 업그레이드',
+          message:
+            `${currentPlanName}을(를) ${plan.name}(으)로 업그레이드합니다.\n\n` +
+            '• 기존 구독은 결제 완료 즉시 해지 처리됩니다.\n' +
+            '• 새 플랜의 혜택·포인트 지급은 결제 완료 즉시 시작됩니다.\n' +
+            '• 기존 구독의 잔여 기간은 사용할 수 없습니다.\n\n' +
+            '진행하시겠습니까?',
+          type: 'info',
+          confirmLabel: '업그레이드 진행',
+          cancelLabel: '취소',
+        };
+      } else if (ct === 'downgrade') {
+        modalConfig = {
+          title: '구독 플랜 조정',
+          message:
+            `${currentPlanName}에서 ${plan.name}(으)로 변경합니다.\n\n` +
+            '• 기존 구독은 결제 완료 즉시 해지 처리됩니다.\n' +
+            '• 새 플랜의 혜택·포인트 지급은 결제 완료 즉시 시작됩니다.\n' +
+            '• 기존 상위 플랜의 잔여 기간은 사용할 수 없습니다.\n\n' +
+            '진행하시겠습니까?',
+          type: 'warning',
+          confirmLabel: '변경 진행',
+          cancelLabel: '취소',
+        };
+      } else {
+        /* period 또는 그 외 케이스 */
+        modalConfig = {
+          title: '결제 주기 변경',
+          message:
+            `${currentPlanName}에서 ${plan.name}(으)로 변경합니다.\n\n` +
+            '• 기존 구독은 결제 완료 즉시 해지 처리됩니다.\n' +
+            '• 새 결제 주기가 즉시 시작됩니다.\n' +
+            '• 기존 구독의 잔여 기간은 사용할 수 없습니다.\n\n' +
+            '진행하시겠습니까?',
+          type: 'info',
+          confirmLabel: '변경 진행',
+          cancelLabel: '취소',
+        };
+      }
+
+      const confirmed = await showConfirm(modalConfig);
+      if (!confirmed) return;
+    }
+
     setProcessingId(plan.planCode);
     setError(null);
 
@@ -409,11 +493,36 @@ export default function PaymentPage() {
           </S.SuccessMsg>
         )}
 
+        {/*
+          현재 구독 요약 배너 — 페이지 진입 즉시 "나는 지금 어떤 구독 중인지" 를 확인할 수 있도록
+          가장 상단에 표시한다. 활성 구독이 있을 때만 렌더되며, 만료일 정보까지 한 줄에 정리한다.
+          사용자 민원: "현재 구독 플랜 확인 불가" → 구독 상품 카드 하단 배지 + 이 상단 배너의
+          이중 확인 경로로 해결한다.
+        */}
+        {hasActiveSubscription && subscriptionStatus && (
+          <S.CurrentSubscriptionBanner role="status">
+            <S.CurrentSubscriptionIcon aria-hidden="true">✓</S.CurrentSubscriptionIcon>
+            <S.CurrentSubscriptionBody>
+              <S.CurrentSubscriptionTitle>
+                현재 <strong>{subscriptionStatus.planName || '구독 상품'}</strong> 이용 중
+              </S.CurrentSubscriptionTitle>
+              <S.CurrentSubscriptionMeta>
+                {subscriptionStatus.expiresAt
+                  ? `만료일 ${formatDate(subscriptionStatus.expiresAt)}까지 혜택이 유지됩니다.`
+                  : '활성 구독이 확인되었습니다.'}
+                {subscriptionStatus.status === 'CANCELLED' && ' (해지 예약됨)'}
+              </S.CurrentSubscriptionMeta>
+            </S.CurrentSubscriptionBody>
+          </S.CurrentSubscriptionBanner>
+        )}
+
         {/* 섹션 1: 구독 상품 */}
         <S.Section>
           <S.SectionTitle>구독 상품</S.SectionTitle>
           <S.SectionDesc>
-            구독하면 매 주기마다 포인트가 자동 지급됩니다.
+            {hasActiveSubscription
+              ? '플랜 카드의 "업그레이드/조정하기" 버튼으로 언제든 변경할 수 있습니다. 결제 완료 즉시 기존 구독은 해지되고 새 플랜이 시작됩니다.'
+              : '구독하면 매 주기마다 포인트가 자동 지급됩니다.'}
           </S.SectionDesc>
 
           {/*
@@ -443,6 +552,14 @@ export default function PaymentPage() {
                   processingId={processingId}
                   onSubscribe={handleSubscribe}
                   formatNumber={formatNumber}
+                  /*
+                   * 현재 구독 플랜 코드와 활성 여부를 전달.
+                   * 카드 측에서 "구독 중" 배지 + 버튼 비활성 처리를 수행한다.
+                   * planCode 가 SubscriptionStatusResponse 에 포함되므로 (2026-04-14 추가)
+                   * planName 문자열 비교가 아닌 코드 기반의 안전한 매칭을 사용한다.
+                   */
+                  currentPlanCode={subscriptionStatus?.planCode || null}
+                  hasActiveSubscription={hasActiveSubscription}
                 />
               ))}
             </S.PlansGrid>

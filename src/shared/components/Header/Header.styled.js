@@ -10,6 +10,7 @@ import styled, { css } from 'styled-components';
 import { Link } from 'react-router-dom';
 import { gradientText } from '../../styles/mixins';
 import { media } from '../../styles/media';
+import { topBarSlide } from '../../styles/animations';
 
 /** 헤더 — 상단 고정, 반투명 배경 + 블러 + 하단 그라데이션 보더 */
 export const HeaderWrapper = styled.header`
@@ -34,6 +35,49 @@ export const HeaderWrapper = styled.header`
     height: 1px;
     background: ${({ theme }) => theme.gradients.primary};
     opacity: 0.5;
+  }
+`;
+
+/**
+ * 전역 TopBar 로딩 인디케이터.
+ *
+ * 헤더 최상단에 붙는 얇은(2px) 그라데이션 바로, 전역 `useLoadingStore` 의
+ * sources 크기가 1 이상일 때만 렌더링된다.
+ * YouTube/GitHub 스타일의 indeterminate progress — 완료율을 알 수 없는
+ * 비동기 작업(Match SSE 분석, 검색 등) 에서 "뭔가 일어나고 있음" 을
+ * 시각적으로 알린다.
+ *
+ * position: absolute 로 HeaderWrapper 상단에 겹치도록 배치하며,
+ * `::before` 의사 요소가 좌→우로 흐르면서 진행 느낌을 만든다.
+ */
+export const TopLoadingBar = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  /* 배경은 아주 옅게 깔아두어 바가 지나지 않는 구간도 살짝 보이게 */
+  background: rgba(124, 108, 240, 0.08);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -35%;
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(124, 108, 240, 0.9) 30%,
+      rgba(6, 214, 160, 0.9) 70%,
+      transparent 100%
+    );
+    /* topBarSlide keyframes — shared/styles/animations.js 정의 */
+    animation: ${topBarSlide} 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    box-shadow: 0 0 10px rgba(124, 108, 240, 0.4);
   }
 `;
 

@@ -20,7 +20,7 @@ import { POINT_ENDPOINTS } from '../../../shared/constants/api';
  *
  * @returns {Promise<Object>} 포인트 잔액 정보
  *   - balance: 현재 잔액
- *   - grade: 등급 (BRONZE, SILVER, GOLD, PLATINUM)
+ *   - grade: 등급 코드 (NORMAL/BRONZE/SILVER/GOLD/PLATINUM/DIAMOND, v3.2 6등급 팝콘 테마)
  *   - totalEarned: 누적 적립 포인트
  */
 export async function getBalance() {
@@ -105,4 +105,41 @@ export async function getPointItems(category) {
 export async function exchangeItem(itemId) {
   requireAuth();
   return api.post(POINT_ENDPOINTS.EXCHANGE(itemId));
+}
+
+// ── 리워드 지급 기준 / 진행 현황 (2026-04-14 신설) ──
+
+/**
+ * 활성 리워드 정책(지급 기준) 목록을 조회한다.
+ *
+ * Backend GET /api/v1/point/policies 와 1:1 매핑.
+ * "어떤 활동이 얼마의 포인트를 주는지" 카탈로그를 반환한다.
+ *
+ * @param {string} [category] - 카테고리 필터 (CONTENT/ENGAGEMENT/MILESTONE/ATTENDANCE)
+ * @returns {Promise<Array<Object>>} 정책 배열
+ *   - policyId, actionType, activityName, actionCategory
+ *   - pointsAmount, pointType, dailyLimit, maxCount, cooldownSeconds
+ *   - thresholdCount, thresholdTarget, parentActionType, description
+ */
+export async function getRewardPolicies(category) {
+  requireAuth();
+  const params = {};
+  if (category) params.category = category;
+  return api.get(POINT_ENDPOINTS.POLICIES, { params });
+}
+
+/**
+ * 내 리워드 진행 현황을 조회한다.
+ *
+ * Backend GET /api/v1/point/progress 와 1:1 매핑.
+ * 활동별 카운터(오늘 n/m), 마일스톤 진행률, 포인트 요약을 종합 반환한다.
+ *
+ * @returns {Promise<Object>} 종합 진행 현황
+ *   - userId, totalEarned, earnedByActivity, currentBalance, gradeCode
+ *   - activities: ActivityProgressResponse[] (일반 활동)
+ *   - milestones: MilestoneProgressResponse[] (임계치 기반)
+ */
+export async function getRewardProgress() {
+  requireAuth();
+  return api.get(POINT_ENDPOINTS.PROGRESS);
 }

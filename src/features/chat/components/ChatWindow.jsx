@@ -34,7 +34,7 @@ import * as S from './ChatWindow.styled';
 const IMAGE_MAX_SIZE_MB = 10;
 /** 허용 이미지 MIME 타입 */
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-/** 기본 최대 입력 글자수 (BRONZE 등급 기본값, 서버 쿼터 정보 수신 전 사용) */
+/** 기본 최대 입력 글자수 (NORMAL 등급 '알갱이' 기본값 200자, 서버 쿼터 정보 수신 전 사용) */
 const DEFAULT_MAX_INPUT_LENGTH = 200;
 
 export default function ChatWindow() {
@@ -153,6 +153,13 @@ export default function ChatWindow() {
 
   /**
    * URL의 sessionId가 변경되면 해당 세션을 로드한다 (브라우저 뒤로가기/직접 접근).
+   *
+   * 2026-04-14 수정:
+   *   1) deps 에 `isAuthenticated` 추가 — Zustand persist 하이드레이션이 렌더 이후에 완료되어
+   *      첫 실행 시 false 로 평가된 뒤 true 로 바뀌어도 재실행되지 않던 레이스 해소.
+   *   2) 실패 시 `/chat` 강제 리다이렉트 제거 — 백엔드 영속화 지연(방금 만든 세션이 아직 DB 에
+   *      플러시되지 않음)이나 일시적 네트워크 오류로 메시지 전체가 사라지던 문제 방지.
+   *      URL 은 유지하고 조용히 실패 — 다음 메시지 전송 시 동일 sessionId 로 이어진다.
    */
   useEffect(() => {
     if (urlSessionId && urlSessionId !== currentSessionId && isAuthenticated) {
@@ -161,11 +168,12 @@ export default function ChatWindow() {
           loadExistingSession(detail.sessionId, detail.messages);
         })
         .catch(() => {
-          // 세션을 찾을 수 없으면 /chat으로 리다이렉트
-          navigate('/chat', { replace: true });
+          /* 복원 실패해도 URL 은 유지한다. 다음 sendMessage 호출 시
+             sessionIdRef 가 비어있으면 서버가 새 세션을 발급하지만,
+             URL 에 기존 id 가 남아있으면 onSession 콜백이 다시 동기화한다. */
         });
     }
-  }, [urlSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [urlSessionId, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 새 메시지가 추가되면 자동 스크롤.

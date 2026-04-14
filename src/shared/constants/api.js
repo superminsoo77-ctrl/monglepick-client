@@ -156,6 +156,12 @@ export const COMMUNITY_ENDPOINTS = {
   COMMENT_LIKE: (postId, commentId) => `${API_VERSION}/posts/${postId}/comments/${commentId}/like`,
   /** 플레이리스트 공유 피드 - GET (PLAYLIST_SHARE 카테고리만, 비로그인 허용) */
   SHARED_PLAYLISTS: `${API_VERSION}/posts/shared-playlists`,
+  /**
+   * 2026-04-14 신규: OCR 실관람 인증 이벤트 공개 목록 조회 - GET (비로그인 허용).
+   * 커뮤니티 "실관람인증" 탭에서 관리자 등록 이벤트를 노출한다.
+   * 반환: ACTIVE/READY 상태 + endDate > now 이벤트만.
+   */
+  OCR_EVENTS: `${API_VERSION}/ocr-events`,
 };
 
 /**
@@ -247,6 +253,16 @@ export const POINT_ENDPOINTS = {
   ITEMS: `${API_VERSION}/point/items`,
   /** 아이템 교환 - POST (path: itemId, query: userId) */
   EXCHANGE: (itemId) => `${API_VERSION}/point/items/${itemId}/exchange`,
+  /**
+   * 리워드 지급 기준(정책 카탈로그) 조회 - GET (query: category?)
+   * 2026-04-14 신설 — PointPage 의 "리워드 지급 기준" 섹션이 사용.
+   */
+  POLICIES: `${API_VERSION}/point/policies`,
+  /**
+   * 내 리워드 진행 현황 조회 - GET
+   * 2026-04-14 신설 — 활동별 카운터 + 마일스톤 진행률 + 포인트 요약 반환.
+   */
+  PROGRESS: `${API_VERSION}/point/progress`,
 };
 
 /**
@@ -272,6 +288,29 @@ export const POINT_SHOP_ENDPOINTS = {
   ITEMS: `${API_VERSION}/point/shop/items`,
   /** AI 이용권 팩 구매 - POST (query: packType=AI_TOKEN_1/5/20/50) */
   PURCHASE_AI_TOKENS: `${API_VERSION}/point/shop/ai-tokens`,
+};
+
+/**
+ * 보유 아이템(UserItem) 관련 엔드포인트 — "내 아이템" 인벤토리 (2026-04-14 신규, C 방향).
+ *
+ * <p>AI 이용권은 {@code user_ai_quota.purchased_ai_tokens} 카운터로 별도 관리되므로
+ * 이 경로에서 조회되지 않는다. 여기서 다루는 대상은 아바타·배지·응모권·힌트 등
+ * 인벤토리형 아이템이다. PointItemService.exchangeItem() v2가 카테고리별로
+ * 자동 분기하여 UserAiQuota 또는 UserItem에 지급한다.</p>
+ */
+export const USER_ITEM_ENDPOINTS = {
+  /** 내 보유 아이템 목록 - GET (query: category?, page, size) */
+  LIST: `${API_VERSION}/users/me/items`,
+  /** 카테고리별 요약 + 착용 정보 - GET */
+  SUMMARY: `${API_VERSION}/users/me/items/summary`,
+  /** 착용 중인 아바타/배지 2원소 배열 - GET (프로필 렌더링용) */
+  EQUIPPED: `${API_VERSION}/users/me/items/equipped`,
+  /** 아이템 착용 - POST (path: userItemId) */
+  EQUIP: (userItemId) => `${API_VERSION}/users/me/items/${userItemId}/equip`,
+  /** 아이템 착용 해제 - POST (path: userItemId) */
+  UNEQUIP: (userItemId) => `${API_VERSION}/users/me/items/${userItemId}/unequip`,
+  /** 아이템 1회 사용 (힌트/응모권) - POST (path: userItemId) */
+  USE: (userItemId) => `${API_VERSION}/users/me/items/${userItemId}/use`,
 };
 
 /**
@@ -423,6 +462,16 @@ export const QUIZ_ENDPOINTS = {
 export const NOTICE_ENDPOINTS = {
   /** 활성 공지 목록 조회 - GET (query: type? = BANNER/POPUP/MODAL) */
   ACTIVE: `${API_VERSION}/notices`,
+};
+
+/**
+ * 배너(Banner) 관련 엔드포인트 — 2026-04-14 신규.
+ * 홈 화면 슬라이드 배너 위젯이 조회한다. 관리자 페이지의 배너 CRUD
+ * (`/admin/banners`)와 독립된 공개 GET 엔드포인트이다. 비로그인 허용.
+ */
+export const BANNER_ENDPOINTS = {
+  /** 노출 중 배너 목록 조회 - GET (query: position? = MAIN/SIDE ..., 기본 MAIN) */
+  ACTIVE: `${API_VERSION}/banners`,
 };
 
 /**

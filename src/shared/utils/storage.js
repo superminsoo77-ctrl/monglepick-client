@@ -17,11 +17,12 @@
 /** 인증 토큰(액세스 토큰) 저장 키 */
 const TOKEN_KEY = 'monglepick_auth_token';
 
-/** 채팅 세션 ID 저장 키 */
-const SESSION_ID_KEY = 'monglepick_session_id';
-
 /** 사용자 정보 저장 키 */
 const USER_KEY = 'monglepick_user';
+
+// [REMOVED] 채팅 세션 ID 키는 삭제되었다.
+// 채팅 세션 ID 의 단일 진실 원본(SSOT)은 URL(`/chat/:sessionId`) 이며,
+// localStorage 이중 관리를 제거하였다 (단일 진실 원본 원칙).
 
 /**
  * localStorage에서 값을 안전하게 가져온다.
@@ -149,36 +150,6 @@ export function removeRefreshToken() {
   return false;
 }
 
-// ── 세션 ID 관련 ──
-
-/**
- * 채팅 세션 ID를 가져온다.
- *
- * @returns {string|null} 세션 ID 또는 null
- */
-export function getSessionId() {
-  return safeGetItem(SESSION_ID_KEY);
-}
-
-/**
- * 채팅 세션 ID를 저장한다.
- *
- * @param {string} sessionId - 세션 ID
- * @returns {boolean} 저장 성공 여부
- */
-export function setSessionId(sessionId) {
-  return safeSetItem(SESSION_ID_KEY, sessionId);
-}
-
-/**
- * 채팅 세션 ID를 삭제한다.
- *
- * @returns {boolean} 삭제 성공 여부
- */
-export function removeSessionId() {
-  return safeRemoveItem(SESSION_ID_KEY);
-}
-
 // ── 사용자 정보 관련 ──
 
 /**
@@ -233,6 +204,6 @@ export function removeUser() {
 export function clearAll() {
   removeToken();
   // removeRefreshToken() — no-op이므로 호출 불필요하나 명시적으로 유지
-  removeSessionId();
+  // 세션 ID 는 URL 이 SSOT 이므로 localStorage 에서 삭제할 대상이 없다.
   removeUser();
 }

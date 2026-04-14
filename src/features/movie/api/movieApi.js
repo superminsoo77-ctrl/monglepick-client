@@ -235,25 +235,32 @@ export async function logSearchResultClick({
 }
 
 /**
- * 영화를 키워드로 검색한다 (Spring Boot 백엔드 LIKE 검색, 플레이리스트 영화 추가용).
+ * 영화를 키워드로 검색한다 (플레이리스트 영화 추가용).
  *
- * FastAPI Recommend 서버가 아닌 Spring Boot 백엔드를 직접 호출하므로
- * Recommend 서버 다운 시에도 정상 동작한다.
+ * 2026-04-14 통합: Backend `/api/v1/movies/search` (MySQL LIKE 단독) → Recommend
+ * `/api/v1/search/movies` (ES 우선 + MySQL LIKE fallback) 로 일원화.
+ *
+ * 변경 이유:
+ * - Backend LIKE 단독 경로는 "어벤저스"↔"어벤져스" 같은 한글 자모 변형 매칭 불가
+ * - Recommend SearchService 는 ES 미가용 시 자동으로 MySQL LIKE 로 폴백하므로
+ *   기존 "Recommend 다운 시 가용성" 의도도 그대로 보존됨
+ * - 응답 형상(id/title/posterUrl)은 `normalizeSearchMovie` 가 호환 유지
  *
  * @param {string} keyword - 검색 키워드 (한국어 또는 영어 제목)
  * @param {number} [size=12] - 반환 건수 (최대 30)
- * @returns {Promise<Array>} 영화 목록 (movieId, title, posterPath, releaseYear, rating 포함)
+ * @returns {Promise<Array>} 영화 목록 (id, title, posterUrl, release_year, rating 등)
  */
 export async function searchMoviesByKeyword(keyword, size = 12) {
   if (!keyword?.trim()) return [];
-  const data = await backendApi.get(MOVIE_ENDPOINTS.LIST + '/search', {
-    params: { keyword: keyword.trim(), size },
+  // searchMovies() 는 { movies, total, ... } 구조. PlaylistPage 는 Array 만 기대하므로
+  // movies 만 꺼내서 반환 (기존 호출부 시그니처 호환).
+  const { movies } = await searchMovies({
+    query: keyword.trim(),
+    searchType: 'title',
+    size,
+    sort: 'relevance',
   });
-  return (Array.isArray(data) ? data : []).map((m) => ({
-    ...m,
-    id: m.movieId,
-    posterUrl: m.posterPath ? `https://image.tmdb.org/t/p/w200${m.posterPath}` : null,
-  }));
+  return movies || [];
 }
 
 /**

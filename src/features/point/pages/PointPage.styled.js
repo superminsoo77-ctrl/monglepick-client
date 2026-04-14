@@ -14,7 +14,7 @@
  *   .point-page__section-title → SectionTitle (하위 컴포넌트에서 공유)
  */
 
-import styled, { keyframes } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 import { fadeInUp, gradientShift } from '../../../shared/styles/animations';
 import { media } from '../../../shared/styles/media';
 
@@ -93,4 +93,62 @@ export const ErrorBanner = styled.div`
   color: ${({ theme }) => theme.colors.error};
   font-size: ${({ theme }) => theme.typography.textSm};
   animation: ${fadeIn} 0.3s ease;
+`;
+
+/* ── 탭 네비게이션 (2026-04-14 신설) ──
+ *
+ * MyPage 의 Tabs/Tab 패턴과 동일한 시각 언어를 사용해 일관성을 유지한다.
+ * - 하단 기준선 공유 + 활성 탭에 gradient 하단 바
+ * - 좁은 화면에서는 가로 스크롤 허용 (overflow-x: auto)
+ */
+export const Tabs = styled.div`
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  overflow-x: auto;
+`;
+
+/**
+ * 개별 탭 버튼.
+ * $active 가 true 이면 primary 색상 + gradient 하단 바 + fontSemibold 강조.
+ */
+export const Tab = styled.button`
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  white-space: nowrap;
+  margin-bottom: -1px;
+  border-radius: ${({ theme }) => theme.radius.md} ${({ theme }) => theme.radius.md} 0 0;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.textPrimary};
+    background-color: ${({ theme }) => theme.colors.bgTertiary};
+  }
+
+  ${({ $active, theme }) =>
+    $active &&
+    css`
+      color: ${theme.colors.primary};
+      border-bottom: 3px solid;
+      border-image: ${theme.gradients.primary} 1;
+      font-weight: ${theme.typography.fontSemibold};
+    `}
+`;
+
+/**
+ * 탭 콘텐츠 영역.
+ * key={activeTab} 으로 리렌더 시 fadeInUp 진입 애니메이션이 매번 재실행된다.
+ */
+export const TabContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xl};
+  min-height: 300px;
+  animation: ${fadeInUp} 0.3s ease-out;
 `;

@@ -2,32 +2,31 @@
  * BalanceCard 컴포넌트 styled-components 정의.
  *
  * 포인트 요약 카드 — gradient-accent 배경 + pulseGlow 애니메이션.
- * 순수 CSS(BalanceCard.css)에서 전환됨.
  *
  * 인라인 스타일 제거:
  *   - 등급(grade)별 배경색/글자색/테두리색 → $grade transient prop으로 매핑
- *   - 유한 집합(BRONZE/SILVER/GOLD/PLATINUM)이므로 내부 switch 헬퍼 사용
+ *   - 6등급(NORMAL/BRONZE/SILVER/GOLD/PLATINUM/DIAMOND, 팝콘 테마) 지원
+ *   - DIAMOND(몽아일체)는 단일 색상 대신 무지개 그라디언트 배경
+ *   - 색상 정의는 `shared/constants/grade.js` 단일 진실 원본에서 import
  */
 
 import styled from 'styled-components';
 import { pulseGlow } from '../../../shared/styles/animations';
 import { media } from '../../../shared/styles/media';
+import { GRADE_COLORS, DEFAULT_GRADE_CODE } from '../../../shared/constants/grade';
 
-/* ── 등급(grade)별 색상 설정 ── */
-const GRADE_COLORS = {
-  BRONZE:   { color: '#cd7f32', bg: 'rgba(205, 127, 50, 0.15)' },
-  SILVER:   { color: '#c0c0c0', bg: 'rgba(192, 192, 192, 0.15)' },
-  GOLD:     { color: '#ffd700', bg: 'rgba(255, 215, 0, 0.15)' },
-  PLATINUM: { color: '#e5e4e2', bg: 'rgba(229, 228, 226, 0.15)' },
+/** 등급 코드에 매핑되는 색상 엔트리 — 알 수 없는 코드는 NORMAL 로 fallback */
+const resolveGrade = ($grade) =>
+  GRADE_COLORS[$grade] || GRADE_COLORS[DEFAULT_GRADE_CODE];
+
+/** 등급 prop에서 text/border color 값 반환 */
+const gradeColor = ({ $grade }) => resolveGrade($grade).color;
+
+/** 등급 prop에서 background 값 반환 — gradient 가 있으면 우선 */
+const gradeBg = ({ $grade }) => {
+  const entry = resolveGrade($grade);
+  return entry.gradient || entry.bg;
 };
-
-/** 등급 prop에서 color 값 반환 */
-const gradeColor = ({ $grade }) =>
-  (GRADE_COLORS[$grade] || GRADE_COLORS.BRONZE).color;
-
-/** 등급 prop에서 bg 값 반환 */
-const gradeBg = ({ $grade }) =>
-  (GRADE_COLORS[$grade] || GRADE_COLORS.BRONZE).bg;
 
 /* 포인트 요약 섹션 — gradient-accent 배경 + pulseGlow */
 export const SummarySection = styled.section`
@@ -122,18 +121,18 @@ export const SummaryRight = styled.div`
   }
 `;
 
-/* 등급 배지 — $grade prop으로 등급별 색상 적용 */
+/* 등급 배지 — $grade prop으로 등급별 색상 적용 (팝콘 테마 한국어명) */
 export const GradeBadge = styled.div`
   padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.lg};
   border-radius: ${({ theme }) => theme.radius.full};
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontBold};
-  /* $grade prop 기반 등급 색상 */
-  background-color: ${gradeBg};
+  /* $grade prop 기반 등급 색상 (DIAMOND 는 gradient 배경) */
+  background: ${gradeBg};
   color: ${gradeColor};
   border: 1px solid ${gradeColor};
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  /* 한글 라벨 — uppercase 제거 */
 `;
 
 /* 충전 버튼 — gradient-primary 배경 */

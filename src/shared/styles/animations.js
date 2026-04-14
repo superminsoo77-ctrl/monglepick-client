@@ -60,3 +60,13 @@ export const cardShine = keyframes`
   0% { left: -100%; }
   100% { left: 200%; }
 `;
+
+/**
+ * 헤더 상단 TopBar 로딩 인디케이터 — 전역 비동기 작업(Match SSE, 검색 등) 중 상단에 흐르는 얇은 바.
+ * YouTube/GitHub 스타일의 indeterminate progress. (무한 반복)
+ */
+export const topBarSlide = keyframes`
+  0%   { left: -35%; width: 35%; }
+  60%  { left: 100%; width: 45%; }
+  100% { left: 100%; width: 45%; }
+`;

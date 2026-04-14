@@ -10,6 +10,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../stores/useAuthStore';
+/* 전역 로딩 상태 스토어 — Match SSE 등 비동기 작업의 진행 여부를 TopBar 에 반영 */
+import useLoadingStore from '../../stores/useLoadingStore';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 (USER_MENU_ITEMS = 유저 드롭다운 항목) */
 import { ROUTES, NAV_ITEMS, USER_MENU_ITEMS } from '../../constants/routes';
 import ThemeToggle from './ThemeToggle';
@@ -24,6 +26,15 @@ export default function Header() {
   const logout = useAuthStore((s) => s.logout);
   // 모바일 메뉴 열림/닫힘 상태
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  /*
+   * 전역 로딩 인디케이터 활성화 여부.
+   *
+   * useLoadingStore 의 sources Set 크기로 판정한다 — Match SSE, 검색 등
+   * 어느 feature 든 하나라도 start() 한 상태면 true 가 되어 상단 TopBar 가 렌더링된다.
+   * `sources.size > 0` 값을 셀렉터로 매핑하여 primitive boolean 이 되도록
+   * 해 store 참조 변경마다 매번 리렌더되는 문제를 막는다.
+   */
+  const isGlobalLoading = useLoadingStore((s) => s.sources.size > 0);
   // 데스크톱 유저 드롭다운 열림/닫힘 상태
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   /*
@@ -195,6 +206,15 @@ export default function Header() {
 
   return (
     <S.HeaderWrapper>
+      {/*
+        전역 비동기 작업 진행 중일 때만 상단 TopBar 로딩 인디케이터 표시.
+        - Match SSE 분석 중: '둘이 영화 고르기' 페이지에서 start('match-sse')
+        - 완료/취소 시 stop() 으로 제거되어 자동으로 언마운트된다.
+        role="progressbar" + aria-label 로 스크린리더 접근성 제공.
+      */}
+      {isGlobalLoading && (
+        <S.TopLoadingBar role="progressbar" aria-label="로딩 중" aria-busy="true" />
+      )}
       <S.Inner>
         {/* ── 로고 영역 ── */}
         <S.LogoLink to={ROUTES.HOME} onClick={closeMobileMenu}>

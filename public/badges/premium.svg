@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  프리미엄 배지 (placeholder).
+  - 골드 그라데이션 별 모양 + 크라운(왕관)
+  - 30일 한정 배지 컨셉. 만료 시 MyPage 헤더에서 자동 미노출.
+  - PointItemInitializer 의 imageUrl 과 경로 동기화 (`/badges/premium.svg`).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7" />
+      <stop offset="50%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="crownGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- 외곽 원형 메달 -->
+  <circle cx="100" cy="110" r="78" fill="url(#goldGrad)" stroke="#92400e" stroke-width="4" />
+  <circle cx="100" cy="110" r="68" fill="none" stroke="#fef3c7" stroke-width="2" opacity="0.6" />
+
+  <!-- 5각 별 -->
+  <polygon
+    points="100,60 112,95 148,95 119,118 130,153 100,132 70,153 81,118 52,95 88,95"
+    fill="#ffffff"
+    stroke="#92400e"
+    stroke-width="2"
+  />
+
+  <!-- 별 중앙의 P 글자 (Premium) -->
+  <text
+    x="100"
+    y="125"
+    text-anchor="middle"
+    font-family="Georgia, serif"
+    font-size="36"
+    font-weight="bold"
+    fill="#b45309"
+  >P</text>
+
+  <!-- 상단 왕관 (3-크라운 단순화) -->
+  <path
+    d="M 65 45 L 75 25 L 90 38 L 100 20 L 110 38 L 125 25 L 135 45 L 130 55 L 70 55 Z"
+    fill="url(#crownGrad)"
+    stroke="#92400e"
+    stroke-width="2"
+  />
+  <circle cx="75" cy="25" r="3" fill="#dc2626" />
+  <circle cx="100" cy="20" r="3" fill="#dc2626" />
+  <circle cx="125" cy="25" r="3" fill="#dc2626" />
+
+  <!-- 리본 (메달 하단) -->
+  <path
+    d="M 75 175 L 60 195 L 80 188 L 90 200 L 100 180 Z"
+    fill="#dc2626"
+    stroke="#7f1d1d"
+    stroke-width="1"
+  />
+  <path
+    d="M 125 175 L 140 195 L 120 188 L 110 200 L 100 180 Z"
+    fill="#dc2626"
+    stroke="#7f1d1d"
+    stroke-width="1"
+  />
+</svg>

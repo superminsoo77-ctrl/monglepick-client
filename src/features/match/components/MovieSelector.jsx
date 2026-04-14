@@ -14,12 +14,14 @@
  * 6. 외부 클릭 시 드롭다운 자동 닫힘
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 /* 영화 검색 API — axios 기반 기존 movieApi 재사용 */
 import { searchMovies } from '../../movie/api/movieApi';
 /* 평점 포맷터 */
 import { formatRating } from '../../../shared/utils/formatters';
+/* 「빠른 선택」 후보 목록 훅 — 위시리스트/리뷰/인기영화 병합 */
+import { useQuickPicks } from '../hooks/useQuickPicks';
 
 // ── 애니메이션 정의 ──
 
@@ -205,6 +207,121 @@ const DropdownMessage = styled.li`
   list-style: none;
 `;
 
+/* ============================================================
+ * 빠른 선택 섹션 — 수동 검색 없이 영화를 고를 수 있는 추천 카드 목록
+ * ============================================================ */
+
+/** 빠른 선택 섹션 전체 래퍼 — 검색창 바로 아래 배치 */
+const QuickPicksSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  margin-top: ${({ theme }) => theme.spacing.xs};
+  animation: ${dropdownFadeIn} 300ms ease;
+`;
+
+/** 빠른 선택 섹션 상단 레이블 */
+const QuickPicksLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  /* 장식용 그라데이션 점 */
+  &::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: ${({ theme }) => theme.gradients?.primary || theme.colors.primary};
+  }
+`;
+
+/** 빠른 선택 카드 그리드 — 3열 × 2행 (6개), 모바일에서는 가로 스크롤 */
+const QuickPicksGrid = styled.ul`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: ${({ theme }) => theme.spacing.xs};
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  @media (max-width: 480px) {
+    /* 모바일: 2열로 축소 */
+    grid-template-columns: repeat(2, 1fr);
+  }
+`;
+
+/** 빠른 선택 카드 하나 — 포스터 + 제목 */
+const QuickPickItem = styled.li`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: ${({ theme }) => theme.spacing.xs};
+  background: ${({ theme }) => theme.colors.bgSecondary || theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              background ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast};
+  min-width: 0; /* 텍스트 오버플로 처리 */
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.primaryLight};
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+/** 빠른 선택 포스터 썸네일 */
+const QuickPickPoster = styled.img`
+  width: 32px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  flex-shrink: 0;
+`;
+
+/** 빠른 선택 정보 영역 (제목/연도) */
+const QuickPickInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+`;
+
+/** 빠른 선택 제목 — 1줄 말줄임 */
+const QuickPickTitle = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+/** 빠른 선택 연도 메타 */
+const QuickPickMeta = styled.span`
+  font-size: 10px;
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
+/** 빈 상태(로딩/결과 없음) 메시지 — 검색 드롭다운과 톤 맞춤 */
+const QuickPicksEmptyHint = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  padding: ${({ theme }) => theme.spacing.xs} 0;
+`;
+
 /**
  * 선택 완료 후 표시되는 영화 카드.
  * 글래스모피즘 스타일로 선택된 영화를 강조 표시한다.
@@ -310,13 +427,25 @@ function getPosterUrl(posterPath, size = 'w92') {
 /**
  * 영화 검색/선택 컴포넌트.
  *
+ * 선택 전 화면에서는 검색창 아래에 「빠른 선택」 섹션이 노출되어
+ * 사용자가 위시리스트/평가 이력/인기 영화 중에서 바로 고를 수 있다.
+ *
  * @param {Object} props
  * @param {string} props.label - 셀렉터 레이블 (예: '영화 A', '영화 B')
  * @param {Object|null} props.selectedMovie - 현재 선택된 영화 객체 (null이면 미선택)
  * @param {function} props.onSelect - 영화 선택 시 호출되는 콜백 (movie 객체 전달)
  * @param {function} props.onClear - 선택 해제 버튼 클릭 시 호출되는 콜백
+ * @param {string} [props.userId=''] - 현재 로그인 사용자 ID. 빈 문자열이면 인기 영화만 빠른 선택 후보로 사용.
+ * @param {string} [props.excludeMovieId=''] - 목록에서 숨길 영화 ID. 상대편 셀렉터에서 이미 고른 영화를 중복 노출하지 않기 위해 사용.
  */
-export default function MovieSelector({ label, selectedMovie, onSelect, onClear }) {
+export default function MovieSelector({
+  label,
+  selectedMovie,
+  onSelect,
+  onClear,
+  userId = '',
+  excludeMovieId = '',
+}) {
   /** 검색 입력창 현재 값 */
   const [query, setQuery] = useState('');
   /** 드롭다운에 표시할 검색 결과 목록 */
@@ -421,6 +550,38 @@ export default function MovieSelector({ label, selectedMovie, onSelect, onClear 
     setIsOpen(false);
   }, [onSelect]);
 
+  // ── 「빠른 선택」 후보 목록 로드 ──
+  // 위시리스트/내 리뷰/인기 영화를 병합하여 최대 6편. 훅 내부에서 Promise.allSettled 로 안전 처리.
+  const { picks, source, isLoading: isPicksLoading } = useQuickPicks({ userId, limit: 6 });
+
+  /**
+   * 빠른 선택 섹션에 실제로 노출할 목록.
+   * excludeMovieId 로 지정된 영화(상대편 셀렉터에서 이미 고른 영화)는 중복 방지를 위해 제외.
+   * useMemo 로 picks/excludeMovieId 변경 시에만 재계산.
+   */
+  const visiblePicks = useMemo(() => {
+    if (!Array.isArray(picks) || picks.length === 0) return [];
+    if (!excludeMovieId) return picks;
+    return picks.filter((m) => (m.movie_id || m.id) !== excludeMovieId);
+  }, [picks, excludeMovieId]);
+
+  /**
+   * 빠른 선택 섹션 부제 — 데이터 소스에 따라 다른 문구 노출.
+   * 사용자가 "왜 이 영화들이 뜨는지" 이해할 수 있도록 맥락을 제공.
+   */
+  const quickPicksLabel = useMemo(() => {
+    switch (source) {
+      case 'personal':
+        return '내가 찜하거나 평가한 영화 중에서';
+      case 'mixed':
+        return '내 이력 + 인기 영화 중에서';
+      case 'popular':
+        return '요즘 인기 있는 영화 중에서';
+      default:
+        return '';
+    }
+  }, [source]);
+
   return (
     <SelectorContainer ref={containerRef}>
       {/* 레이블 — 빈 문자열이면 렌더링하지 않음 */}
@@ -501,6 +662,45 @@ export default function MovieSelector({ label, selectedMovie, onSelect, onClear 
                 })
               )}
             </Dropdown>
+          )}
+
+          {/* ── 「빠른 선택」 섹션 ──
+              - 드롭다운이 열려있지 않고(사용자가 검색 중이 아님)
+              - 사용자가 검색어를 2글자 미만으로 입력한 경우에만 노출 */}
+          {!isOpen && query.trim().length < 2 && (
+            isPicksLoading ? (
+              // 로딩 상태: 깜빡임 방지를 위한 가벼운 힌트만 표시
+              <QuickPicksEmptyHint>추천 영화 불러오는 중...</QuickPicksEmptyHint>
+            ) : visiblePicks.length > 0 ? (
+              <QuickPicksSection>
+                <QuickPicksLabel>{quickPicksLabel}</QuickPicksLabel>
+                <QuickPicksGrid role="list" aria-label="빠른 선택 후보">
+                  {visiblePicks.map((movie) => {
+                    const movieId = movie.movie_id || movie.id;
+                    const year = movie.release_year || '';
+                    return (
+                      <QuickPickItem
+                        key={`quick-${movieId}`}
+                        role="listitem"
+                        onClick={() => handleSelect(movie)}
+                        title={`${movie.title}${year ? ` (${year})` : ''}`}
+                        aria-label={`${movie.title} 선택`}
+                      >
+                        <QuickPickPoster
+                          src={getPosterUrl(movie.poster_path, 'w92')}
+                          alt=""
+                          loading="lazy"
+                        />
+                        <QuickPickInfo>
+                          <QuickPickTitle>{movie.title}</QuickPickTitle>
+                          {year && <QuickPickMeta>{year}</QuickPickMeta>}
+                        </QuickPickInfo>
+                      </QuickPickItem>
+                    );
+                  })}
+                </QuickPicksGrid>
+              </QuickPicksSection>
+            ) : null
           )}
         </div>
       )}

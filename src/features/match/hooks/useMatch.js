@@ -4,164 +4,150 @@
  * 두 영화를 선택하고 SSE 스트리밍으로 분석 결과를 받아오는
  * 전체 흐름의 상태를 관리한다.
  *
- * 관리 상태:
+ * -----------------------------------------------------------
+ * 상태 저장소 (2026-04-14 리팩터)
+ * -----------------------------------------------------------
+ * 이전에는 useState 로 로컬 상태를 보관했다. 이 방식은 MatchPage 가
+ * 언마운트되면(예: 추천 카드 클릭 → `/movie/:id` 이동) 상태가 사라져
+ * 뒤로가기 후 Match 페이지가 초기화되는 UX 결함이 있었다.
+ *
+ * 현재는 `useMatchStore` (Zustand + sessionStorage persist) 를
+ * 단일 저장소로 사용한다. 라우트 이탈/재진입 시 selectedMovie1/2,
+ * sharedFeatures, matchResults 가 자동 복원된다.
+ *
+ * 훅은 store 상태를 선택적으로 구독하고, SSE 관련 refs 만 로컬로
+ * 보관한다(abortController 등은 각 호출마다 새로 만들어야 하므로
+ * 영속화 대상이 아니다).
+ *
+ * -----------------------------------------------------------
+ * 관리 상태 (store 경유)
+ * -----------------------------------------------------------
  * - selectedMovie1 / selectedMovie2: 선택된 두 영화 객체
- * - sharedFeatures: 두 영화의 공통 특성 분석 결과 (shared_features SSE 이벤트)
- * - matchResults: 추천 영화 목록 최대 3편 (match_result SSE 이벤트, Match v3 2026-04-14 5→3)
- * - currentStatus: 현재 처리 단계 메시지 (status SSE 이벤트)
+ * - sharedFeatures: 두 영화의 공통 특성 분석 결과 (shared_features SSE)
+ * - matchResults: 추천 영화 목록 최대 5편 (match_result SSE, Match v3)
+ * - currentStatus: 현재 처리 단계 메시지 (status SSE)
  * - completedPhases: 완료된 처리 단계 목록 (체크마크 표시용)
  * - isLoading: SSE 스트리밍 진행 중 여부
  * - error: 에러 메시지
- *
- * useChat 훅 패턴을 따른다:
- * - AbortController ref로 요청 취소 지원
- * - 콜백 기반 SSE 이벤트 처리
- * - useCallback으로 함수 안정화
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 /* Match SSE API — 같은 feature 내의 matchApi에서 가져옴 */
 import { sendMatchRequest } from '../api/matchApi';
+/* Match 전용 Zustand 스토어 — 라우트 이동 시 상태 영속 */
+import useMatchStore from '../../../shared/stores/useMatchStore';
 
 /**
  * Movie Match 상태 관리 훅.
  *
  * @param {Object} [config={}] - 훅 설정 옵션
- * @param {string} [config.userId=''] - 사용자 ID (인증된 사용자의 ID, 빈 문자열이면 익명)
+ * @param {string} [config.userId=''] - 사용자 ID (빈 문자열이면 익명)
  * @returns {Object} Match 상태 및 액션 함수 모음
- * @returns {Object|null} selectedMovie1 - 첫 번째로 선택된 영화 객체 (null이면 미선택)
- * @returns {Object|null} selectedMovie2 - 두 번째로 선택된 영화 객체 (null이면 미선택)
- * @returns {Object|null} sharedFeatures - 두 영화의 공통 특성 분석 결과 (null이면 미수신)
- * @returns {Object[]} matchResults - 추천 영화 목록 (최대 3편, 초기값 빈 배열 — Match v3 2026-04-14)
- * @returns {string} currentStatus - 현재 처리 단계 상태 메시지
- * @returns {string[]} completedPhases - 완료된 처리 단계 phase 코드 목록
- * @returns {boolean} isLoading - SSE 스트리밍 진행 중 여부
- * @returns {string|null} error - 에러 메시지 (null이면 에러 없음)
- * @returns {function} selectMovie1 - 첫 번째 영화 선택 함수
- * @returns {function} selectMovie2 - 두 번째 영화 선택 함수
- * @returns {function} clearMovie1 - 첫 번째 영화 선택 해제 함수
- * @returns {function} clearMovie2 - 두 번째 영화 선택 해제 함수
- * @returns {function} startMatch - Match 분석 시작 함수 (SSE 스트리밍 개시)
- * @returns {function} reset - 전체 상태 초기화 함수
- * @returns {function} cancelRequest - 진행 중인 SSE 요청 취소 함수
  */
 export function useMatch({ userId = '' } = {}) {
-  // ── 영화 선택 상태 ──
-
-  /** 첫 번째 선택 영화 — MovieSelector에서 선택 시 저장 */
-  const [selectedMovie1, setSelectedMovie1] = useState(null);
-  /** 두 번째 선택 영화 — MovieSelector에서 선택 시 저장 */
-  const [selectedMovie2, setSelectedMovie2] = useState(null);
-
-  // ── SSE 수신 데이터 상태 ──
-
-  /** 두 영화의 공통 특성 분석 결과 (shared_features 이벤트) */
-  const [sharedFeatures, setSharedFeatures] = useState(null);
-  /** 추천 영화 목록 최대 3편 (match_result 이벤트 — Match v3, 2026-04-14 5→3) */
-  const [matchResults, setMatchResults] = useState([]);
-
-  // ── 진행 상태 ──
-
-  /** 현재 처리 단계 메시지 — status 이벤트의 message 필드 */
-  const [currentStatus, setCurrentStatus] = useState('');
-  /**
-   * 완료된 처리 단계 phase 코드 목록.
-   * status 이벤트가 새로운 phase로 바뀔 때마다 이전 phase를 여기에 추가.
-   * UI에서 체크마크(완료) 표시에 사용한다.
+  /* ── store 상태 선택적 구독 ──
+   *
+   * 각 필드별로 selector 를 분리해 불필요한 리렌더를 방지한다.
+   * (하나로 묶어 객체 반환 시 매번 새 참조가 반환돼 리렌더 폭풍 발생)
    */
-  const [completedPhases, setCompletedPhases] = useState([]);
-  /** SSE 스트리밍 진행 중 여부 */
-  const [isLoading, setIsLoading] = useState(false);
-  /** 에러 메시지 — null이면 에러 없음 */
-  const [error, setError] = useState(null);
+  const selectedMovie1 = useMatchStore((s) => s.selectedMovie1);
+  const selectedMovie2 = useMatchStore((s) => s.selectedMovie2);
+  const sharedFeatures = useMatchStore((s) => s.sharedFeatures);
+  const matchResults = useMatchStore((s) => s.matchResults);
+  const currentStatus = useMatchStore((s) => s.currentStatus);
+  const completedPhases = useMatchStore((s) => s.completedPhases);
+  const isLoading = useMatchStore((s) => s.isLoading);
+  const error = useMatchStore((s) => s.error);
 
-  // ── refs ──
+  /* ── store setter 구독 (함수 참조는 안정적) ── */
+  const setSharedFeatures = useMatchStore((s) => s.setSharedFeatures);
+  const setMatchResults = useMatchStore((s) => s.setMatchResults);
+  const setCurrentStatus = useMatchStore((s) => s.setCurrentStatus);
+  const appendCompletedPhase = useMatchStore((s) => s.appendCompletedPhase);
+  const setCompletedPhases = useMatchStore((s) => s.setCompletedPhases);
+  const setIsLoading = useMatchStore((s) => s.setIsLoading);
+  const setError = useMatchStore((s) => s.setError);
+  const selectMovieInSlot = useMatchStore((s) => s.selectMovieInSlot);
+  const resetStore = useMatchStore((s) => s.reset);
 
-  /** 요청 취소용 AbortController — cancelRequest에서 abort() 호출 */
+  // ── refs (SSE 요청 생명주기 전용, store 영속화 대상 아님) ──
+
+  /** 요청 취소용 AbortController — cancelRequest 에서 abort() 호출 */
   const abortControllerRef = useRef(null);
   /**
    * 현재 진행 중인 phase 코드를 추적하는 ref.
-   * status 이벤트 수신 시 이전 phase를 completedPhases에 추가하기 위해 사용.
-   * (setState 클로저 문제를 피하기 위해 ref 사용)
+   * status 이벤트 수신 시 이전 phase 를 completedPhases 에 추가하기 위해 사용.
+   * (state 클로저 문제 회피용 ref)
    */
   const currentPhaseRef = useRef('');
+
+  /**
+   * match_result SSE 가 이미 수신되었는지 추적하는 ref.
+   *
+   * [기존 주석 유지 — 2026-04-14]
+   * agent 는 항상 match_result → done 순서로 이벤트를 발행하지만, 네트워크
+   * 청크 경계 / SSE 프록시 / 브라우저 스케줄러 조합에 따라 done 이 앞서
+   * 도달하는 극히 드문 케이스가 관측됐다. match_result 수신 여부를
+   * 독립 ref 로 기록해 두고, onDone 에서 아직 도착하지 않았으면 isLoading
+   * 을 해제하지 않고 대기한다.
+   */
+  const matchResultReceivedRef = useRef(false);
+  /**
+   * match_result 없이 done 이 먼저 도착했을 때 "대기 모드" 로 진입했는지 추적.
+   */
+  const pendingDoneRef = useRef(false);
 
   // ── 영화 선택 액션 ──
 
   /**
-   * 첫 번째 영화를 선택한다.
-   * 이미 진행 중인 분석이 있으면 결과를 초기화한다.
+   * 첫 번째 영화를 선택한다. 이전 분석 결과도 함께 초기화된다.
    *
-   * @param {Object} movie - 선택할 영화 객체 (searchMovies() 반환값)
+   * @param {Object} movie - 선택할 영화 객체
    */
-  const selectMovie1 = useCallback((movie) => {
-    setSelectedMovie1(movie);
-    // 영화가 바뀌면 이전 분석 결과 초기화
-    setSharedFeatures(null);
-    setMatchResults([]);
-    setCompletedPhases([]);
-    setCurrentStatus('');
-    setError(null);
-  }, []);
+  const selectMovie1 = useCallback(
+    (movie) => {
+      selectMovieInSlot(1, movie);
+    },
+    [selectMovieInSlot],
+  );
 
   /**
-   * 두 번째 영화를 선택한다.
-   * 이미 진행 중인 분석이 있으면 결과를 초기화한다.
-   *
-   * @param {Object} movie - 선택할 영화 객체 (searchMovies() 반환값)
+   * 두 번째 영화를 선택한다. 이전 분석 결과도 함께 초기화된다.
    */
-  const selectMovie2 = useCallback((movie) => {
-    setSelectedMovie2(movie);
-    // 영화가 바뀌면 이전 분석 결과 초기화
-    setSharedFeatures(null);
-    setMatchResults([]);
-    setCompletedPhases([]);
-    setCurrentStatus('');
-    setError(null);
-  }, []);
+  const selectMovie2 = useCallback(
+    (movie) => {
+      selectMovieInSlot(2, movie);
+    },
+    [selectMovieInSlot],
+  );
 
-  /**
-   * 첫 번째 영화 선택을 해제한다.
-   */
+  /** 첫 번째 영화 선택 해제 */
   const clearMovie1 = useCallback(() => {
-    setSelectedMovie1(null);
-    // 분석 결과도 함께 초기화
-    setSharedFeatures(null);
-    setMatchResults([]);
-    setCompletedPhases([]);
-    setCurrentStatus('');
-    setError(null);
-  }, []);
+    selectMovieInSlot(1, null);
+  }, [selectMovieInSlot]);
 
-  /**
-   * 두 번째 영화 선택을 해제한다.
-   */
+  /** 두 번째 영화 선택 해제 */
   const clearMovie2 = useCallback(() => {
-    setSelectedMovie2(null);
-    // 분석 결과도 함께 초기화
-    setSharedFeatures(null);
-    setMatchResults([]);
-    setCompletedPhases([]);
-    setCurrentStatus('');
-    setError(null);
-  }, []);
+    selectMovieInSlot(2, null);
+  }, [selectMovieInSlot]);
 
   // ── Match 분석 액션 ──
 
   /**
    * 두 영화의 Match 분석을 시작한다.
-   * Agent에 SSE 스트리밍 요청을 보내고 이벤트를 처리한다.
    *
-   * 사전 조건: selectedMovie1과 selectedMovie2가 모두 선택된 상태여야 한다.
+   * 사전 조건: selectedMovie1, selectedMovie2 가 모두 선택된 상태.
    * 이미 진행 중인 요청이 있으면 무시한다.
    *
    * @returns {Promise<void>}
    */
   const startMatch = useCallback(async () => {
-    // 두 영화가 모두 선택되어야 분석 가능
-    if (!selectedMovie1 || !selectedMovie2) return;
-    // 이미 분석 진행 중이면 무시
-    if (isLoading) return;
+    // store 의 현재 상태를 직접 읽어 클로저 stale 문제 회피
+    const state = useMatchStore.getState();
+    const m1 = state.selectedMovie1;
+    const m2 = state.selectedMovie2;
+    if (!m1 || !m2) return;
+    if (state.isLoading) return;
 
     // ── 상태 초기화 ──
     setIsLoading(true);
@@ -171,6 +157,8 @@ export function useMatch({ userId = '' } = {}) {
     setCompletedPhases([]);
     setCurrentStatus('');
     currentPhaseRef.current = '';
+    matchResultReceivedRef.current = false;
+    pendingDoneRef.current = false;
 
     // AbortController 생성 (요청 취소용)
     abortControllerRef.current = new AbortController();
@@ -178,107 +166,110 @@ export function useMatch({ userId = '' } = {}) {
     try {
       await sendMatchRequest(
         {
-          // 영화 ID 추출 — API 응답 형태에 따라 movie_id 또는 id 필드 사용
-          movieId1: selectedMovie1.movie_id || selectedMovie1.id || String(selectedMovie1.id),
-          movieId2: selectedMovie2.movie_id || selectedMovie2.id || String(selectedMovie2.id),
+          movieId1: m1.movie_id || m1.id || String(m1.id),
+          movieId2: m2.movie_id || m2.id || String(m2.id),
           userId,
         },
         {
           /**
            * status 이벤트 핸들러.
-           * 새로운 phase 메시지를 받으면 현재 phase를 완료 목록에 추가하고
-           * 새 phase를 currentStatus로 설정한다.
-           *
-           * @param {Object} data - {phase: string, message: string}
+           * 새로운 phase 메시지를 받으면 현재 phase 를 완료 목록에 추가하고
+           * 새 phase 를 currentStatus 로 설정한다.
            */
           onStatus: (data) => {
-            // 이전 phase가 있으면 완료 목록에 추가
             if (currentPhaseRef.current && currentPhaseRef.current !== data.phase) {
-              setCompletedPhases((prev) =>
-                prev.includes(currentPhaseRef.current)
-                  ? prev
-                  : [...prev, currentPhaseRef.current]
-              );
+              appendCompletedPhase(currentPhaseRef.current);
             }
-            // 현재 phase 업데이트
             currentPhaseRef.current = data.phase || '';
             setCurrentStatus(data.message || '');
           },
 
-          /**
-           * shared_features 이벤트 핸들러.
-           * 두 영화의 공통 특성 분석 결과를 저장한다.
-           *
-           * @param {Object} data - {common_genres, common_moods, common_keywords, similarity_summary, ...}
-           */
           onSharedFeatures: (data) => {
             setSharedFeatures(data);
           },
 
-          /**
-           * match_result 이벤트 핸들러.
-           * 추천 영화 목록을 저장한다.
-           *
-           * @param {Object} data - {movies: [{movie_id, title, genres, rating, poster_path, score_detail, explanation, rank}, ...]}
-           */
           onMatchResult: (data) => {
-            // movies 배열이 있으면 저장, 없으면 빈 배열
-            setMatchResults(data.movies || []);
+            const movies = data.movies || [];
+            setMatchResults(movies);
+            if (movies.length > 0) {
+              matchResultReceivedRef.current = true;
+              // 이미 done 이 먼저 도착해 대기 모드였다면 이 시점에 로딩 해제
+              if (pendingDoneRef.current) {
+                pendingDoneRef.current = false;
+                setCurrentStatus('');
+                setIsLoading(false);
+              }
+            }
           },
 
           /**
            * done 이벤트 핸들러.
-           * 스트리밍이 정상 완료되었을 때 로딩 상태를 해제하고
-           * 마지막 phase를 완료 목록에 추가한다.
+           *
+           * 정상 순서: status × N → match_result → done.
+           *   → onDone 시점에 matchResultReceivedRef 가 true 이므로 즉시 로딩 해제.
+           *
+           * 이례적 순서(네트워크 청크 경계 / 프록시 플러시 등): done 이 먼저 도착.
+           *   → matchResultReceivedRef 가 false 이므로 pendingDoneRef 를 세우고
+           *     로딩 해제를 보류한다.
            */
           onDone: () => {
-            // 마지막 phase를 완료 목록에 추가
             if (currentPhaseRef.current) {
-              setCompletedPhases((prev) =>
-                prev.includes(currentPhaseRef.current)
-                  ? prev
-                  : [...prev, currentPhaseRef.current]
-              );
+              appendCompletedPhase(currentPhaseRef.current);
             }
-            setCurrentStatus('');
-            setIsLoading(false);
+            if (matchResultReceivedRef.current) {
+              setCurrentStatus('');
+              setIsLoading(false);
+            } else {
+              pendingDoneRef.current = true;
+            }
           },
 
-          /**
-           * error 이벤트 핸들러.
-           * SSE 스트림에서 에러가 발생했을 때 에러 메시지를 저장한다.
-           *
-           * @param {Object} data - {error_code: string, message: string}
-           */
           onError: (data) => {
             setError(data.message || '영화 분석 중 오류가 발생했습니다.');
-            // 에러 시 이전에 수신된 결과 데이터 클리어 — 에러 배너와 결과가 동시에 표시되는 문제 방지
             setMatchResults([]);
             setSharedFeatures(null);
             setCurrentStatus('');
+            matchResultReceivedRef.current = false;
+            pendingDoneRef.current = false;
             setIsLoading(false);
           },
         },
         abortControllerRef.current.signal,
       );
+
+      // sendMatchRequest 가 정상 반환됐는데 match_result 가 끝내 도착하지 않은
+      // 경우(스트림 중도 종료 등) 무한 로딩 방지를 위해 복구 처리
+      if (pendingDoneRef.current && !matchResultReceivedRef.current) {
+        pendingDoneRef.current = false;
+        setError('추천 결과를 받아오지 못했어요. 다시 시도해주세요.');
+        setCurrentStatus('');
+        setIsLoading(false);
+      }
     } catch (err) {
-      // AbortError는 사용자가 직접 취소한 것이므로 에러 메시지를 표시하지 않음
+      // AbortError 는 사용자가 직접 취소한 것이므로 에러 메시지 표시 없음
       if (err.name === 'AbortError') {
         setCurrentStatus('');
         setIsLoading(false);
         return;
       }
 
-      // 그 외 네트워크 에러 / HTTP 에러 처리
       setError(err.message || '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
       setCurrentStatus('');
       setIsLoading(false);
     }
-  }, [selectedMovie1, selectedMovie2, userId, isLoading]);
+  }, [
+    userId,
+    setIsLoading,
+    setError,
+    setSharedFeatures,
+    setMatchResults,
+    setCompletedPhases,
+    setCurrentStatus,
+    appendCompletedPhase,
+  ]);
 
   /**
    * 진행 중인 SSE 요청을 취소한다.
-   * AbortController.abort()를 호출하여 fetch 스트림을 즉시 중단한다.
    */
   const cancelRequest = useCallback(() => {
     if (abortControllerRef.current) {
@@ -288,24 +279,16 @@ export function useMatch({ userId = '' } = {}) {
   }, []);
 
   /**
-   * 전체 상태를 초기화한다.
-   * 진행 중인 요청이 있으면 먼저 취소한다.
+   * 전체 상태를 초기화한다. 진행 중인 요청이 있으면 먼저 취소한다.
+   * sessionStorage 의 영속 상태도 함께 지워진다 (store.reset 경유).
    */
   const reset = useCallback(() => {
-    // 진행 중인 요청 취소
     cancelRequest();
-
-    // 모든 상태 초기화
-    setSelectedMovie1(null);
-    setSelectedMovie2(null);
-    setSharedFeatures(null);
-    setMatchResults([]);
-    setCurrentStatus('');
-    setCompletedPhases([]);
-    setIsLoading(false);
-    setError(null);
+    resetStore();
     currentPhaseRef.current = '';
-  }, [cancelRequest]);
+    matchResultReceivedRef.current = false;
+    pendingDoneRef.current = false;
+  }, [cancelRequest, resetStore]);
 
   return {
     // 선택된 영화

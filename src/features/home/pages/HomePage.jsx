@@ -17,6 +17,8 @@ import MovieList from '../../../shared/components/MovieList/MovieList';
 import { getPopularMovies, getLatestMovies } from '../../movie/api/movieApi';
 /* 공지사항 API — shared/api에서 가져옴 */
 import { getActiveNotices } from '../../../shared/api/noticeApi';
+/* 히어로 우측 슬라이드 배너 위젯 — 관리자 등록 배너를 작게 노출 (2026-04-14 신규) */
+import SideSlideBanner from '../components/SideSlideBanner';
 /* styled-components — HomePage.styled.js */
 import * as S from './HomePage.styled';
 
@@ -184,6 +186,14 @@ export default function HomePage() {
         <S.HeroOrb1 aria-hidden="true" />
         <S.HeroOrb2 aria-hidden="true" />
       </S.Hero>
+
+      {/*
+        우측하단 플로팅 슬라이드 배너 — 관리자 페이지에서 등록한 활성 배너를
+        220×140 카드로 자동 회전시키며 viewport 에 고정 노출한다(2026-04-14 placement v2).
+        Hero 의 overflow:hidden 에 영향받지 않도록 Wrapper 레벨 + position:fixed 로 분리.
+        모바일(≤480px)에서만 숨김이며, 활성 배너가 0개이면 자체적으로 렌더되지 않는다.
+      */}
+      <SideSlideBanner position="MAIN" />
 
       {/* ── 공지사항 배너 섹션 — BANNER/POPUP/MODAL 활성 공지 표시 ── */}
       {notices.length > 0 && (

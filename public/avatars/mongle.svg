@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  몽글이 프로필 아바타 (placeholder).
+  팝콘 테마 캐릭터의 단순화된 표현.
+  - 노란/주황 그라데이션 원형 본체
+  - 흰색 팝콘 알갱이 3개 (상단)
+  - 단순 미소 표정 (눈 2개 + 입 1개)
+  - 디자인 교체 시 이 SVG 만 덮어쓰면 자동 반영됨 (PointItemInitializer 의 imageUrl 동일)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#fff5b3" />
+      <stop offset="60%" stop-color="#ffd966" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </radialGradient>
+    <radialGradient id="popcornGrad" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </radialGradient>
+  </defs>
+
+  <!-- 본체 (둥근 컵 모양) -->
+  <circle cx="100" cy="115" r="75" fill="url(#bodyGrad)" stroke="#92400e" stroke-width="3" />
+
+  <!-- 팝콘 알갱이 3개 -->
+  <circle cx="70" cy="55" r="22" fill="url(#popcornGrad)" stroke="#fde68a" stroke-width="2" />
+  <circle cx="105" cy="40" r="26" fill="url(#popcornGrad)" stroke="#fde68a" stroke-width="2" />
+  <circle cx="140" cy="58" r="22" fill="url(#popcornGrad)" stroke="#fde68a" stroke-width="2" />
+
+  <!-- 눈 -->
+  <circle cx="80" cy="115" r="6" fill="#1f2937" />
+  <circle cx="120" cy="115" r="6" fill="#1f2937" />
+  <circle cx="82" cy="113" r="2" fill="#ffffff" />
+  <circle cx="122" cy="113" r="2" fill="#ffffff" />
+
+  <!-- 미소 입 -->
+  <path d="M 78 140 Q 100 158, 122 140" stroke="#1f2937" stroke-width="4" fill="none" stroke-linecap="round" />
+
+  <!-- 볼터치 -->
+  <ellipse cx="65" cy="135" rx="8" ry="5" fill="#fb7185" opacity="0.5" />
+  <ellipse cx="135" cy="135" rx="8" ry="5" fill="#fb7185" opacity="0.5" />
+</svg>

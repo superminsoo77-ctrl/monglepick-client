@@ -16,10 +16,10 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+/* react-router-dom — 세션 ID 를 URL 에 반영하여 단일 진실 원본(SSOT)으로 관리 */
+import { useNavigate } from 'react-router-dom';
 /* SSE 채팅 API — 같은 feature 내의 chatApi에서 가져옴 */
 import { sendChatMessage } from '../api/chatApi';
-/* localStorage 래퍼 유틸 — 세션 ID 안전 접근 */
-import { getSessionId, setSessionId, removeSessionId } from '../../../shared/utils/storage';
 
 /**
  * 채팅 상태 관리 훅.
@@ -40,6 +40,13 @@ import { getSessionId, setSessionId, removeSessionId } from '../../../shared/uti
  * @returns {function} dismissQuotaError - 쿼터 에러 배너 닫기 함수
  */
 export function useChat({ userId = '' } = {}) {
+  /*
+   * 세션 ID 의 단일 진실 원본(SSOT)은 URL(`/chat/:sessionId`) 이다.
+   * - 새 세션 발급 시 onSession 콜백에서 navigate 로 URL 을 교체한다.
+   * - 새로고침/뒤로가기/홈 복귀 시 ChatWindow 의 urlSessionId 기반 복원 useEffect 가 동작한다.
+   * - localStorage 에는 세션 ID 를 저장하지 않는다 (이중 관리 방지).
+   */
+  const navigate = useNavigate();
   // 메시지 목록: [{role: 'user'|'bot'|'movie_cards', content: string, movies?: array, timestamp: number}]
   const [messages, setMessages] = useState([]);
   // 현재 처리 상태 메시지 (status 이벤트에서 수신)
@@ -58,10 +65,10 @@ export function useChat({ userId = '' } = {}) {
 
   // 요청 취소용 AbortController ref
   const abortControllerRef = useRef(null);
-  // 세션 ID — storage 래퍼를 통해 localStorage에서 복원하여 대화 연속성 유지
-  const sessionIdRef = useRef(getSessionId() || '');
+  // 세션 ID — URL 이 SSOT. ChatWindow 가 urlSessionId 로 loadExistingSession 을 호출할 때 채워진다.
+  const sessionIdRef = useRef('');
   // 세션 ID state (사이드바 활성 세션 강조 표시 등 리렌더링 트리거용)
-  const [currentSessionId, setCurrentSessionId] = useState(getSessionId() || '');
+  const [currentSessionId, setCurrentSessionId] = useState('');
   // 현재 스트리밍 중인 봇 응답을 누적하는 ref (토큰 스트리밍용)
   const pendingResponseRef = useRef('');
   // 현재 스트리밍 중인 영화 카드를 누적하는 ref
@@ -110,12 +117,14 @@ export function useChat({ userId = '' } = {}) {
           image: imageBase64,
         },
         {
-          // session 이벤트: 세션 ID를 받아 ref + localStorage에 저장 (storage 래퍼 사용)
+          // session 이벤트: 세션 ID 를 받으면 URL 을 /chat/:sessionId 로 교체하여 SSOT 유지.
+          // 새로고침/뒤로가기/홈 복귀 후 재진입 시 ChatWindow 의 urlSessionId 복원 로직이
+          // 자동으로 이전 대화를 복원한다.
           onSession: (data) => {
             if (data.session_id) {
               sessionIdRef.current = data.session_id;
               setCurrentSessionId(data.session_id);
-              setSessionId(data.session_id);
+              navigate(`/chat/${data.session_id}`, { replace: true });
             }
           },
 
@@ -263,7 +272,8 @@ export function useChat({ userId = '' } = {}) {
   }, [isLoading, userId]);
 
   /**
-   * 대화 내용을 전부 초기화한다.
+   * 대화 내용을 전부 초기화한다 (새 대화 시작).
+   * URL 을 /chat 으로 이동하여 기존 sessionId 를 SSOT 에서 제거한다.
    */
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -272,11 +282,11 @@ export function useChat({ userId = '' } = {}) {
     setClarification(null);
     setPointInfo(null);
     setQuotaError(null);
-    // 세션 ID 초기화 + localStorage 삭제 (storage 래퍼 사용)
     sessionIdRef.current = '';
     setCurrentSessionId('');
-    removeSessionId();
-  }, []);
+    // URL 이 /chat/:sessionId 상태라면 /chat 으로 되돌려 새 대화 시작 상태로 만든다.
+    navigate('/chat', { replace: true });
+  }, [navigate]);
 
   /**
    * 진행 중인 SSE 요청을 취소한다.
@@ -341,7 +351,7 @@ export function useChat({ userId = '' } = {}) {
     setQuotaError(null);
     sessionIdRef.current = sessionId;
     setCurrentSessionId(sessionId);
-    setSessionId(sessionId);
+    // URL 동기화는 ChatWindow 의 handleSelectSession / urlSessionId useEffect 가 담당한다.
   }, []);
 
   return {

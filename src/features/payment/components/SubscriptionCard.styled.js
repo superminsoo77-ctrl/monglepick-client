@@ -48,6 +48,20 @@ export const Wrapper = styled.div`
     animation: ${borderGlow} 3s ease infinite;
   `}
 
+  /*
+   * 현재 구독 중인 플랜 카드 — BEST 보다 우선 적용되도록 아래쪽에 배치.
+   * 시각적으로 "지금 이용 중"을 즉시 알 수 있도록 accent 톤으로 테두리 강조.
+   * 기존 border-color 와 glow 를 덮어쓴다.
+   */
+  ${({ $isCurrent, theme }) =>
+    $isCurrent &&
+    css`
+    border-color: ${theme.colors.accent || theme.colors.primary};
+    box-shadow: 0 0 0 2px ${theme.colors.accent || theme.colors.primary}33,
+      ${theme.shadows.lg};
+    animation: none;
+  `}
+
   /* hover 시 카드가 위로 떠오르며 테두리 강조 */
   &:hover {
     /* hover border — glass.border 토큰으로 대체 */
@@ -85,20 +99,75 @@ export const Wrapper = styled.div`
 `;
 
 /**
- * BEST 배지 — gradient-accent 배경, 카드 상단 오른쪽에 절대 위치.
+ * BEST / 구독 중 배지 — 카드 상단 오른쪽 절대 위치.
+ *
+ * $variant 'current' 이면 "구독 중" 표시용으로 primary gradient 를 사용한다.
+ * 기본값(undefined) 이면 BEST 뱃지 — gradient-accent 배경.
  */
 export const Badge = styled.div`
   position: absolute;
   top: -10px;
   right: ${({ theme }) => theme.spacing.md};
   padding: 2px ${({ theme }) => theme.spacing.md};
-  background: ${({ theme }) => theme.gradients.accent};
+  background: ${({ $variant, theme }) =>
+    $variant === 'current' ? theme.gradients.primary : theme.gradients.accent};
   color: white;
   border-radius: ${({ theme }) => theme.radius.full};
   font-size: ${({ theme }) => theme.typography.textXs};
   font-weight: ${({ theme }) => theme.typography.fontBold};
   letter-spacing: 0.05em;
-  box-shadow: 0 0 12px rgba(239, 71, 111, 0.3);
+  box-shadow: ${({ $variant }) =>
+    $variant === 'current'
+      ? '0 0 12px rgba(99, 102, 241, 0.35)'
+      : '0 0 12px rgba(239, 71, 111, 0.3)'};
+  z-index: 1;
+`;
+
+/**
+ * 다른 플랜 구독 중일 때 카드 안쪽에 표시되는 안내 문구 (레거시 — 현재 미사용).
+ *
+ * 플랜 변경 허용(2026-04-14) 이후로는 ChangeHint 로 대체되었으나,
+ * 하위 호환을 위해 export 유지한다. 신규 코드는 ChangeHint 를 사용할 것.
+ */
+export const LockNote = styled.p`
+  margin: 0;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
+  background: ${({ theme }) => theme.glass.bg};
+  border: 1px dashed ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.md};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  line-height: ${({ theme }) => theme.typography.leadingNormal};
+`;
+
+/**
+ * 플랜 변경(업그레이드/다운그레이드/주기 변경) 시 카드 안쪽 힌트.
+ *
+ * $variant 에 따라 톤을 다르게 준다:
+ *   - 'upgrade' : primary 톤으로 긍정적 강조 (상위 등급으로 올라감)
+ *   - 'adjust'  : 중립 톤 (하위 등급/주기 변경, 조정 성격)
+ *
+ * 상세 안내는 클릭 시 확인 모달에서 수행하므로 여기서는 한 줄로 짧게 유지한다.
+ */
+export const ChangeHint = styled.p`
+  margin: 0;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.radius.md};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  line-height: ${({ theme }) => theme.typography.leadingNormal};
+
+  ${({ $variant, theme }) =>
+    $variant === 'upgrade'
+      ? css`
+          background: ${theme.colors.primary}14; /* 8% alpha — theme 토큰에 primaryAlpha 없어 hex suffix 사용 */
+          border: 1px solid ${theme.colors.primary}44;
+          color: ${theme.colors.primary};
+        `
+      : css`
+          background: ${theme.glass.bg};
+          border: 1px solid ${theme.glass.border};
+          color: ${theme.colors.textSecondary};
+        `}
 `;
 
 /**
@@ -180,41 +249,76 @@ export const Desc = styled.p`
 /**
  * 구독 버튼.
  *
- * $isBest 가 true 이면 처음부터 gradient 배경이 적용된다.
- * 기본 상태에서는 테두리만 있다가 hover 시 gradient로 전환된다.
+ * 두 가지 축의 스타일 변형이 있다:
+ *   1) $isBest (true/false)          — BEST 플랜(yearly_premium 등)은 처음부터 gradient 배경
+ *   2) $variant ('default'|'upgrade'|'adjust') — 플랜 변경 케이스별 톤 (2026-04-14 추가)
+ *
+ * 우선순위: $variant='upgrade' 는 항상 primary gradient 강조 (BEST 카드가 아니어도 강조).
+ *           $variant='adjust'  는 중립 테두리 버튼 (조정 성격).
+ *           $variant='default' (일반 신규 구독 또는 "구독 중" disabled 상태) 는 기존 스타일 유지.
  */
 export const SubscribeBtn = styled.button`
   width: 100%;
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
-  background: ${({ $isBest, theme }) =>
-    $isBest ? theme.gradients.primary : 'none'};
-  border: 1px solid ${({ $isBest, theme }) =>
-    $isBest ? 'transparent' : theme.colors.primary};
   border-radius: ${({ theme }) => theme.radius.lg};
-  color: ${({ $isBest, theme }) => ($isBest ? 'white' : theme.colors.primary)};
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontSemibold};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
   margin-top: ${({ theme }) => theme.spacing.sm};
 
-  /* 기본 카드 hover — gradient 배경으로 전환 */
-  &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.gradients.primary};
-    border-color: transparent;
-    color: white;
-    box-shadow: ${({ theme }) => theme.glows.primary};
-  }
-
-  /* BEST 카드 hover — translateY + glow */
-  ${({ $isBest, theme }) =>
-    $isBest &&
-    `
-    &:hover:not(:disabled) {
-      box-shadow: ${theme.glows.primary};
-      transform: translateY(-1px);
+  /* ── 기본 스타일: $variant / $isBest 조합으로 배경/테두리/색상 결정 ── */
+  ${({ $variant, $isBest, theme }) => {
+    if ($variant === 'upgrade') {
+      /* 업그레이드: 항상 primary gradient 로 강조 (CTA 성격 강함) */
+      return css`
+        background: ${theme.gradients.primary};
+        border: 1px solid transparent;
+        color: white;
+        box-shadow: ${theme.glows.primary};
+      `;
     }
-  `}
+    if ($variant === 'adjust') {
+      /* 조정/주기 변경: 중립 테두리 버튼 (과도한 CTA 회피) */
+      return css`
+        background: none;
+        border: 1px solid ${theme.colors.borderDefault};
+        color: ${theme.colors.textPrimary};
+      `;
+    }
+    /* default: BEST 카드면 gradient, 아니면 테두리만 */
+    return css`
+      background: ${$isBest ? theme.gradients.primary : 'none'};
+      border: 1px solid ${$isBest ? 'transparent' : theme.colors.primary};
+      color: ${$isBest ? 'white' : theme.colors.primary};
+    `;
+  }}
+
+  /* ── hover 효과 ── */
+  &:hover:not(:disabled) {
+    ${({ $variant, theme }) => {
+      if ($variant === 'upgrade') {
+        return css`
+          transform: translateY(-1px);
+          box-shadow: ${theme.glows.primary};
+        `;
+      }
+      if ($variant === 'adjust') {
+        return css`
+          background: ${theme.glass.bg};
+          border-color: ${theme.colors.primary};
+          color: ${theme.colors.primary};
+        `;
+      }
+      /* default */
+      return css`
+        background: ${theme.gradients.primary};
+        border-color: transparent;
+        color: white;
+        box-shadow: ${theme.glows.primary};
+      `;
+    }}
+  }
 
   &:disabled {
     opacity: 0.5;

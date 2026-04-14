@@ -113,3 +113,25 @@ export async function uploadImages(files) {
 export async function deletePlaylistPost(playlistId) {
   return api.delete(`${COMMUNITY_ENDPOINTS.POSTS}/playlist/${playlistId}`);
 }
+
+/**
+ * 커뮤니티 "실관람인증" 탭용 OCR 이벤트 공개 목록 조회 (2026-04-14 신규).
+ *
+ * - 비로그인 허용 (Backend SecurityConfig 에서 permitAll)
+ * - 서버가 ACTIVE/READY 상태 + 아직 끝나지 않은 이벤트만 반환 (클라이언트에서 별도 필터 불필요)
+ * - 응답 필드: eventId, movieId, movieTitle, moviePosterPath,
+ *   title(이벤트 제목), memo(상세 설명), startDate, endDate, status
+ *
+ * @returns {Promise<Array>} OCR 이벤트 카드 배열. 없으면 빈 배열.
+ */
+export async function getOcrEvents() {
+  /*
+   * Backend OcrEventController 는 ApiResponse 래퍼를 사용하므로
+   * axios interceptor 가 response.data 까지만 벗겨내고, 실제 페이로드는
+   *   { success: true, data: [...], error: null }
+   * 형태로 들어온다. 배열은 wrapper.data 에서 꺼낸다.
+   */
+  const wrapper = await api.get(COMMUNITY_ENDPOINTS.OCR_EVENTS);
+  const list = wrapper?.data ?? wrapper; // 래퍼 유무와 관계없이 안전 fallback
+  return Array.isArray(list) ? list : [];
+}

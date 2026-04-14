@@ -6,9 +6,10 @@ import { getPosts, createPost } from '../api/communityApi';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import PostList from '../components/PostList';
 import PostForm from '../components/PostForm';
-import EmptyState from '../../../shared/components/EmptyState/EmptyState';
 import QuizPage from '../../quiz/pages/QuizPage';
 import PlaylistShareFeed from '../components/PlaylistShareFeed';
+// 2026-04-14 신규: 관리자가 등록한 OCR 실관람 인증 이벤트를 "실관람인증" 탭에 노출
+import OcrEventFeed from '../components/OcrEventFeed';
 import * as S from './CommunityPage.styled';
 
 const TABS = [
@@ -231,13 +232,7 @@ export default function CommunityPage() {
 
           {activeTab === 'playlist-share' && <PlaylistShareFeed />}
 
-          {activeTab === 'reviews' && (
-            <EmptyState
-              icon="📝"
-              title="리뷰를 작성해보세요"
-              description="영화 상세 페이지에서 리뷰를 작성할 수 있습니다"
-            />
-          )}
+          {activeTab === 'reviews' && <OcrEventFeed />}
 
           {activeTab === 'quiz' && <QuizPage embedded />}
         </S.Content>

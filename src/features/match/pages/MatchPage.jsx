@@ -11,10 +11,12 @@
  * SPA 특성을 활용해 부드러운 스텝 전환 애니메이션을 적용한다.
  */
 
-import { useMemo, Fragment } from 'react';
+import { useMemo, useEffect, Fragment } from 'react';
 import styled, { css } from 'styled-components';
 import { useMatch } from '../hooks/useMatch';
 import useAuthStore from '../../../shared/stores/useAuthStore';
+/* 전역 로딩 스토어 — Match SSE 진행 중임을 공통 Header TopBar 에 알린다 */
+import useLoadingStore from '../../../shared/stores/useLoadingStore';
 import MovieSelector from '../components/MovieSelector';
 import SharedFeaturesBadge from '../components/SharedFeaturesBadge';
 import MatchResultCard from '../components/MatchResultCard';
@@ -690,19 +692,52 @@ export default function MatchPage() {
     reset,
   } = useMatch({ userId });
 
-  /* ── 현재 스텝 계산 ── */
+  /* ── 현재 스텝 계산 ──
+   *
+   * [버그 수정 2026-04-14]
+   * 기존 로직은 `sharedFeatures` 수신 즉시 Step 3 로 전환됐다.
+   * 그러나 Match 그래프는 feature_extractor → ... → explanation_generator 순서로
+   * 실행되며, `shared_features` SSE 는 그래프 초반(feature_extractor 직후)에,
+   * `match_result` 는 가장 마지막(explanation_generator 완료) 에 발행된다.
+   *
+   * 이 시간차(수 초) 동안 유저는 Step 3 결과 화면(제목 "이런 영화 어떠세요?" +
+   * 공통점 배지)만 표시되고 **추천 영화 카드가 비어있는 죽은 구간** 을 마주했다.
+   * "영화 추천될 때까지 아무 액션이 없다" 는 사용자 피드백의 근본 원인.
+   *
+   * 수정: isLoading 이 true 인 동안에는 무조건 Step 2(진행 중 UI) 를 유지한다.
+   *  - match_result 수신 → 즉시 matchResults 채워짐
+   *  - done 수신 → isLoading=false 전환
+   * 두 시점 모두 동일 tick 이후이므로 Step 3 진입 시엔 이미 카드가 채워져 있다.
+   */
   const step = useMemo(() => {
-    if (matchResults.length > 0 || sharedFeatures) return 3;
     if (isLoading) return 2;
+    if (matchResults.length > 0) return 3;
     if (selectedMovie1) return 1;
     return 0;
-  }, [matchResults.length, sharedFeatures, isLoading, selectedMovie1]);
+  }, [matchResults.length, isLoading, selectedMovie1]);
 
   /* ── 진행률 퍼센트 (Step 2) ── */
   const progressPercent = useMemo(() => {
     if (phaseEntries.length === 0) return 0;
     return Math.round((completedPhases.length / phaseEntries.length) * 100);
   }, [completedPhases.length]);
+
+  /* ── 전역 로딩 스토어 동기화 ──
+   *
+   * Match SSE 가 진행 중인 동안 공통 Header 의 TopLoadingBar 가 떠야 하므로,
+   * isLoading 변화를 useLoadingStore 에 반영한다. source id 를 'match-sse' 로
+   * 고정해, 같은 페이지에서 연속 재분석을 돌려도 idempotent 하게 동작한다.
+   *
+   * 언마운트 cleanup 에서 stop() 을 호출해, 분석 중 라우트 이탈 시 TopBar 가
+   * 영원히 남는 잔상 버그를 방지한다.
+   */
+  const startGlobalLoading = useLoadingStore((s) => s.start);
+  const stopGlobalLoading = useLoadingStore((s) => s.stop);
+  useEffect(() => {
+    if (isLoading) startGlobalLoading('match-sse');
+    else stopGlobalLoading('match-sse');
+    return () => stopGlobalLoading('match-sse');
+  }, [isLoading, startGlobalLoading, stopGlobalLoading]);
 
   /* ── 핸들러 ── */
   const handleStart = () => {
@@ -772,6 +807,7 @@ export default function MatchPage() {
                 selectedMovie={selectedMovie1}
                 onSelect={selectMovie1}
                 onClear={clearMovie1}
+                userId={userId}
               />
             </SelectorArea>
 
@@ -822,6 +858,10 @@ export default function MatchPage() {
                 selectedMovie={selectedMovie2}
                 onSelect={selectMovie2}
                 onClear={clearMovie2}
+                userId={userId}
+                /* 두 번째 셀렉터의 빠른 선택 목록에서 첫 번째로 고른 영화는 숨긴다 —
+                   동일 영화 선택 시 backend 가 400 을 반환하므로 UX 선제 방어 */
+                excludeMovieId={selectedMovie1?.movie_id || selectedMovie1?.id || ''}
               />
             </SelectorArea>
           </StepWrapper>
@@ -875,6 +915,11 @@ export default function MatchPage() {
 
         {/* ════════════════════════════════════════════
          *  Step 2 — 분석 진행 중
+         *
+         *  [2026-04-14] Step 전환 버그 수정 후 이 화면이 Agent `match_result`
+         *  SSE 가 도착할 때까지 끝까지 유지된다. 기존 StatusText + 진행률 바 +
+         *  단계 그리드만으로도 "진행 중이에요 / 찾고 있어요" 흐름이 충분히
+         *  보이므로 별도 스피너/스켈레톤 없이 심플하게 간다.
          * ════════════════════════════════════════════ */}
         {step === 2 && (
           <StepWrapper key="step-2">

@@ -25,6 +25,47 @@ export const InnerContainer = styled.div`
   gap: ${({ theme }) => theme.spacing.xxl};
 `;
 
+/**
+ * 상단 "← 이전" 버튼.
+ *
+ * 2026-04-14 추가: 둘이 영화 고르기(Match) / 검색 결과 / 커뮤니티 등
+ * 어떤 경로로 진입했든 뒤로가기를 직관적으로 제공한다.
+ * navigate(-1) 로 브라우저 히스토리를 한 단계 뒤로 이동한다.
+ *
+ * 키보드 포커스 및 hover 상태를 별도 색상으로 주어 접근성 확보.
+ */
+export const BackButton = styled.button`
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: ${({ theme }) => `${theme.spacing.xs} ${theme.spacing.md}`};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  cursor: pointer;
+  transition: ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
+    outline-offset: 2px;
+  }
+
+  /* 좌측 화살표 — svg 크기 고정 */
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
 /** 리뷰 섹션 — 세로 flex */
 export const ReviewsSection = styled.section`
   display: flex;

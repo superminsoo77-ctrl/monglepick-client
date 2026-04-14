@@ -7,7 +7,10 @@ import {
   getMyReviews,
   updateProfile,
 } from '../api/userApi';
+/* 착용 아이템 API — 2026-04-14 신설 (C 방향). 프로필 상단에 아바타·배지 표시용. */
+import { getEquippedItems } from '../../point/api/userItemApi';
 import { ROUTES } from '../../../shared/constants/routes';
+import { getGradeLabel } from '../../../shared/constants/grade';
 import MovieList from '../../../shared/components/MovieList/MovieList';
 import Loading from '../../../shared/components/Loading/Loading';
 import EmptyState from '../../../shared/components/EmptyState/EmptyState';
@@ -256,6 +259,16 @@ export default function MyPagePage() {
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  /**
+   * 착용 아바타 / 배지 (2026-04-14 신설, C 방향).
+   *
+   * <p>Backend GET /api/v1/users/me/items/equipped 는 [avatar, badge] 2-원소 배열을 반환한다.
+   * 각 원소는 UserItemResponse 또는 null (미착용).
+   * 프로필 수정 이미지가 없을 때 아바타가, 항상 닉네임 옆에 배지가 표시된다.</p>
+   */
+  const [equippedAvatar, setEquippedAvatar] = useState(null);
+  const [equippedBadge, setEquippedBadge] = useState(null);
+
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
@@ -268,6 +281,31 @@ export default function MyPagePage() {
    * 마이페이지 하단 번호형 페이지네이션과 맞추기 위해
    * 현재 페이지 / 총 페이지 수를 함께 로컬 state로 저장한다.
    */
+  /**
+   * 착용 아이템 로드 — 2026-04-14 신설.
+   *
+   * <p>프로필 헤더의 아바타·배지 렌더링용. 마운트 시 1회 + 프로필 수정 완료 후 재호출.
+   * 실패 시 조용히 무시(null 유지)하여 기존 프로필 렌더링에 영향을 주지 않는다.</p>
+   */
+  const loadEquippedItems = useCallback(async () => {
+    try {
+      const result = await getEquippedItems();
+      /* Backend 는 [avatar, badge] 고정 순서로 반환. 타입 방어를 위해 null 체크 포함. */
+      if (Array.isArray(result) && result.length >= 2) {
+        setEquippedAvatar(result[0] || null);
+        setEquippedBadge(result[1] || null);
+      } else {
+        setEquippedAvatar(null);
+        setEquippedBadge(null);
+      }
+    } catch (err) {
+      /* 비로그인 상태에서 호출되었거나 네트워크 오류 — 무시하고 fallback UI 유지 */
+      console.debug('착용 아이템 조회 실패 (무시):', err?.message);
+      setEquippedAvatar(null);
+      setEquippedBadge(null);
+    }
+  }, []);
+
   const loadMyReviews = useCallback(async (page = 1) => {
     const reviewData = await getMyReviews({ page, size: REVIEW_PAGE_SIZE });
     setMyReviews(reviewData?.reviews || []);
@@ -278,6 +316,12 @@ export default function MyPagePage() {
       totalPages: reviewData?.pagination?.totalPages || 0,
     });
   }, []);
+
+  /* 마운트 시 착용 아이템 로드 — 탭 전환과 무관하게 항상 헤더에 반영 */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadEquippedItems();
+  }, [isAuthenticated, loadEquippedItems]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -380,14 +424,44 @@ export default function MyPagePage() {
         {/* 페이지 헤더 */}
         <S.Header>
           <S.AvatarWrap>
+            {/*
+              착용 아바타 이미지가 있으면 그것을 최우선으로 표시.
+              없으면 프로필 수정으로 업로드한 profileImageUrl, 그것도 없으면 닉네임 이니셜.
+              2026-04-14 C 방향: equippedAvatar.imageUrl 우선순위 최상단.
+            */}
             <S.Avatar>
-              {user?.nickname?.charAt(0) || 'U'}
+              {equippedAvatar?.imageUrl ? (
+                <img
+                  src={equippedAvatar.imageUrl}
+                  alt={equippedAvatar.itemName || '착용 아바타'}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                />
+              ) : profile?.profileImageUrl ? (
+                <img
+                  src={profile.profileImageUrl}
+                  alt="프로필 이미지"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                />
+              ) : (
+                user?.nickname?.charAt(0) || 'U'
+              )}
             </S.Avatar>
           </S.AvatarWrap>
           <S.UserInfo>
             <S.NameRow>
               <S.Nickname>{user?.nickname || '사용자'}</S.Nickname>
-              <S.GradeBadge>{profile?.grade || user?.grade || 'BRONZE'}</S.GradeBadge>
+              {/* 등급 배지 — 백엔드 코드(NORMAL/BRONZE/.../DIAMOND)를 팝콘 테마 한국어로 변환 */}
+              <S.GradeBadge>{getGradeLabel(profile?.grade || user?.grade)}</S.GradeBadge>
+              {/*
+                착용 배지 — 2026-04-14 C 방향 신설.
+                프리미엄 배지 1개월 등 포인트로 교환한 배지가 있으면 등급 배지 옆에 표시.
+                GradeBadge 스타일을 재활용하여 통일감 유지.
+              */}
+              {equippedBadge && (
+                <S.GradeBadge title={equippedBadge.itemName} style={{ background: '#ffd700', color: '#333' }}>
+                  ⭐ {equippedBadge.itemName}
+                </S.GradeBadge>
+              )}
             </S.NameRow>
             <S.Email>{user?.email || ''}</S.Email>
             <S.EditBtn onClick={() => setIsEditModalOpen(true)}>
