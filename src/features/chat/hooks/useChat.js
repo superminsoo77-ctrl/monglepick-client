@@ -269,7 +269,9 @@ export function useChat({ userId = '' } = {}) {
       setStatus('');
       setIsLoading(false);
     }
-  }, [isLoading, userId]);
+    // navigate 는 setSession 콜백(라인 127) 내부에서 sessionId 발급 시 사용되므로 deps 포함.
+    // React Compiler 의 inferred dep 과 source dep 불일치(`navigate` 누락) 해결.
+  }, [isLoading, userId, navigate]);
 
   /**
    * 대화 내용을 전부 초기화한다 (새 대화 시작).
