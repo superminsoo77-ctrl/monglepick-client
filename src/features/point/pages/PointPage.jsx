@@ -45,13 +45,15 @@ import {
   getShopItems,
   purchaseAiTokens,
 } from '../api/pointShopApi';
-/* 보유 아이템 API — 2026-04-14 신규 (C 방향 인벤토리 연동) */
+/* 보유 아이템 API — 2026-04-14 신규 (C 방향 인벤토리 연동)
+ * `useItem` 은 React Hook 네이밍 컨벤션(use*)과 충돌해 react-hooks/rules-of-hooks 가 오인하므로
+ * 컴포넌트 내부에서는 `consumeItemApi` 로 별칭하여 사용한다. (API 모듈 export 명은 그대로 유지) */
 import {
   getMyItems,
   getMyItemsSummary,
   equipItem,
   unequipItem,
-  useItem,
+  useItem as consumeItemApi,
 } from '../api/userItemApi';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
@@ -574,7 +576,7 @@ export default function PointPage() {
     setProcessingUserItemId(userItem.userItemId);
     setError(null);
     try {
-      await useItem(userItem.userItemId);
+      await consumeItemApi(userItem.userItemId);
       await Promise.all([loadMyItemsSummary(), loadMyItemsPage()]);
     } catch (err) {
       setError(err.message || '아이템 사용에 실패했습니다.');

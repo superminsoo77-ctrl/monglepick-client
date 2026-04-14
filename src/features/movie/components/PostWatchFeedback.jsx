@@ -407,7 +407,15 @@ export default function PostWatchFeedback({ isOpen, movieTitle, movieId, onSubmi
   /* 별점 클릭 시 팝 애니메이션 트리거용 (마지막 클릭된 별 인덱스) */
   const [poppedStar, setPoppedStar] = useState(0);
 
-  /** 모달이 닫힐 때 내부 상태 초기화 — 다음 열림 시 깨끗한 상태로 시작 */
+  /**
+   * 모달이 닫힐 때 내부 상태 초기화 — 다음 열림 시 깨끗한 상태로 시작.
+   *
+   * NOTE: React Compiler 의 `react-hooks/set-state-in-effect` 규칙은 일반적으로
+   * effect 내부의 setState 동기 호출을 금지하지만, 모달 close 시 입력값 리셋은
+   * 외부 prop(isOpen) 동기화 패턴으로 정당한 사용이다.
+   * 부모 측 `key` 리마운트 패턴은 형제 모달들과 통일되지 않아 적용하지 않았다.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) {
       setRating(0);
@@ -417,6 +425,7 @@ export default function PostWatchFeedback({ isOpen, movieTitle, movieId, onSubmi
       setPoppedStar(0);
     }
   }, [isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** ESC 키로 닫기 + body 스크롤 잠금 */
   useEffect(() => {
