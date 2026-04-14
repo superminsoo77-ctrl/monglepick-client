@@ -10,7 +10,11 @@
 /* 공용 axios 인스턴스 + 인증 필수 가드 */
 import api, { requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
-import { PAYMENT_ENDPOINTS, SUBSCRIPTION_ENDPOINTS } from '../../../shared/constants/api';
+import {
+  PAYMENT_ENDPOINTS,
+  POINT_PACK_ENDPOINTS,
+  SUBSCRIPTION_ENDPOINTS,
+} from '../../../shared/constants/api';
 
 // ── 결제 주문 ──
 
@@ -57,6 +61,20 @@ export async function confirmPayment({ orderId, paymentKey, amount }) {
 export async function getOrders({ page = 0, size = 20 } = {}) {
   requireAuth();
   return api.get(PAYMENT_ENDPOINTS.ORDER_LIST, { params: { page, size } });
+}
+
+// ── 포인트팩 ──
+
+/**
+ * 활성 포인트팩 목록을 조회한다.
+ *
+ * 관리자 페이지에서 관리하는 point_pack_prices 테이블의 is_active=true 팩만
+ * sortOrder ASC 로 반환한다. 비로그인 허용이므로 requireAuth() 를 호출하지 않는다.
+ *
+ * @returns {Promise<Array<{packId:number, packName:string, price:number, pointsAmount:number, sortOrder:number}>>}
+ */
+export async function getPointPacks() {
+  return api.get(POINT_PACK_ENDPOINTS.LIST);
 }
 
 // ── 구독 ──

@@ -28,6 +28,7 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import {
   createOrder,
   getOrders,
+  getPointPacks,
   getSubscriptionPlans,
   getSubscriptionStatus,
   cancelSubscription,
@@ -48,21 +49,43 @@ import * as S from './PaymentPage.styled';
 /* ── 상수 정의 ── */
 
 /**
- * 포인트 팩 상품 목록.
+ * 포인트팩 API 응답을 화면 렌더링용 모델로 변환한다.
  *
- * 설계서 v3.2 §13.1 / 엑셀 Table 50 기준 — 1P = 10원 통일.
- * 사용자용 포인트 팩 조회 API 가 백엔드에 아직 없어 하드코딩으로 표시하지만,
- * 백엔드 {@code point_pack_prices} 테이블의 초기값과 완전히 동일하게 맞춰두었다.
- * 추후 `GET /api/v1/point-packs` 엔드포인트가 추가되면 API 연동으로 전환할 예정.
+ * Backend {@link PointPackController}의 PointPackResponse 는 DB 원본 필드
+ * ({@code packId, packName, price, pointsAmount, sortOrder}) 를 그대로 내려보내고,
+ * 화면 컴포넌트({@link PointPackSection})는 {@code id/label/points/price/bonus/best}
+ * 모양을 기대한다. 이 격차를 흡수하는 전용 매퍼이다.
+ *
+ * 규칙:
+ *   - {@code id}     → `pack_${packId}` (React key + processingId 비교용 안정 문자열)
+ *   - {@code label}  → "1,000P" 형식 (천단위 콤마)
+ *   - {@code points} → {@code pointsAmount} 그대로
+ *   - {@code price}  → {@code price} 그대로 (KRW)
+ *   - {@code bonus}  → 현재 마스터 테이블에 보너스 필드가 없으므로 null
+ *   - {@code best}   → 응답 내 최대 points 항목에만 true (최고가 팩 강조)
+ *
+ * "best" 규칙은 과거 하드코딩에서 10,000P 팩에 {@code best: true}를 박아두었던
+ * 동작을 데이터 기반으로 일반화한 것이다. 관리자가 더 큰 팩을 추가하면 자동으로
+ * 그 팩이 BEST 배지를 가져가게 된다.
+ *
+ * @param {Array} apiPacks - Backend 응답 배열
+ * @returns {Array} PointPackSection 이 기대하는 형태의 배열
  */
-const POINT_PACKS = [
-  { id: 'pack_100',   points: 100,   price: 1000,   label: '100P',    bonus: null },
-  { id: 'pack_200',   points: 200,   price: 2000,   label: '200P',    bonus: null },
-  { id: 'pack_500',   points: 500,   price: 5000,   label: '500P',    bonus: null },
-  { id: 'pack_1000',  points: 1000,  price: 10000,  label: '1,000P',  bonus: null },
-  { id: 'pack_5000',  points: 5000,  price: 50000,  label: '5,000P',  bonus: null },
-  { id: 'pack_10000', points: 10000, price: 100000, label: '10,000P', bonus: null, best: true },
-];
+function mapPointPacksForView(apiPacks) {
+  if (!Array.isArray(apiPacks) || apiPacks.length === 0) return [];
+  /* 최고가(=최다 포인트) 팩을 찾아 best 배지 부여 */
+  const maxPoints = apiPacks.reduce((acc, p) => Math.max(acc, p?.pointsAmount ?? 0), 0);
+  return apiPacks.map((p) => ({
+    id: `pack_${p.packId}`,
+    label: `${(p.pointsAmount ?? 0).toLocaleString()}P`,
+    points: p.pointsAmount,
+    price: p.price,
+    bonus: null,
+    best: p.pointsAmount === maxPoints && maxPoints > 0,
+    /* 관리자 노출명을 툴팁/디버그에 활용하고 싶을 경우를 대비해 원본도 보존 */
+    packName: p.packName,
+  }));
+}
 
 /**
  * Toss Payments 결제수단 코드 (SDK v2 method enum).
@@ -99,6 +122,11 @@ export default function PaymentPage() {
 
   /* 구독 상품 목록 */
   const [plans, setPlans] = useState([]);
+  /* 포인트팩 목록 — 관리자 수정이 즉시 반영되도록 API 로부터 로드 */
+  const [pointPacks, setPointPacks] = useState([]);
+  const [isLoadingPointPacks, setIsLoadingPointPacks] = useState(true);
+  /* 포인트팩 로드 실패 메시지 — 구독 플랜과 동일한 에러 배너 UX */
+  const [pointPacksError, setPointPacksError] = useState(null);
   /* 현재 구독 상태 */
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   /* 결제 내역 (Spring Page 응답) */
@@ -159,6 +187,30 @@ export default function PaymentPage() {
   }, []);
 
   /**
+   * 포인트팩 목록을 로드한다.
+   *
+   * 관리자 페이지({@code /admin/payment}의 포인트팩 탭)에서 수정된 가격/이름/활성 여부가
+   * 유저 화면에 실시간 반영되도록 Backend {@code GET /api/v1/point-packs} 를 호출한다.
+   * 비로그인 허용 공개 EP 이므로 requireAuth 없이 호출 가능하다.
+   */
+  const loadPointPacks = useCallback(async () => {
+    setIsLoadingPointPacks(true);
+    setPointPacksError(null);
+    try {
+      const data = await getPointPacks();
+      /* Array 또는 {content:[]} 두 형식 모두 수용 (Spring Page 방어) */
+      const raw = Array.isArray(data) ? data : data?.content || [];
+      setPointPacks(mapPointPacksForView(raw));
+    } catch (err) {
+      console.error('[PaymentPage] 포인트팩 조회 실패:', err);
+      setPointPacks([]);
+      setPointPacksError(err?.message || '포인트팩 목록을 불러올 수 없습니다.');
+    } finally {
+      setIsLoadingPointPacks(false);
+    }
+  }, []);
+
+  /**
    * 현재 구독 상태를 로드한다.
    */
   const loadSubscriptionStatus = useCallback(async () => {
@@ -203,8 +255,10 @@ export default function PaymentPage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadPlans();
+      /* 포인트팩 목록도 함께 로드 — 관리자 수정 즉시 반영 */
+      loadPointPacks();
     }
-  }, [isAuthenticated, loadPlans]);
+  }, [isAuthenticated, loadPlans, loadPointPacks]);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
@@ -573,12 +627,30 @@ export default function PaymentPage() {
             필요한 만큼 포인트를 충전하세요.
           </S.SectionDesc>
 
-          <PointPackSection
-            packs={POINT_PACKS}
-            processingId={processingId}
-            onBuyPack={handleBuyPack}
-            formatNumber={formatNumber}
-          />
+          {/*
+            구독 상품과 동일한 렌더 우선순위.
+            포인트팩은 관리자 페이지({@code /admin/payment})에서 실시간 수정되므로
+            하드코딩 fallback 없이 항상 API 응답을 그대로 노출한다.
+          */}
+          {isLoadingPointPacks ? (
+            <Loading message="포인트팩 로딩 중..." />
+          ) : pointPacksError ? (
+            <S.ErrorBanner role="alert">
+              <span>{pointPacksError}</span>
+              <S.RetryBtn type="button" onClick={loadPointPacks}>
+                다시 시도
+              </S.RetryBtn>
+            </S.ErrorBanner>
+          ) : pointPacks.length === 0 ? (
+            <S.EmptyMsg>현재 판매 중인 포인트팩이 없습니다.</S.EmptyMsg>
+          ) : (
+            <PointPackSection
+              packs={pointPacks}
+              processingId={processingId}
+              onBuyPack={handleBuyPack}
+              formatNumber={formatNumber}
+            />
+          )}
         </S.Section>
 
         {/* 섹션 3: 내 구독 상태 */}

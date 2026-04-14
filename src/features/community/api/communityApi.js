@@ -135,3 +135,45 @@ export async function getOcrEvents() {
   const list = wrapper?.data ?? wrapper; // 래퍼 유무와 관계없이 안전 fallback
   return Array.isArray(list) ? list : [];
 }
+
+/**
+ * 특정 영화의 "현재 진행 중" OCR 실관람 인증 이벤트 단건 조회 (2026-04-14 신규).
+ *
+ * 영화 상세 페이지 상단 배너 노출 여부 판단에 사용한다.
+ * 진행 중 이벤트가 없으면 null 을 반환하며, 이 때 배너를 렌더링하지 않는다.
+ *
+ * @param {string|number} movieId - 영화 ID
+ * @returns {Promise<object|null>} 이벤트 상세(eventId/title/memo/startDate/endDate/status 등) 또는 null
+ */
+export async function getOcrEventByMovie(movieId) {
+  if (!movieId) return null;
+  try {
+    // axios interceptor 가 response.data 를 벗겨주므로 wrapper = { success, data, error }
+    const wrapper = await api.get(COMMUNITY_ENDPOINTS.OCR_EVENT_BY_MOVIE(movieId));
+    const event = wrapper?.data ?? null;
+    // 백엔드에서 없으면 data: null 로 내려온다.
+    return event && typeof event === 'object' ? event : null;
+  } catch (err) {
+    // 404 등 네트워크 오류는 상세 페이지 렌더링을 막지 않도록 조용히 삼킨다.
+    console.warn('[OCR 이벤트] by-movie 조회 실패:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * OCR 실관람 인증 제출 (2026-04-14 신규).
+ *
+ * 1) `uploadImages()` 로 영수증 이미지를 먼저 업로드해 URL 을 얻는다.
+ * 2) 얻은 URL 을 `imageUrl` 에 담아 본 함수로 제출한다.
+ *
+ * 서버는 이벤트가 ACTIVE 상태이고 종료되지 않았을 때만 허용하며,
+ * 같은 유저가 같은 이벤트에 중복 제출 시 409 를 반환한다.
+ *
+ * @param {number} eventId - 대상 이벤트 PK
+ * @param {{imageUrl: string, watchDate?: string, movieName?: string}} payload
+ * @returns {Promise<{verificationId: number, eventId: number, message: string}>}
+ */
+export async function submitOcrVerification(eventId, payload) {
+  const wrapper = await api.post(COMMUNITY_ENDPOINTS.OCR_VERIFY(eventId), payload);
+  return wrapper?.data ?? wrapper;
+}

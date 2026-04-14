@@ -23,7 +23,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 import { trackEvent } from '../../../shared/utils/eventTracker';
 
 /* ── 애니메이션 ── */
@@ -205,9 +205,9 @@ const StarButton = styled.button`
 
   ${({ $pop }) =>
     $pop &&
-    `
-    animation: ${starPop} 0.28s ease-out;
-  `}
+    css`
+      animation: ${starPop} 0.28s ease-out;
+    `}
 `;
 
 /** 별점 라벨 — 선택한 점수에 따라 텍스트 표시 */

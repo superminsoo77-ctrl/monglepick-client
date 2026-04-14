@@ -6,8 +6,14 @@
  * - agentApi   : FastAPI AI Agent (채팅 SSE, Movie Match SSE)
  * - recommendApi : FastAPI Recommend (검색, 온보딩)
  *
- * JWT 토큰 자동 갱신(refresh) 로직은 backendApi에만 적용된다.
- * Agent/Recommend 인스턴스는 Bearer 토큰 주입만 수행한다.
+ * JWT 토큰 자동 갱신(refresh) 로직은 3개 인스턴스 모두에 공통 적용된다.
+ *   - 요청 시: 토큰이 만료 임박이면 미리 /jwt/refresh 호출 (Backend 직접 호출)
+ *   - 401 응답 시: refresh 후 원 요청 1회 재시도
+ * `isRefreshing` 뮤텍스를 세 인스턴스가 공유하므로 refresh race 를 방지한다.
+ *
+ * 2026-04-14: recommendApi/agentApi 가 SimpleTokenInjector 만 쓰던 기존 구조에서는
+ *            Access Token 만료 후 리뷰/채팅 요청이 바로 401 로 떨어지는 문제가 있었다.
+ *            → backendApi 와 동일한 전체 인증 인터셉터로 통일.
  *
  * 적용된 보안 개선 사항:
  * - [C-C2] 토큰 주입 전 JWT 3-파트 형식 검증 (유효하지 않은 토큰 자동 제거)
@@ -158,19 +164,58 @@ async function refreshAccessToken() {
  * ══════════════════════════════════════════════════════════ */
 
 /**
- * Bearer 토큰 주입 request interceptor를 인스턴스에 부착한다.
- * JWT 형식 검증만 수행하며, 만료 시 refresh는 하지 않는다.
- * (Agent, Recommend 인스턴스용)
+ * Bearer 토큰 주입 request interceptor (만료 검사 + 자동 refresh 포함).
+ *
+ * <p>JWT 형식 검증 → 만료 임박 시 refresh → Authorization 헤더 주입의 순서로 동작한다.
+ * `backendApi` 의 request interceptor 와 동일 로직을 공용 헬퍼로 추출한 것이다.</p>
+ *
+ * <p>3개 인스턴스(Backend/Agent/Recommend)가 모듈 스코프 `isRefreshing` 뮤텍스와
+ * `failedQueue` 를 공유하므로 동시 다발 refresh race condition 이 발생하지 않는다.</p>
  *
  * @param {import('axios').AxiosInstance} instance - axios 인스턴스
  */
-function attachSimpleTokenInjector(instance) {
+function attachAuthRequestInterceptor(instance) {
   instance.interceptors.request.use(
-    (config) => {
+    async (config) => {
       const token = getToken();
-      if (token && isValidJwtFormat(token)) {
-        config.headers.Authorization = `Bearer ${token}`;
+
+      if (!token) return config;
+
+      // [C-C2] JWT 형식 검증
+      if (!isValidJwtFormat(token)) {
+        removeToken();
+        return config;
       }
+
+      // [W-C3] 토큰 만료 검사 — 만료 임박 시 미리 refresh 시도
+      if (isTokenExpired(token)) {
+        if (isRefreshing) {
+          try {
+            const newToken = await enqueueRefreshWaiter();
+            config.headers.Authorization = `Bearer ${newToken}`;
+          } catch {
+            // refresh 실패 — Authorization 헤더 없이 요청 (서버가 401 반환 → 응답 인터셉터에서 처리)
+          }
+          return config;
+        }
+
+        isRefreshing = true;
+        try {
+          const newToken = await refreshAccessToken();
+          processQueue(null, newToken);
+          config.headers.Authorization = `Bearer ${newToken}`;
+        } catch (err) {
+          processQueue(err, null);
+          clearAll();
+          useAuthStore.setState({ token: null, user: null });
+        } finally {
+          isRefreshing = false;
+        }
+        return config;
+      }
+
+      // 유효한 토큰 주입
+      config.headers.Authorization = `Bearer ${token}`;
       return config;
     },
     (error) => Promise.reject(error),
@@ -178,20 +223,63 @@ function attachSimpleTokenInjector(instance) {
 }
 
 /**
- * 에러 응답에서 서버 메시지를 추출하는 response interceptor를 부착한다.
- * response.data 자동 추출 + 에러 메시지 한국어 변환.
+ * 401 응답 시 refresh 후 원 요청을 1회 재시도하는 response interceptor.
+ *
+ * <p>성공 응답은 `response.data` 만 추출해 반환하고, 에러 응답은 서버 메시지를
+ * 파싱해 `Error` 객체로 포장한다. 401 재시도 로직은 `backendApi` 와 동일 패턴이며,
+ * 모듈 스코프 뮤텍스를 공유한다.</p>
  *
  * @param {import('axios').AxiosInstance} instance - axios 인스턴스
  */
-function attachErrorResponseInterceptor(instance) {
+function attachAuthResponseInterceptor(instance) {
   instance.interceptors.response.use(
     /* 성공 응답 — response.data만 반환 */
     (response) => response.data,
 
-    /* 에러 응답 — 서버 메시지 추출 + Error 객체 생성 */
-    (error) => {
-      const data = error.response?.data;
+    async (error) => {
+      const originalRequest = error.config || {};
       const status = error.response?.status;
+
+      // refresh 요청 자체가 401 이면 재시도하지 않음 (무한 루프 방지)
+      const isRefreshRequest = originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH);
+
+      if (
+        status === 401 &&
+        !originalRequest._retry &&
+        !isRefreshRequest
+      ) {
+        originalRequest._retry = true;
+
+        if (isRefreshing) {
+          try {
+            const newToken = await enqueueRefreshWaiter();
+            originalRequest.headers = originalRequest.headers || {};
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return instance(originalRequest);
+          } catch (queueError) {
+            return Promise.reject(queueError);
+          }
+        }
+
+        isRefreshing = true;
+        try {
+          const newToken = await refreshAccessToken();
+          processQueue(null, newToken);
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return instance(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          clearAll();
+          useAuthStore.setState({ token: null, user: null });
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      }
+
+      // 에러 메시지 추출
+      const data = error.response?.data;
       const message = data?.message || data?.detail || getFallbackMessage(status);
       const apiError = new Error(message);
       apiError.code = data?.code || null;
@@ -347,13 +435,16 @@ backendApi.interceptors.response.use(
   },
 );
 
-/* ── Agent: 토큰 주입 + 에러 처리 ── */
-attachSimpleTokenInjector(agentApi);
-attachErrorResponseInterceptor(agentApi);
+/* ── Agent: 전체 JWT interceptor (형식검증 + 만료검사 + refresh + 401 재시도) ── */
+attachAuthRequestInterceptor(agentApi);
+attachAuthResponseInterceptor(agentApi);
 
-/* ── Recommend: 토큰 주입 + 에러 처리 ── */
-attachSimpleTokenInjector(recommendApi);
-attachErrorResponseInterceptor(recommendApi);
+/* ── Recommend: 전체 JWT interceptor (형식검증 + 만료검사 + refresh + 401 재시도) ──
+   2026-04-14: 기존에는 SimpleTokenInjector 만 쓰고 있어서 Access Token 만료 후
+              `POST /api/v2/movies/{id}/reviews` 같은 인증 필수 엔드포인트가
+              즉시 401 로 실패했다. backendApi 와 동일 refresh 로직으로 통일. */
+attachAuthRequestInterceptor(recommendApi);
+attachAuthResponseInterceptor(recommendApi);
 
 /* ══════════════════════════════════════════════════════════
  * 공용 유틸리티 export
