@@ -25,12 +25,17 @@ import {
 import { createReview, getReviews } from '../../review/api/reviewApi';
 /* 위시리스트 API — features/user에서 가져옴 */
 import { addToWishlist, getWishlistStatus, removeFromWishlist } from '../../user/api/userApi';
+/* OCR 실관람 인증 이벤트 API (2026-04-14 신규) — 영화별 진행 중 이벤트 조회 */
+import { getOcrEventByMovie } from '../../community/api/communityApi';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 영화 상세 카드 — 같은 feature 내의 components에서 가져옴 */
 import MovieDetailCard from '../components/MovieDetailCard';
 /* Phase 5-2: 시청 후 평점 팝업 */
 import PostWatchFeedback from '../components/PostWatchFeedback';
+/* OCR 실관람 인증 배너 + 제출 모달 (2026-04-14 신규) */
+import OcrEventBanner from '../components/OcrEventBanner';
+import OcrVerificationModal from '../components/OcrVerificationModal';
 /* 리뷰 목록 — features/review에서 가져옴 */
 import ReviewList from '../../review/components/ReviewList';
 /* 로딩 스피너 — shared/components에서 가져옴 */
@@ -82,6 +87,16 @@ export default function MovieDetailPage() {
 
   // Phase 5-2: 시청 후 평점 팝업 상태
   const [showFeedback, setShowFeedback] = useState(false);
+
+  /*
+   * OCR 실관람 인증 이벤트 상태 (2026-04-14 신규).
+   *
+   * 이 영화가 현재 진행 중인 OCR 인증 이벤트의 대상이라면 상단에 배너를 노출한다.
+   * - ocrEvent : 진행 중 이벤트 객체 (없으면 null → 배너 미노출)
+   * - showOcrModal : "인증하러 가기" 클릭 시 열리는 제출 모달의 오픈 여부
+   */
+  const [ocrEvent, setOcrEvent] = useState(null);
+  const [showOcrModal, setShowOcrModal] = useState(false);
 
   // 영화 좋아요 상태 — 인스타그램 스타일 낙관적 UI 업데이트에 사용
   const [isLiked, setIsLiked] = useState(false);
@@ -147,6 +162,16 @@ export default function MovieDetailPage() {
         } catch {
           // 리뷰 로드 실패 시 빈 배열
           setReviews([]);
+        }
+
+        // 진행 중 OCR 실관람 인증 이벤트 조회 (2026-04-14 신규) — 비로그인도 허용.
+        // 실패/이벤트 없음 시 null 이 반환되며, 배너는 ocrEvent 가 truthy 일 때만 렌더링.
+        try {
+          const event = await getOcrEventByMovie(id);
+          setOcrEvent(event);
+        } catch {
+          // 이벤트 조회 실패는 상세 렌더링을 막지 않음
+          setOcrEvent(null);
         }
 
         // 좋아요 수는 비로그인도 볼 수 있게 공개 카운트 API를 우선 사용한다.
@@ -262,6 +287,39 @@ export default function MovieDetailPage() {
   };
 
   /**
+   * OCR 실관람 인증 배너의 "인증하러 가기" 버튼 핸들러 (2026-04-14 신규).
+   *
+   * 비로그인 사용자는 로그인 안내를 먼저 띄워 현재 위치에서의 유입을 방지한다.
+   * 로그인 사용자는 영수증 업로드 모달({@link OcrVerificationModal})을 연다.
+   */
+  const handleOcrVerifyClick = async () => {
+    if (!isAuthenticated) {
+      await showAlert({
+        title: '로그인 필요',
+        message: '실관람 인증을 하려면 로그인이 필요합니다.',
+        type: 'warning',
+      });
+      return;
+    }
+    setShowOcrModal(true);
+  };
+
+  /**
+   * OCR 인증 제출 성공 콜백 (2026-04-14 신규).
+   *
+   * 모달을 닫고 친절한 안내 메시지를 띄운다.
+   * 향후 리워드 지급 단계가 추가되면 이 자리에서 showReward() 를 호출한다.
+   */
+  const handleOcrVerifySuccess = async (result) => {
+    setShowOcrModal(false);
+    await showAlert({
+      title: '인증 접수 완료',
+      message: result?.message || '영수증이 정상적으로 접수되었습니다.',
+      type: 'success',
+    });
+  };
+
+  /**
    * Phase 5-2: "시청 완료" 버튼 핸들러.
    * 시청 후 평점 팝업을 표시한다.
    */
@@ -347,6 +405,18 @@ export default function MovieDetailPage() {
           <span>이전</span>
         </S.BackButton>
 
+        {/*
+          OCR 실관람 인증 배너 (2026-04-14 신규).
+          진행 중 이벤트가 있는 경우에만 영화 상세 카드 위에 표시된다.
+          AI 추천/검색/커뮤니티 등 어디서 상세로 진입했든 즉시 인증 플로우로 유도한다.
+        */}
+        {ocrEvent && (
+          <OcrEventBanner
+            event={ocrEvent}
+            onVerifyClick={handleOcrVerifyClick}
+          />
+        )}
+
         {/* 영화 상세 카드 */}
         <MovieDetailCard
           movie={movie}
@@ -366,6 +436,14 @@ export default function MovieDetailPage() {
           movieId={id}
           onSubmit={handleFeedbackSubmit}
           onClose={() => setShowFeedback(false)}
+        />
+
+        {/* OCR 실관람 인증 제출 모달 (2026-04-14 신규) */}
+        <OcrVerificationModal
+          isOpen={showOcrModal}
+          event={ocrEvent}
+          onClose={() => setShowOcrModal(false)}
+          onSuccess={handleOcrVerifySuccess}
         />
 
         {/* 리뷰 섹션 */}

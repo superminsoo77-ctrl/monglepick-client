@@ -162,6 +162,18 @@ export const COMMUNITY_ENDPOINTS = {
    * 반환: ACTIVE/READY 상태 + endDate > now 이벤트만.
    */
   OCR_EVENTS: `${API_VERSION}/ocr-events`,
+  /**
+   * 2026-04-14 신규: 특정 영화의 진행 중 OCR 이벤트 단건 조회 - GET (비로그인 허용).
+   * 영화 상세 페이지 상단 "실관람 인증 진행중" 배너 노출 여부 판단에 사용.
+   * 반환: 단건 OcrEventPublicResponse 또는 null.
+   */
+  OCR_EVENT_BY_MOVIE: (movieId) => `${API_VERSION}/ocr-events/by-movie/${movieId}`,
+  /**
+   * 2026-04-14 신규: OCR 실관람 인증 제출 - POST (JWT 필수).
+   * 영수증 이미지 업로드 후 받은 URL 을 imageUrl 로 전달.
+   * 바디: { imageUrl, watchDate?, movieName? }
+   */
+  OCR_VERIFY: (eventId) => `${API_VERSION}/ocr-events/${eventId}/verify`,
 };
 
 /**
@@ -324,6 +336,19 @@ export const PAYMENT_ENDPOINTS = {
   CONFIRM: `${API_VERSION}/payment/confirm`,
   /** 결제 내역 조회 - GET /payment/orders (query: page, size) */
   ORDER_LIST: `${API_VERSION}/payment/orders`,
+};
+
+/**
+ * 포인트팩(PointPack) 관련 엔드포인트 — 2026-04-14 신설.
+ *
+ * 관리자 페이지에서 관리하는 {@code point_pack_prices} 테이블의 활성 팩만
+ * sortOrder 순으로 반환한다. 과거에는 PaymentPage 에서 상수 배열로 하드코딩되어
+ * 관리자 수정이 반영되지 않았으나, 이 엔드포인트 도입 이후 단일 진실 원본으로 통일된다.
+ * 비로그인 허용 (Public API).
+ */
+export const POINT_PACK_ENDPOINTS = {
+  /** 활성 포인트팩 목록 조회 - GET (공개) */
+  LIST: `${API_VERSION}/point-packs`,
 };
 
 /**
