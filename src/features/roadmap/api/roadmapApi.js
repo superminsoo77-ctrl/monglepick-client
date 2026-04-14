@@ -17,10 +17,10 @@ import { ROADMAP_ENDPOINTS } from '../../../shared/constants/api';
  * @param {string} [params.category] - 카테고리 필터 (GENRE, DIRECTOR, ERA, COUNTRY, THEME)
  * @returns {Promise<Array<{id, title, description, category, movieCount, thumbnailUrl, difficulty}>>}
  */
-export async function getCourses({ category } = {}) {
+export async function getCourses({ theme } = {}) {
   requireAuth();
   const params = {};
-  if (category) params.category = category;
+  if (theme) params.theme = theme;
   return backendApi.get(ROADMAP_ENDPOINTS.COURSES, { params });
 }
 
@@ -62,9 +62,11 @@ export async function startCourse(courseId) {
  *
  * @param {string|number} courseId
  * @param {string} movieId
+ * @param {string} [review] - 도장깨기 인증 한마디 (선택)
  * @returns {Promise<{completedCount: number, totalCount: number}>}
  */
-export async function completeMovie(courseId, movieId) {
+export async function completeMovie(courseId, movieId, review) {
   requireAuth();
-  return backendApi.post(ROADMAP_ENDPOINTS.COMPLETE_MOVIE(courseId, movieId));
+  const body = review ? { review } : {};
+  return backendApi.post(ROADMAP_ENDPOINTS.COMPLETE_MOVIE(courseId, movieId), body);
 }

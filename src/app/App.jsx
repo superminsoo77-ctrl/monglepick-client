@@ -76,6 +76,8 @@ import PlaylistPage from '../features/playlist/pages/PlaylistPage';
 import SharedPlaylistDetailPage from '../features/community/pages/SharedPlaylistDetailPage';
 /* 업적 페이지 — features/achievement에서 가져옴 */
 import AchievementPage from '../features/achievement/pages/AchievementPage';
+/* 업적 상세 페이지 */
+import AchievementDetailPage from '../features/achievement/pages/AchievementDetailPage';
 /*
  * 영화 퀴즈 페이지 — v2 개편(2026-04-08)으로 CommunityPage 의 "오늘의 퀴즈" 탭으로 이관됨.
  * /quiz 진입은 /community?tab=quiz 로 redirect 처리하므로 App.jsx 에서는 import 불필요.
@@ -86,6 +88,8 @@ import AchievementPage from '../features/achievement/pages/AchievementPage';
 import WorldcupPage from '../features/worldcup/pages/WorldcupPage';
 /* 영화 로드맵 페이지 — features/roadmap에서 가져옴 */
 import RoadmapPage from '../features/roadmap/pages/RoadmapPage';
+/* 도장깨기 리뷰 작성 페이지 */
+import StampReviewPage from '../features/roadmap/pages/StampReviewPage';
 /* 404 에러 페이지 — features/error에서 가져옴 */
 import NotFoundPage from '../features/error/pages/NotFoundPage';
 
@@ -341,6 +345,18 @@ function App() {
           }
         />
 
+        {/* 업적 상세 (인증 필수) */}
+        <Route
+          path="/achievement/:id"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <AchievementDetailPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
         {/* 도장깨기 목록 (인증 필수) */}
         <Route
           path="/stamp"
@@ -360,6 +376,18 @@ function App() {
             <PrivateRoute>
               <MainLayout>
                 <RoadmapPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* 도장깨기 리뷰 작성 (인증 필수) */}
+        <Route
+          path="/stamp/:courseId/review/:movieId"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <StampReviewPage />
               </MainLayout>
             </PrivateRoute>
           }

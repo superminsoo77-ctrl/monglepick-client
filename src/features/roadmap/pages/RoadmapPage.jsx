@@ -16,38 +16,43 @@ import {
   getCourses,
   getCourseDetail,
   startCourse,
-  completeMovie,
 } from '../api/roadmapApi';
 import * as S from './RoadmapPage.styled';
 
 /** TMDB 포스터 URL */
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w200';
 
-/** 카테고리 정의 */
+/** 카테고리 정의 — key는 백엔드 theme 필드 값과 동일한 한국어 문자열 */
 const CATEGORIES = [
   { key: '', label: '전체', icon: '&#x1F3AC;' },
-  { key: 'GENRE', label: '장르별', icon: '&#x1F3AD;' },
-  { key: 'DIRECTOR', label: '감독별', icon: '&#x1F3A5;' },
-  { key: 'ERA', label: '시대별', icon: '&#x1F4C5;' },
-  { key: 'COUNTRY', label: '국가별', icon: '&#x1F30D;' },
-  { key: 'THEME', label: '테마별', icon: '&#x1F3AF;' },
+  { key: '장르별', label: '장르별', icon: '&#x1F3AD;' },
+  { key: '감독별', label: '감독별', icon: '&#x1F3A5;' },
+  { key: '시대별', label: '시대별', icon: '&#x1F4C5;' },
+  { key: '국가별', label: '국가별', icon: '&#x1F30D;' },
+  { key: '테마별', label: '테마별', icon: '&#x1F3AF;' },
 ];
 
-/** 난이도 라벨 매핑 */
+/** 난이도 라벨 매핑 — 백엔드 Difficulty enum (beginner/intermediate/advanced) */
 const DIFFICULTY_LABELS = {
-  EASY: '입문',
-  MEDIUM: '중급',
-  HARD: '고급',
+  beginner: '입문',
+  intermediate: '중급',
+  advanced: '고급',
 };
 
-/** 카테고리별 기본 아이콘 */
+/** 테마별 기본 아이콘 */
 const CATEGORY_ICONS = {
-  GENRE: '&#x1F3AD;',
-  DIRECTOR: '&#x1F3A5;',
-  ERA: '&#x1F4C5;',
-  COUNTRY: '&#x1F30D;',
-  THEME: '&#x1F3AF;',
+  '장르별': '&#x1F3AD;',
+  '감독별': '&#x1F3A5;',
+  '시대별': '&#x1F4C5;',
+  '국가별': '&#x1F30D;',
+  '테마별': '&#x1F3AF;',
 };
+
+/** 탭 정의 */
+const TABS = [
+  { key: 'all', label: '전체 코스' },
+  { key: 'inprogress', label: '진행 중' },
+];
 
 export default function RoadmapPage() {
   const navigate = useNavigate();
@@ -68,6 +73,9 @@ export default function RoadmapPage() {
   /** 상세 페이지 경로 빌더 (진입 모드에 따라 분기) */
   const detailRoute = isStampMode ? ROUTES.STAMP_DETAIL : ROUTES.ROADMAP_DETAIL;
 
+  /* ── 탭 상태 ── */
+  const [activeTab, setActiveTab] = useState('all');
+
   /* ── 목록 상태 ── */
   const [courses, setCourses] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -79,14 +87,16 @@ export default function RoadmapPage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
+
   /**
    * 코스 목록 로드.
+   * 진행 중 탭에서는 카테고리 필터 없이 전체 코스를 가져와 프론트에서 필터링한다.
    */
   const loadCourses = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await getCourses({
-        category: selectedCategory || undefined,
+        theme: activeTab === 'all' ? (selectedCategory || undefined) : undefined,
       });
       setCourses(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
@@ -95,7 +105,7 @@ export default function RoadmapPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, activeTab]);
 
   /**
    * 코스 상세 로드.
@@ -105,10 +115,8 @@ export default function RoadmapPage() {
     try {
       const data = await getCourseDetail(courseId);
       setDetail(data);
-      /* 완료된 영화 ID 세트 생성 */
-      const completed = new Set(
-        (data.completedMovies || []).map((m) => m.movieId || m.id || m),
-      );
+      /* 완료된 영화 ID 세트 생성 — 백엔드 completedMovieIds 배열 (문자열 ID) */
+      const completed = new Set(data.completedMovieIds || []);
       setCompletedMovieIds(completed);
     } catch {
       showAlert({ title: '오류', message: '코스를 불러올 수 없습니다.', type: 'error' });
@@ -148,30 +156,23 @@ export default function RoadmapPage() {
   };
 
   /**
-   * 영화 시청 완료 토글.
+   * 체크박스 클릭.
+   * - 미완료 → 리뷰 작성 페이지로 이동
+   * - 이미 완료 → 아무 동작 없음 (완료 취소는 지원하지 않음)
    */
-  const handleToggleComplete = async (movieId) => {
-    if (!detail) return;
-    try {
-      await completeMovie(detail.id, movieId);
-      setCompletedMovieIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(movieId)) {
-          next.delete(movieId);
-        } else {
-          next.add(movieId);
-        }
-        return next;
-      });
-    } catch {
-      showAlert({ title: '오류', message: '처리에 실패했습니다.', type: 'error' });
-    }
+  const handleCheckboxClick = (movieId, movieTitle) => {
+    if (!detail || completedMovieIds.has(movieId)) return;
+    navigate(
+      buildPath(ROUTES.STAMP_REVIEW, { courseId: detail.id, movieId }),
+      { state: { movieTitle, courseTitle: detail.title } },
+    );
   };
 
   /* ── 상세 뷰 ── */
   if (detailId) {
     const movies = detail?.movies || [];
-    const totalCount = movies.length;
+    /* movieCount는 백엔드 roadmap_courses.movie_count (목록 API와 동일한 분모) */
+    const totalCount = detail?.movieCount || movies.length;
     const completedCount = completedMovieIds.size;
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
@@ -214,13 +215,6 @@ export default function RoadmapPage() {
 
                   return (
                     <S.MovieItem key={mid || idx}>
-                      <S.Checkbox
-                        $checked={isCompleted}
-                        onClick={() => handleToggleComplete(mid)}
-                        title={isCompleted ? '시청 취소' : '시청 완료'}
-                      >
-                        {isCompleted ? '✓' : ''}
-                      </S.Checkbox>
                       {poster ? (
                         <S.MoviePoster src={poster} alt={movie.title} loading="lazy" />
                       ) : (
@@ -233,6 +227,14 @@ export default function RoadmapPage() {
                           {movie.director && ` · ${movie.director}`}
                         </S.MovieMeta>
                       </S.MovieInfo>
+                      <S.VerifyBtn
+                        $done={isCompleted}
+                        onClick={() => !isCompleted && detail.started && handleCheckboxClick(mid, movie.title)}
+                        disabled={isCompleted || !detail.started}
+                        title={isCompleted ? '시청 인증 완료' : !detail.started ? '코스를 먼저 시작해 주세요' : '시청 인증하기'}
+                      >
+                        {isCompleted ? '✓ 인증완료' : '시청 인증'}
+                      </S.VerifyBtn>
                     </S.MovieItem>
                   );
                 })}
@@ -250,23 +252,42 @@ export default function RoadmapPage() {
   }
 
   /* ── 목록 뷰 ── */
+  const visibleCourses = activeTab === 'inprogress'
+    ? courses.filter((c) => (c.progressPercent || 0) > 0 || c.started)
+    : courses;
+
   return (
     <S.Container>
-      <S.PageTitle>영화 로드맵</S.PageTitle>
+      <S.PageTitle>도장깨기</S.PageTitle>
       <S.Subtitle>테마별 영화 코스를 따라가며 영화 지식을 넓혀보세요!</S.Subtitle>
 
-      {/* 카테고리 필터 */}
-      <S.CategoryFilters>
-        {CATEGORIES.map((cat) => (
-          <S.CategoryBtn
-            key={cat.key}
-            $active={selectedCategory === cat.key}
-            onClick={() => setSelectedCategory(cat.key)}
+      {/* 탭 */}
+      <S.Tabs>
+        {TABS.map((tab) => (
+          <S.Tab
+            key={tab.key}
+            $active={activeTab === tab.key}
+            onClick={() => setActiveTab(tab.key)}
           >
-            {cat.label}
-          </S.CategoryBtn>
+            {tab.label}
+          </S.Tab>
         ))}
-      </S.CategoryFilters>
+      </S.Tabs>
+
+      {/* 카테고리 필터 (전체 탭에서만) */}
+      {activeTab === 'all' && (
+        <S.CategoryFilters>
+          {CATEGORIES.map((cat) => (
+            <S.CategoryBtn
+              key={cat.key}
+              $active={selectedCategory === cat.key}
+              onClick={() => setSelectedCategory(cat.key)}
+            >
+              {cat.label}
+            </S.CategoryBtn>
+          ))}
+        </S.CategoryFilters>
+      )}
 
       {/* 로딩 */}
       {isLoading && (
@@ -276,39 +297,43 @@ export default function RoadmapPage() {
       )}
 
       {/* 코스 그리드 */}
-      {!isLoading && courses.length > 0 && (
+      {!isLoading && visibleCourses.length > 0 && (
         <S.CourseGrid>
-          {courses.map((course) => {
+          {visibleCourses.map((course) => {
             const progress = course.progressPercent || 0;
             return (
               <S.CourseCard
                 key={course.id}
                 onClick={() => navigate(buildPath(detailRoute, { id: course.id }))}
               >
-                <S.CourseThumbnail
-                  dangerouslySetInnerHTML={{
-                    __html: course.thumbnailUrl || CATEGORY_ICONS[course.category] || '&#x1F3AC;',
-                  }}
-                />
-                <S.CourseInfo>
+                <S.CourseHeaderRow>
+                  <S.CourseThumbnail
+                    dangerouslySetInnerHTML={{
+                      __html: course.thumbnailUrl || CATEGORY_ICONS[course.theme] || '&#x1F3AC;',
+                    }}
+                  />
                   <S.CourseTitle>{course.title}</S.CourseTitle>
-                  {course.description && (
-                    <S.CourseDesc>{course.description}</S.CourseDesc>
+                </S.CourseHeaderRow>
+                {course.description && (
+                  <S.CourseDesc>{course.description}</S.CourseDesc>
+                )}
+                <S.CourseMeta>
+                  <span>{course.movieCount || 0}편</span>
+                  {course.difficulty && (
+                    <S.DifficultyBadge $level={course.difficulty}>
+                      {DIFFICULTY_LABELS[course.difficulty] || course.difficulty}
+                    </S.DifficultyBadge>
                   )}
-                  <S.CourseMeta>
-                    <span>{course.movieCount || 0}편</span>
-                    {course.difficulty && (
-                      <S.DifficultyBadge $level={course.difficulty}>
-                        {DIFFICULTY_LABELS[course.difficulty] || course.difficulty}
-                      </S.DifficultyBadge>
-                    )}
-                  </S.CourseMeta>
-                  {progress > 0 && (
+                </S.CourseMeta>
+                {/* 진행률 바는 진행 중 탭에서만 표시 */}
+                {activeTab === 'inprogress' && progress > 0 && (
+                  <>
                     <S.ProgressBarOuter>
                       <S.ProgressBarInner $percent={progress} />
                     </S.ProgressBarOuter>
-                  )}
-                </S.CourseInfo>
+                    <S.ProgressText>{Math.round(progress)}% 완료</S.ProgressText>
+                  </>
+                )}
               </S.CourseCard>
             );
           })}
@@ -316,13 +341,14 @@ export default function RoadmapPage() {
       )}
 
       {/* 빈 상태 */}
-      {!isLoading && courses.length === 0 && (
+      {!isLoading && visibleCourses.length === 0 && (
         <S.EmptyState>
           <S.EmptyIcon>&#x1F4DA;</S.EmptyIcon>
           <S.EmptyText>
-            아직 등록된 코스가 없어요.
-            <br />
-            곧 다양한 영화 코스가 추가될 예정이에요!
+            {activeTab === 'inprogress'
+              ? <>진행 중인 코스가 없어요.<br />코스를 시작해보세요!</>
+              : <>아직 등록된 코스가 없어요.<br />곧 다양한 영화 코스가 추가될 예정이에요!</>
+            }
           </S.EmptyText>
         </S.EmptyState>
       )}

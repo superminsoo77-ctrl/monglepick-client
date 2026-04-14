@@ -69,10 +69,14 @@ export const ROUTES = {
   SHARED_PLAYLIST_DETAIL: '/community/playlist/:playlistId',
   /** 업적 페이지 — 사용자 업적 진행 */
   ACHIEVEMENT: '/achievement',
+  /** 업적 상세 페이지 — 동적 파라미터 :id */
+  ACHIEVEMENT_DETAIL: '/achievement/:id',
   /** 도장깨기 페이지 — 영화 코스 시청 미션 (RoadmapPage 재사용) */
   STAMP: '/stamp',
   /** 도장깨기 코스 상세 — 동적 파라미터 :id */
   STAMP_DETAIL: '/stamp/:id',
+  /** 도장깨기 리뷰 작성 — 동적 파라미터 :courseId, :movieId */
+  STAMP_REVIEW: '/stamp/:courseId/review/:movieId',
   /** 퀴즈 페이지 — 오늘의 영화 퀴즈 (비로그인 열람 가능, 제출은 로그인 필수) */
   QUIZ: '/quiz',
   /** 월드컵 페이지 — 영화 이상형 월드컵 */

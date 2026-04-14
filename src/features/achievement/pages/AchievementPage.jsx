@@ -7,7 +7,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAchievements } from '../api/achievementApi';
+import { ROUTES, buildPath } from '../../../shared/constants/routes';
 import * as S from './AchievementPage.styled';
 
 /** 업적 카테고리 */
@@ -28,6 +30,7 @@ const CATEGORY_ICONS = {
 };
 
 export default function AchievementPage() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [achievements, setAchievements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +109,15 @@ export default function AchievementPage() {
             const percent = Math.round((progress / maxProgress) * 100);
 
             return (
-              <S.AchievementCard key={ach.id} $achieved={ach.achieved}>
+              <S.AchievementCard
+                key={ach.achievementTypeId ?? ach.id}
+                $achieved={ach.achieved}
+                onClick={() => navigate(
+                  buildPath(ROUTES.ACHIEVEMENT_DETAIL, { id: ach.achievementTypeId ?? ach.id }),
+                  { state: { achievement: ach } }
+                )}
+                style={{ cursor: 'pointer' }}
+              >
                 <S.AchievementIcon
                   dangerouslySetInnerHTML={{
                     __html: ach.iconUrl || CATEGORY_ICONS[ach.category] || '&#x1F3C5;',

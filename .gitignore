@@ -7,11 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.vite
-
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
+build
+.vite
+
+# Local env files
 *.local
 
 # Editor directories and files
@@ -30,15 +35,27 @@ dist-ssr
 .env.local
 .env.*.local
 .env.staging
+.env.production
 !.env.example
 
 # Claude Code
 .claude/
+CLAUDE.md
 
-# Coverage
+# Test coverage
 coverage/
+.nyc_output
 
 # OS files
 Thumbs.db
-CLAUDE.md
-.env.production
+desktop.ini
+
+# Cache
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Misc
+*.pem
+.vercel
+.netlify

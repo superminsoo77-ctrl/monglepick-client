@@ -102,6 +102,8 @@ export default function PlaylistPage() {
   useEffect(() => {
     if (detailId) {
       loadDetail(detailId);
+      /* 소유자 확인을 위해 내 플레이리스트 목록도 로드 */
+      loadPlaylists();
     } else {
       loadPlaylists();
       setDetail(null);
@@ -313,6 +315,10 @@ export default function PlaylistPage() {
 
   /* ── 상세 뷰 ── */
   if (detailId) {
+    /* 내 플레이리스트 목록에 있으면 소유자, 단 가져온(import) 플레이리스트는 토글 불가 */
+    const isOwner = playlists.some((p) => String(p.playlistId) === String(detailId));
+    const canTogglePublic = isOwner && !detail?.isImported;
+
     return (
       <S.Container>
         <S.BackLink onClick={() => navigate(ROUTES.PLAYLIST)}>
@@ -337,19 +343,25 @@ export default function PlaylistPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <S.CardMeta>{(detail.items || []).length}편</S.CardMeta>
-                {/* 공개/비공개 토글 */}
-                <S.ToggleRow style={{ margin: 0 }}>
-                  <S.ToggleLabel style={{ fontSize: 13 }}>
+                {/* 공개/비공개: 소유자이며 가져온 플레이리스트가 아닐 때만 토글 가능 */}
+                {canTogglePublic ? (
+                  <S.ToggleRow style={{ margin: 0 }}>
+                    <S.ToggleLabel style={{ fontSize: 13 }}>
+                      {detail.isPublic ? '🌐 공개' : '🔒 비공개'}
+                    </S.ToggleLabel>
+                    <S.ToggleSwitch
+                      $on={detail.isPublic}
+                      onClick={handleTogglePublic}
+                      disabled={isTogglingPublic}
+                      type="button"
+                      title={detail.isPublic ? '비공개로 전환' : '공개로 전환'}
+                    />
+                  </S.ToggleRow>
+                ) : (
+                  <S.CardMeta style={{ fontSize: 12, opacity: 0.6 }}>
                     {detail.isPublic ? '🌐 공개' : '🔒 비공개'}
-                  </S.ToggleLabel>
-                  <S.ToggleSwitch
-                    $on={detail.isPublic}
-                    onClick={handleTogglePublic}
-                    disabled={isTogglingPublic}
-                    type="button"
-                    title={detail.isPublic ? '비공개로 전환' : '공개로 전환'}
-                  />
-                </S.ToggleRow>
+                  </S.CardMeta>
+                )}
               </div>
             </S.Header>
 
