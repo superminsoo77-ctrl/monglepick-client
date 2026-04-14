@@ -155,6 +155,23 @@ function formatRecentSearchTimestamp(value) {
   });
 }
 
+function isGenreDiscoveryRecentSearch(item) {
+  const historyFilters = item?.filters || {};
+  const historyGenres = Array.isArray(historyFilters.genres) ? historyFilters.genres : [];
+  return historyFilters.search_mode === 'genre_discovery' && historyGenres.length > 0;
+}
+
+function getRecentSearchDisplayKeyword(item) {
+  const historyFilters = item?.filters || {};
+  const historyGenres = Array.isArray(historyFilters.genres) ? historyFilters.genres : [];
+
+  if (!isGenreDiscoveryRecentSearch(item)) {
+    return item?.keyword || '';
+  }
+
+  return historyGenres.join(' · ');
+}
+
 function buildSearchCacheKey({ query, searchType, genre, sort, selectedGenres = [] }) {
   return JSON.stringify({
     query: query || '',
@@ -1395,7 +1412,9 @@ export default function SearchPage() {
                       type="button"
                       onClick={() => handleRecentSearchClick(item)}
                     >
-                      <S.RecentPreviewKeyword>{item.keyword}</S.RecentPreviewKeyword>
+                      <S.RecentPreviewKeyword $isGenreHistory={isGenreDiscoveryRecentSearch(item)}>
+                        {getRecentSearchDisplayKeyword(item)}
+                      </S.RecentPreviewKeyword>
                     </S.RecentPreviewButton>
                   </S.RecentPreviewItem>
                 ))}
@@ -1514,7 +1533,9 @@ export default function SearchPage() {
                             type="button"
                             onClick={() => handleRecentSearchClick(item)}
                           >
-                            <S.RecentModalKeyword>{item.keyword}</S.RecentModalKeyword>
+                            <S.RecentModalKeyword $isGenreHistory={isGenreDiscoveryRecentSearch(item)}>
+                              {getRecentSearchDisplayKeyword(item)}
+                            </S.RecentModalKeyword>
                             <S.RecentModalMeta>
                               {formatRecentSearchTimestamp(item.searched_at)}
                             </S.RecentModalMeta>

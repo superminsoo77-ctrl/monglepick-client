@@ -405,7 +405,7 @@ export const RecentPreviewItem = styled.li`
  * 검색창 아래에서 빠르게 재검색할 수 있도록 칩 스타일을 사용한다.
  */
 export const RecentPreviewButton = styled.button`
-  max-width: 160px;
+  max-width: 220px;
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
   border-radius: ${({ theme }) => theme.radius.full};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
@@ -428,7 +428,10 @@ export const RecentPreviewButton = styled.button`
  */
 export const RecentPreviewKeyword = styled.span`
   display: block;
-  color: ${({ theme }) => theme.colors.textPrimary};
+  width: 100%;
+  color: ${({ $isGenreHistory, theme }) => (
+    $isGenreHistory ? theme.colors.primaryDark : theme.colors.textPrimary
+  )};
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontMedium};
   white-space: nowrap;
@@ -651,7 +654,9 @@ export const RecentModalKeywordButton = styled.button`
  */
 export const RecentModalKeyword = styled.span`
   width: 100%;
-  color: ${({ theme }) => theme.colors.textPrimary};
+  color: ${({ $isGenreHistory, theme }) => (
+    $isGenreHistory ? theme.colors.primaryDark : theme.colors.textPrimary
+  )};
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontSemibold};
   white-space: nowrap;
