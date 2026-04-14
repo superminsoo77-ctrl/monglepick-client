@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 import { ROUTES, buildPath } from '../../../shared/constants/routes';
 import {
@@ -52,7 +52,21 @@ const CATEGORY_ICONS = {
 export default function RoadmapPage() {
   const navigate = useNavigate();
   const { id: detailId } = useParams();
+  const { pathname } = useLocation();
   const { showAlert } = useModal();
+
+  /**
+   * 현재 경로가 /stamp 계열인지 여부.
+   * - true  → 도장깨기 모드: STAMP / STAMP_DETAIL 사용
+   * - false → 로드맵 모드:  ROADMAP / ROADMAP_DETAIL 사용
+   */
+  const isStampMode = pathname.startsWith(ROUTES.STAMP.replace('/:id', '').replace(':id', ''));
+
+  /** 목록으로 돌아갈 경로 (진입 모드에 따라 분기) */
+  const listRoute = isStampMode ? ROUTES.STAMP : ROUTES.ROADMAP;
+
+  /** 상세 페이지 경로 빌더 (진입 모드에 따라 분기) */
+  const detailRoute = isStampMode ? ROUTES.STAMP_DETAIL : ROUTES.ROADMAP_DETAIL;
 
   /* ── 목록 상태 ── */
   const [courses, setCourses] = useState([]);
@@ -98,11 +112,12 @@ export default function RoadmapPage() {
       setCompletedMovieIds(completed);
     } catch {
       showAlert({ title: '오류', message: '코스를 불러올 수 없습니다.', type: 'error' });
-      navigate(ROUTES.ROADMAP, { replace: true });
+      /* 진입 경로에 따라 목록으로 복귀 (stamp 모드면 /stamp, 아니면 /roadmap) */
+      navigate(listRoute, { replace: true });
     } finally {
       setIsDetailLoading(false);
     }
-  }, [navigate, showAlert]);
+  }, [navigate, showAlert, listRoute]);
 
   /* 마운트 시 목록 또는 상세 로드 */
   useEffect(() => {
@@ -162,8 +177,8 @@ export default function RoadmapPage() {
 
     return (
       <S.Container>
-        <S.BackLink onClick={() => navigate(ROUTES.ROADMAP)}>
-          ← 로드맵 목록
+        <S.BackLink onClick={() => navigate(listRoute)}>
+          {isStampMode ? '← 도장깨기 목록' : '← 로드맵 목록'}
         </S.BackLink>
 
         {isDetailLoading && <S.SkeletonCard $h={300} />}
@@ -268,7 +283,7 @@ export default function RoadmapPage() {
             return (
               <S.CourseCard
                 key={course.id}
-                onClick={() => navigate(buildPath(ROUTES.ROADMAP_DETAIL, { id: course.id }))}
+                onClick={() => navigate(buildPath(detailRoute, { id: course.id }))}
               >
                 <S.CourseThumbnail
                   dangerouslySetInnerHTML={{

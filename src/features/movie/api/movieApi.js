@@ -201,6 +201,28 @@ export async function logSearchResultClick({
 }
 
 /**
+ * 영화를 키워드로 검색한다 (Spring Boot 백엔드 LIKE 검색, 플레이리스트 영화 추가용).
+ *
+ * FastAPI Recommend 서버가 아닌 Spring Boot 백엔드를 직접 호출하므로
+ * Recommend 서버 다운 시에도 정상 동작한다.
+ *
+ * @param {string} keyword - 검색 키워드 (한국어 또는 영어 제목)
+ * @param {number} [size=12] - 반환 건수 (최대 30)
+ * @returns {Promise<Array>} 영화 목록 (movieId, title, posterPath, releaseYear, rating 포함)
+ */
+export async function searchMoviesByKeyword(keyword, size = 12) {
+  if (!keyword?.trim()) return [];
+  const data = await backendApi.get(MOVIE_ENDPOINTS.LIST + '/search', {
+    params: { keyword: keyword.trim(), size },
+  });
+  return (Array.isArray(data) ? data : []).map((m) => ({
+    ...m,
+    id: m.movieId,
+    posterUrl: m.posterPath ? `https://image.tmdb.org/t/p/w200${m.posterPath}` : null,
+  }));
+}
+
+/**
  * 인기 영화 목록을 조회한다.
  * Spring Data Page 응답(content)을 { movies, total } 형식으로 변환한다.
  *

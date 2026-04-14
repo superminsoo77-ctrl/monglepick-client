@@ -74,7 +74,6 @@ export async function getSharedPlaylists({ page = 1, size = 15 } = {}) {
   const data = await api.get(COMMUNITY_ENDPOINTS.SHARED_PLAYLISTS, {
     params: { page: Math.max(0, page - 1), size },
   });
-  console.log('[getSharedPlaylists] raw data:', data);
   return {
     posts: data?.content ?? [],
     total: data?.totalElements ?? 0,
@@ -100,4 +99,16 @@ export async function uploadImages(files) {
     headers: { 'Content-Type': undefined },
   });
   return data.urls;
+}
+/**
+ * 플레이리스트를 비공개로 전환할 때 연결된 공유 게시글을 삭제한다.
+ *
+ * postId 대신 playlistId로 서버에서 게시글을 찾아 삭제하므로,
+ * 페이지 새로고침으로 postId가 소실되어도 안전하게 삭제된다.
+ *
+ * @param {number} playlistId - 비공개로 전환할 플레이리스트 ID
+ * @returns {Promise<void>}
+ */
+export async function deletePlaylistPost(playlistId) {
+  return api.delete(`${COMMUNITY_ENDPOINTS.POSTS}/playlist/${playlistId}`);
 }

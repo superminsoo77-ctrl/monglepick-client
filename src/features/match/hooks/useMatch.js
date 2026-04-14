@@ -252,6 +252,9 @@ export function useMatch({ userId = '' } = {}) {
            */
           onError: (data) => {
             setError(data.message || '영화 분석 중 오류가 발생했습니다.');
+            // 에러 시 이전에 수신된 결과 데이터 클리어 — 에러 배너와 결과가 동시에 표시되는 문제 방지
+            setMatchResults([]);
+            setSharedFeatures(null);
             setCurrentStatus('');
             setIsLoading(false);
           },

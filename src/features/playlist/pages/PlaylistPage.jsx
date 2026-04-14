@@ -4,7 +4,9 @@
  * 사용자의 영화 플레이리스트를 관리한다.
  * - 목록 보기: 플레이리스트 카드 그리드
  * - 생성/수정: 인라인 모달 폼
- * - 상세 보기: 플레이리스트 내 영화 목록 + 영화 제거
+ * - 상세 보기: 플레이리스트 내 영화 목록 + 공개/비공개 토글
+ *
+ * 공개 전환 시 커뮤니티에 자동 게시, 비공개 전환 시 자동 삭제.
  *
  * @module features/playlist/pages/PlaylistPage
  */
@@ -23,8 +25,8 @@ import {
   removeMovieFromPlaylist,
   addMovieToPlaylist,
 } from '../api/playlistApi';
-import { searchMovies } from '../../movie/api/movieApi';
-import { sharePlaylist } from '../../community/api/communityApi';
+import { searchMoviesByKeyword } from '../../movie/api/movieApi';
+import { sharePlaylist, deletePlaylistPost } from '../../community/api/communityApi';
 import * as S from './PlaylistPage.styled';
 
 /** TMDB 포스터 URL */
@@ -42,13 +44,15 @@ export default function PlaylistPage() {
   /* ── 상세 상태 ── */
   const [detail, setDetail] = useState(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  /* 이 플레이리스트의 커뮤니티 게시글 ID (공개 상태일 때) */
+  const [sharedPostId, setSharedPostId] = useState(null);
+  const [isTogglingPublic, setIsTogglingPublic] = useState(false);
 
   /* ── 폼 모달 상태 ── */
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
-  const [formIsPublic, setFormIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* ── 영화 추가 모달 상태 ── */
@@ -57,12 +61,6 @@ export default function PlaylistPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimerRef = useRef(null);
-
-  /* ── 커뮤니티 공유 모달 상태 ── */
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareTitle, setShareTitle] = useState('');
-  const [shareContent, setShareContent] = useState('');
-  const [isSharing, setIsSharing] = useState(false);
 
   /**
    * 목록 로드.
@@ -88,6 +86,7 @@ export default function PlaylistPage() {
     try {
       const data = await getPlaylistDetail(playlistId);
       setDetail(data);
+      setSharedPostId(null);
     } catch {
       showAlert({ title: '오류', message: '플레이리스트를 불러올 수 없습니다.', type: 'error' });
       navigate(ROUTES.PLAYLIST, { replace: true });
@@ -106,6 +105,83 @@ export default function PlaylistPage() {
     }
   }, [detailId, loadPlaylists, loadDetail]);
 
+  /**
+   * 공개/비공개 토글.
+   * - 공개로 전환: updatePlaylist(DB isPublic=true) 성공 후 커뮤니티 자동 게시
+   * - 비공개로 전환: updatePlaylist(DB isPublic=false) 성공 후 커뮤니티 게시글 삭제
+   *
+   * 실패 분리 원칙:
+   * - updatePlaylist 실패 → DB 변경 없음이므로 UI도 롤백
+   * - sharePlaylist 실패  → DB는 이미 isPublic=true이므로 UI 상태는 유지,
+   *                         커뮤니티 게시 실패 안내만 표시 (불일치 방지)
+   */
+  const handleTogglePublic = async () => {
+    if (!detail || isTogglingPublic) return;
+    const newIsPublic = !detail.isPublic;
+    setIsTogglingPublic(true);
+
+    /* ── 1단계: DB isPublic 변경 ── */
+    try {
+      await updatePlaylist(detail.playlistId, {
+        title: detail.playlistName,
+        description: detail.description || '',
+        isPublic: newIsPublic,
+      });
+    } catch (err) {
+      /* updatePlaylist 실패: DB 미변경 → UI 롤백 */
+      showAlert({
+        title: '오류',
+        message: err?.message || '공개 설정 변경에 실패했습니다.',
+        type: 'error',
+      });
+      setIsTogglingPublic(false);
+      return;
+    }
+
+    /* DB 반영 성공 → UI를 즉시 동기화 */
+    setDetail((prev) => ({ ...prev, isPublic: newIsPublic }));
+
+    /* ── 2단계: 커뮤니티 게시/삭제 (sharePlaylist 실패는 UI 롤백 없음) ── */
+    if (newIsPublic) {
+      /* 공개 → 커뮤니티 자동 게시 */
+      try {
+        const post = await sharePlaylist({
+          title: detail.playlistName,
+          content: `${detail.playlistName} 플레이리스트를 공유합니다.`,
+          playlistId: detail.playlistId,
+        });
+        setSharedPostId(post?.id ?? null);
+        showAlert({
+          title: '공개 완료',
+          message: '커뮤니티 플레이리스트 공유에 게시됐어요!',
+          type: 'success',
+        });
+      } catch {
+        /*
+         * sharePlaylist 실패: DB는 이미 isPublic=true로 저장됨.
+         * UI 상태를 롤백하면 DB↔UI 불일치가 발생하므로 롤백하지 않는다.
+         * 사용자에게 커뮤니티 게시만 실패했음을 안내한다.
+         */
+        showAlert({
+          title: '알림',
+          message: '플레이리스트는 공개 전환됐지만, 커뮤니티 게시에 실패했어요. 잠시 후 다시 시도해 주세요.',
+          type: 'warning',
+        });
+      }
+    } else {
+      /* 비공개 → playlistId로 공유 게시글 삭제 (postId 소실 여부 무관) */
+      try {
+        await deletePlaylistPost(detail.playlistId);
+      } catch {
+        /* 이미 삭제됐거나 게시글이 없는 경우 무시 */
+      }
+      setSharedPostId(null);
+      showAlert({ title: '비공개 전환', message: '비공개로 변경됐어요.', type: 'info' });
+    }
+
+    setIsTogglingPublic(false);
+  };
+
   /* ── 생성/수정 폼 핸들러 ── */
 
   /** 생성 폼 열기 */
@@ -113,7 +189,6 @@ export default function PlaylistPage() {
     setEditTarget(null);
     setFormTitle('');
     setFormDesc('');
-    setFormIsPublic(false);
     setShowForm(true);
   };
 
@@ -123,19 +198,23 @@ export default function PlaylistPage() {
     setEditTarget(playlist);
     setFormTitle(playlist.playlistName || '');
     setFormDesc(playlist.description || '');
-    setFormIsPublic(playlist.isPublic ?? false);
     setShowForm(true);
   };
 
-  /** 폼 제출 */
+  /** 폼 제출 — isPublic은 기존 값 유지 (토글로만 변경) */
   const handleFormSubmit = async () => {
     if (!formTitle.trim()) return;
     setIsSubmitting(true);
     try {
       if (editTarget) {
-        await updatePlaylist(editTarget.playlistId, { title: formTitle.trim(), description: formDesc.trim(), isPublic: formIsPublic });
+        await updatePlaylist(editTarget.playlistId, {
+          title: formTitle.trim(),
+          description: formDesc.trim(),
+          isPublic: editTarget.isPublic ?? false,
+        });
       } else {
-        await createPlaylist({ title: formTitle.trim(), description: formDesc.trim(), isPublic: formIsPublic });
+        /* 생성 시 기본값: 비공개 */
+        await createPlaylist({ title: formTitle.trim(), description: formDesc.trim(), isPublic: false });
       }
       setShowForm(false);
       loadPlaylists();
@@ -178,7 +257,6 @@ export default function PlaylistPage() {
 
     try {
       await removeMovieFromPlaylist(detail.playlistId, movieId);
-      /* 로컬 상태에서 즉시 제거 */
       setDetail((prev) => ({
         ...prev,
         items: (prev.items || []).filter((m) => m.movieId !== movieId),
@@ -197,8 +275,8 @@ export default function PlaylistPage() {
     searchTimerRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await searchMovies({ query: q.trim(), size: 12 });
-        setSearchResults(res.movies || []);
+        const res = await searchMoviesByKeyword(q.trim(), 12);
+        setSearchResults(res || []);
       } catch {
         setSearchResults([]);
       } finally {
@@ -230,42 +308,6 @@ export default function PlaylistPage() {
     }
   };
 
-  /** 커뮤니티 공유 모달 열기 */
-  const openShareModal = () => {
-    if (!detail) return;
-    if (!detail.isPublic) {
-      showAlert({
-        title: '공개 설정 필요',
-        message: '비공개 플레이리스트는 공유할 수 없어요.\n플레이리스트를 공개로 설정한 후 공유해 주세요.',
-        type: 'info',
-      });
-      return;
-    }
-    setShareTitle(detail.playlistName || '');
-    setShareContent('');
-    setShowShareModal(true);
-  };
-
-  /** 커뮤니티 공유 제출 */
-  const handleShareSubmit = async () => {
-    if (!shareTitle.trim() || !detail) return;
-    setIsSharing(true);
-    try {
-      await sharePlaylist({
-        title: shareTitle.trim(),
-        content: shareContent.trim(),
-        playlistId: detail.playlistId,
-      });
-      setShowShareModal(false);
-      showAlert({ title: '공유 완료', message: '커뮤니티에 플레이리스트가 공유됐어요!', type: 'success' });
-    } catch (err) {
-      const msg = err?.response?.data?.error?.message || err.message || '공유에 실패했습니다.';
-      showAlert({ title: '오류', message: msg, type: 'error' });
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
   /* ── 상세 뷰 ── */
   if (detailId) {
     return (
@@ -290,7 +332,22 @@ export default function PlaylistPage() {
                   <S.CardDesc style={{ marginTop: 4 }}>{detail.description}</S.CardDesc>
                 )}
               </div>
-              <S.CardMeta>{(detail.items || []).length}편</S.CardMeta>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <S.CardMeta>{(detail.items || []).length}편</S.CardMeta>
+                {/* 공개/비공개 토글 */}
+                <S.ToggleRow style={{ margin: 0 }}>
+                  <S.ToggleLabel style={{ fontSize: 13 }}>
+                    {detail.isPublic ? '🌐 공개' : '🔒 비공개'}
+                  </S.ToggleLabel>
+                  <S.ToggleSwitch
+                    $on={detail.isPublic}
+                    onClick={handleTogglePublic}
+                    disabled={isTogglingPublic}
+                    type="button"
+                    title={detail.isPublic ? '비공개로 전환' : '공개로 전환'}
+                  />
+                </S.ToggleRow>
+              </div>
             </S.Header>
 
             {(detail.items || []).length > 0 ? (
@@ -320,8 +377,7 @@ export default function PlaylistPage() {
                     );
                   })}
                 </S.MovieList>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
-                  <S.SmallBtn onClick={openShareModal}>공유하기</S.SmallBtn>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
                   <S.CreateBtn onClick={() => setShowAddMovie(true)}>+ 영화 추가</S.CreateBtn>
                 </div>
               </>
@@ -331,8 +387,7 @@ export default function PlaylistPage() {
                 <S.EmptyText>
                   이 플레이리스트에 아직 영화가 없어요.
                 </S.EmptyText>
-                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                  <S.SmallBtn onClick={openShareModal}>공유하기</S.SmallBtn>
+                <div style={{ marginTop: 16 }}>
                   <S.CreateBtn onClick={() => setShowAddMovie(true)}>+ 영화 추가</S.CreateBtn>
                 </div>
               </S.EmptyState>
@@ -394,38 +449,6 @@ export default function PlaylistPage() {
           </S.FormOverlay>,
           document.body
         )}
-
-        {/* 커뮤니티 공유 모달 */}
-        {showShareModal && createPortal(
-          <S.FormOverlay onClick={() => setShowShareModal(false)}>
-            <S.FormPanel onClick={(e) => e.stopPropagation()}>
-              <S.FormTitle>커뮤니티에 공유</S.FormTitle>
-              <S.FormInput
-                placeholder="게시글 제목을 입력하세요"
-                value={shareTitle}
-                onChange={(e) => setShareTitle(e.target.value)}
-                maxLength={100}
-                autoFocus
-              />
-              <S.FormTextarea
-                placeholder="이 플레이리스트에 대해 한마디 남겨보세요 (필수)"
-                value={shareContent}
-                onChange={(e) => setShareContent(e.target.value)}
-                maxLength={500}
-              />
-              <S.FormButtons>
-                <S.FormBtn $variant="cancel" onClick={() => setShowShareModal(false)}>취소</S.FormBtn>
-                <S.FormBtn
-                  disabled={!shareTitle.trim() || !shareContent.trim() || isSharing}
-                  onClick={handleShareSubmit}
-                >
-                  {isSharing ? '공유 중...' : '공유하기'}
-                </S.FormBtn>
-              </S.FormButtons>
-            </S.FormPanel>
-          </S.FormOverlay>,
-          document.body
-        )}
       </S.Container>
     );
   }
@@ -454,6 +477,9 @@ export default function PlaylistPage() {
               {pl.description && <S.CardDesc>{pl.description}</S.CardDesc>}
               <S.CardMeta>
                 <span>{pl.movieCount ?? 0}편</span>
+                <span style={{ fontSize: 12, opacity: 0.6 }}>
+                  {pl.isPublic ? '🌐 공개' : '🔒 비공개'}
+                </span>
                 <S.CardActions>
                   <S.SmallBtn onClick={(e) => openEditForm(pl, e)}>수정</S.SmallBtn>
                   <S.SmallBtn className="danger" onClick={(e) => handleDelete(pl, e)}>삭제</S.SmallBtn>
@@ -494,16 +520,6 @@ export default function PlaylistPage() {
               onChange={(e) => setFormDesc(e.target.value)}
               maxLength={200}
             />
-            <S.ToggleRow>
-              <S.ToggleLabel>
-                {formIsPublic ? '🌐 공개 — 다른 사람들이 볼 수 있어요' : '🔒 비공개 — 나만 볼 수 있어요'}
-              </S.ToggleLabel>
-              <S.ToggleSwitch
-                $on={formIsPublic}
-                onClick={() => setFormIsPublic((v) => !v)}
-                type="button"
-              />
-            </S.ToggleRow>
             <S.FormButtons>
               <S.FormBtn $variant="cancel" onClick={() => setShowForm(false)}>
                 취소

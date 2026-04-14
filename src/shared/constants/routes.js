@@ -67,8 +67,12 @@ export const ROUTES = {
   PLAYLIST_DETAIL: '/playlist/:id',
   /** 커뮤니티 공유 플레이리스트 상세 (읽기 전용) — 동적 파라미터 :playlistId */
   SHARED_PLAYLIST_DETAIL: '/community/playlist/:playlistId',
-  /** 업적/도장깨기 페이지 — 사용자 업적 및 도장깨기 진행 */
+  /** 업적 페이지 — 사용자 업적 진행 */
   ACHIEVEMENT: '/achievement',
+  /** 도장깨기 페이지 — 영화 코스 시청 미션 (RoadmapPage 재사용) */
+  STAMP: '/stamp',
+  /** 도장깨기 코스 상세 — 동적 파라미터 :id */
+  STAMP_DETAIL: '/stamp/:id',
   /** 퀴즈 페이지 — 오늘의 영화 퀴즈 (비로그인 열람 가능, 제출은 로그인 필수) */
   QUIZ: '/quiz',
   /** 월드컵 페이지 — 영화 이상형 월드컵 */
@@ -144,8 +148,8 @@ export const NAV_ITEMS = [
     children: [
       { path: ROUTES.RECOMMENDATIONS, label: '추천 내역' }, // /recommendations
       { path: ROUTES.PLAYLIST, label: '플레이리스트' },     // /playlist
-      { path: ROUTES.ROADMAP, label: '영화 로드맵' },       // /roadmap
-      { path: ROUTES.ACHIEVEMENT, label: '업적·도장깨기' }, // /achievement
+      { path: ROUTES.ACHIEVEMENT, label: '업적' },          // /achievement
+      { path: ROUTES.STAMP, label: '도장깨기' },            // /stamp
       { path: ROUTES.WORLDCUP, label: '영화 월드컵' },      // /worldcup (이상형 월드컵)
     ],
   },

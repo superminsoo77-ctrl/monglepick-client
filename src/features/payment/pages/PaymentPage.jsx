@@ -10,8 +10,8 @@
  *
  * Toss Payments SDK v2 연동 흐름:
  *   1) createOrder → orderId + amount + clientKey 반환
- *   2) loadTossPayments(clientKey) → widgets 초기화
- *   3) widgets.setAmount → widgets.requestPayment (successUrl/failUrl 리다이렉트)
+ *   2) loadTossPayments(clientKey) → payment 객체 초기화
+ *   3) payment.requestPayment (method + amount + successUrl/failUrl 리다이렉트)
  *   4) PaymentSuccessPage에서 confirmPayment (paymentKey + orderId + amount)
  *
  * 비인증 사용자는 PrivateRoute에 의해 로그인 페이지로 리다이렉트된다.
@@ -228,8 +228,8 @@ export default function PaymentPage() {
    * Toss Payments SDK v2를 초기화하고 결제를 요청하는 공통 함수.
    *
    * 1) Backend createOrder로 orderId 생성
-   * 2) loadTossPayments → widgets 초기화
-   * 3) widgets.setAmount → widgets.requestPayment (redirect 방식)
+   * 2) loadTossPayments → payment 객체 초기화
+   * 3) payment.requestPayment (redirect 방식 — 결제수단 선택 포함)
    * 4) 결제 완료 시 successUrl로 리다이렉트 → PaymentSuccessPage에서 승인 처리
    *
    * @param {Object} orderData - createOrder에 전달할 주문 데이터
@@ -248,13 +248,12 @@ export default function PaymentPage() {
 
     /* 2. Toss SDK v2 초기화 — customerKey는 user.id 사용 (회원 결제) */
     const tossPayments = await loadTossPayments(clientKey);
-    const widgets = tossPayments.widgets({ customerKey: user.id });
+    const payment = tossPayments.payment({ customerKey: user.id });
 
-    /* 3. 결제 금액 설정 */
-    await widgets.setAmount({ currency: 'KRW', value: amount });
-
-    /* 4. 결제 요청 (redirect 방식 — PC/모바일 모두 지원) */
-    await widgets.requestPayment({
+    /* 3. 결제 요청 (redirect 방식 — Toss 페이지에서 결제수단 선택 포함) */
+    await payment.requestPayment({
+      method: '카드',
+      amount: { currency: 'KRW', value: amount },
       orderId,
       orderName,
       successUrl: SUCCESS_URL,

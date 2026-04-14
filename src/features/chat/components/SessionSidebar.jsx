@@ -53,6 +53,8 @@ export default function SessionSidebar({
   isLoading,
   hasMore,
   onLoadMore,
+  loadError,
+  onRetry,
 }) {
   return (
     <S.SidebarOverlay $isOpen={isOpen} onClick={onClose}>
@@ -73,7 +75,22 @@ export default function SessionSidebar({
 
         {/* 세션 목록 */}
         <S.SessionList>
-          {sessions.length === 0 && !isLoading && (
+          {/* [FIX] 로드 에러 시 에러 메시지 + 재시도 버튼 표시.
+              기존에는 에러가 console.error만 남기고 빈 목록을 보여줘서
+              사용자가 "이력이 없는 것"으로 오인했음. */}
+          {loadError && (
+            <S.EmptyState>
+              <S.EmptyIcon>&#x26A0;</S.EmptyIcon>
+              <S.EmptyText>{loadError}</S.EmptyText>
+              {onRetry && (
+                <S.LoadMoreBtn onClick={onRetry} style={{ marginTop: 12, width: 'auto' }}>
+                  다시 시도
+                </S.LoadMoreBtn>
+              )}
+            </S.EmptyState>
+          )}
+
+          {!loadError && sessions.length === 0 && !isLoading && (
             <S.EmptyState>
               <S.EmptyIcon>&#x1F4AC;</S.EmptyIcon>
               <S.EmptyText>

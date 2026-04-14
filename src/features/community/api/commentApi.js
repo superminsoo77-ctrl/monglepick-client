@@ -19,16 +19,42 @@ import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
 const commentsBase = (postId) => `/api/v1/posts/${postId}/comments`;
 
 /**
+ * 백엔드 댓글 응답을 프론트 표시 형식으로 정규화한다.
+ *
+ * 백엔드가 평면 필드(authorNickname, userNickname 등)로 반환하는 경우에도
+ * nickname 으로 일관되게 접근할 수 있도록 보장한다.
+ *
+ * @param {Object} c - 원본 댓글 응답 객체
+ * @returns {Object} nickname 필드가 보장된 정규화된 댓글 객체
+ */
+function normalizeComment(c) {
+  if (!c) return c;
+  return {
+    ...c,
+    nickname:
+      c.nickname ||
+      c.authorNickname ||
+      c.userNickname ||
+      c.author?.nickname ||
+      null,
+  };
+}
+
+/**
  * 특정 게시글의 댓글 목록을 페이징으로 조회한다 (비로그인 허용).
  *
  * @param {number|string} postId - 게시글 ID
  * @param {Object} [params={}] - 조회 파라미터
  * @param {number} [params.page=0] - Spring Page 규격 페이지 번호 (0-indexed)
  * @param {number} [params.size=20] - 페이지 크기
- * @returns {Promise<Object>} Spring Page 응답
+ * @returns {Promise<Object>} Spring Page 응답 (content 배열은 normalizeComment 적용)
  */
 export async function getComments(postId, { page = 0, size = 20 } = {}) {
-  return api.get(commentsBase(postId), { params: { page, size } });
+  const data = await api.get(commentsBase(postId), { params: { page, size } });
+  return {
+    ...data,
+    content: (data?.content ?? []).map(normalizeComment),
+  };
 }
 
 /**
@@ -42,7 +68,8 @@ export async function getComments(postId, { page = 0, size = 20 } = {}) {
  */
 export async function createComment(postId, { content, parentCommentId = null }) {
   requireAuth();
-  return api.post(commentsBase(postId), { content, parentCommentId });
+  const data = await api.post(commentsBase(postId), { content, parentCommentId });
+  return normalizeComment(data);
 }
 
 /**

@@ -72,7 +72,7 @@ import RecommendationPage from '../features/recommendation/pages/RecommendationP
 /* 플레이리스트 페이지 — features/playlist에서 가져옴 */
 import PlaylistPage from '../features/playlist/pages/PlaylistPage';
 import SharedPlaylistDetailPage from '../features/community/pages/SharedPlaylistDetailPage';
-/* 업적/도장깨기 페이지 — features/achievement에서 가져옴 */
+/* 업적 페이지 — features/achievement에서 가져옴 */
 import AchievementPage from '../features/achievement/pages/AchievementPage';
 /*
  * 영화 퀴즈 페이지 — v2 개편(2026-04-08)으로 CommunityPage 의 "오늘의 퀴즈" 탭으로 이관됨.
@@ -327,13 +327,37 @@ function App() {
           }
         />
 
-        {/* 업적/도장깨기 (인증 필수) */}
+        {/* 업적 (인증 필수) */}
         <Route
           path="/achievement"
           element={
             <PrivateRoute>
               <MainLayout>
                 <AchievementPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* 도장깨기 목록 (인증 필수) */}
+        <Route
+          path="/stamp"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <RoadmapPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        {/* 도장깨기 코스 상세 (인증 필수) */}
+        <Route
+          path="/stamp/:id"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <RoadmapPage />
               </MainLayout>
             </PrivateRoute>
           }
