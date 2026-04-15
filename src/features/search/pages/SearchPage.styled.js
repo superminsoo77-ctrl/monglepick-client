@@ -999,17 +999,6 @@ export const ResultCount = styled.p`
   }
 `;
 
-export const ResultMeta = styled.span`
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: ${({ theme }) => theme.radius.full};
-  background: ${({ theme }) => theme.colors.bgSecondary};
-  color: ${({ theme }) => theme.colors.textSecondary};
-  font-size: ${({ theme }) => theme.typography.textXs};
-  font-weight: ${({ theme }) => theme.typography.fontMedium};
-`;
-
 export const SearchSuggestionBanner = styled.div`
   display: flex;
   flex-direction: column;

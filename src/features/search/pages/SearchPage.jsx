@@ -1608,11 +1608,6 @@ export default function SearchPage() {
             <>
               <S.ResultCount>
                 검색 결과 <strong>{totalCount}</strong>건
-                {searchSource && (
-                  <S.ResultMeta>
-                    {searchSource === 'elasticsearch' ? 'Elasticsearch' : 'MySQL'}
-                  </S.ResultMeta>
-                )}
               </S.ResultCount>
 
               {(searchDidYouMean || relatedQueries.length > 0) && (
