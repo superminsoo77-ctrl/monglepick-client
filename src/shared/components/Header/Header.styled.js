@@ -129,17 +129,44 @@ export const Nav = styled.nav`
     top: ${({ theme }) => theme.layout.headerHeight};
     left: 0;
     right: 0;
-    bottom: 0;
+    /*
+     * 높이는 'top: headerHeight + height: (viewport - headerHeight)' 로 명시한다.
+     *
+     * 기존 'bottom: 0' 방식이 짤림의 근본 원인이었다:
+     *   - 모바일 브라우저(iOS Safari, Chrome Android) 의 address bar 는 동적으로
+     *     보였다/숨겨졌다 하며 이로 인해 visual viewport 가 매 프레임 변동된다.
+     *   - 'bottom: 0' 은 layout viewport 기준이라, address bar 가 표시된 상태에서는
+     *     실제로 보이는 영역보다 메뉴가 더 길어져 하단이 잘려 보였다.
+     *
+     * 해결:
+     *   1) 100dvh (dynamic viewport height) 를 사용해 address bar 변화에 동적으로 대응.
+     *      → dvh 미지원 브라우저는 100vh 로 폴백.
+     *   2) safe-area-inset-bottom 만큼 padding-bottom 을 추가해 홈 인디케이터/제스처 바를
+     *      회피 (index.html 의 viewport-fit=cover 와 함께 동작).
+     *   3) -webkit-overflow-scrolling: touch + overscroll-behavior: contain 으로
+     *      iOS 모멘텀 스크롤 활성 + 부모 body 로 스크롤 체이닝 차단.
+     */
+    height: calc(100vh - ${({ theme }) => theme.layout.headerHeight});
+    height: calc(100dvh - ${({ theme }) => theme.layout.headerHeight});
     /* 모바일 메뉴가 페이지 콘텐츠 위에 오도록 z-index 설정 */
     z-index: ${({ theme }) => theme.zIndex.modal};
     flex-direction: column;
     padding: ${({ theme }) => theme.spacing.lg};
+    /* 홈 인디케이터/노치 영역 회피 — viewport-fit=cover 필요 */
+    padding-bottom: calc(${({ theme }) => theme.spacing.lg} + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(${({ theme }) => theme.spacing.lg} + env(safe-area-inset-left, 0px));
+    padding-right: calc(${({ theme }) => theme.spacing.lg} + env(safe-area-inset-right, 0px));
     background-color: ${({ theme }) => theme.header.mobileBg};
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
     gap: ${({ theme }) => theme.spacing.sm};
     overflow-y: auto;
+    overflow-x: hidden;
+    /* iOS 모멘텀 스크롤 — 햄버거 메뉴가 길어졌을 때 부드러운 터치 스크롤 보장 */
+    -webkit-overflow-scrolling: touch;
+    /* 부모 body 로 스크롤 체이닝 방지 — 메뉴 끝에서 페이지가 밀리는 현상 차단 */
+    overscroll-behavior: contain;
   }
 `;
 
@@ -585,6 +612,21 @@ export const MobileOnly = styled.div`
 
   ${media.tablet} {
     display: block;
+  }
+`;
+
+/**
+ * 데스크톱에서만 표시 (모바일에서 숨김).
+ *
+ * 헤더의 데스크톱용 ThemeToggle 처럼, 모바일에서는 햄버거 메뉴 안의
+ * MobileOnly 영역에서 다시 렌더되므로 데스크톱 인스턴스를 숨겨야 한다.
+ * 누락되어 모바일에서 테마 토글 버튼이 헤더 + 메뉴 안 두 번 노출되던 버그 수정.
+ */
+export const DesktopOnly = styled.div`
+  display: contents;
+
+  ${media.tablet} {
+    display: none;
   }
 `;
 

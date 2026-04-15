@@ -24,6 +24,8 @@ import { useChat } from '../hooks/useChat';
 /* 채팅 이력 관리 훅 — 사이드바 세션 목록 */
 import { useSessionHistory } from '../hooks/useSessionHistory';
 import MovieCard from './MovieCard';
+/* 후속 질문 + AI 생성 제안 카드 (Claude Code 스타일, 2026-04-15 신설) */
+import ClarificationOptions from './ClarificationOptions';
 /* 몽글이 캐릭터 애니메이션 컴포넌트 */
 import MonggleCharacter from '../../../shared/components/MonggleCharacter/MonggleCharacter';
 /* 채팅 이력 사이드바 */
@@ -448,25 +450,47 @@ export default function ChatWindow() {
         </S.HeaderClearBtn>
       </S.ChatHeader>
 
-      {/* ── 포인트 정보 바 (포인트 차감 결과 수신 시 표시) ── */}
+      {/* ── 포인트/쿼터 정보 바 (추천 완료 후 point_update 수신 시 표시) ──
+           2026-04-15 확장: source(GRADE_FREE/SUB_BONUS/PURCHASED/BLOCKED)별로
+           "오늘 N/M회" · 구독 보너스 잔여 · 이용권 잔여를 동시에 노출.
+           balance === -1 은 "미조회 상태" 약속값이라 그대로 표시하지 않는다. */}
       {pointInfo && (
         <S.ChatPointBar>
-          <S.PointBalance>
-            {/* 보석 이모지 + 잔액 표시 */}
-            <S.PointIcon>&#x1F48E;</S.PointIcon>
-            {pointInfo.balance.toLocaleString()}P
-          </S.PointBalance>
-          <S.PointDivider>|</S.PointDivider>
+          {/* 1) 잔액 — -1(미조회) 은 숨기고 0 이상만 노출 */}
+          {typeof pointInfo.balance === 'number' && pointInfo.balance >= 0 && (
+            <>
+              <S.PointBalance>
+                <S.PointIcon>&#x1F48E;</S.PointIcon>
+                {pointInfo.balance.toLocaleString()}P
+              </S.PointBalance>
+              <S.PointDivider>|</S.PointDivider>
+            </>
+          )}
+
+          {/* 2) 소스별 사용 현황 */}
           <S.PointUsage>
-            {/* 차감된 포인트가 0이 아닌 경우에만 사용량 표시 */}
-            {pointInfo.deducted > 0
-              ? `오늘 ${pointInfo.deducted.toLocaleString()}P 사용`
-              : '오늘 사용 없음'
-            }
+            {pointInfo.source === 'GRADE_FREE' && pointInfo.dailyLimit != null
+              ? (pointInfo.dailyLimit === -1
+                  ? `오늘 ${pointInfo.dailyUsed ?? 0}회 사용 (무제한)`
+                  : `오늘 무료 ${pointInfo.dailyUsed ?? 0}/${pointInfo.dailyLimit}회`)
+              : pointInfo.source === 'SUB_BONUS'
+                ? `구독 보너스 잔여 ${pointInfo.subBonusRemaining}회`
+                : pointInfo.source === 'PURCHASED'
+                  ? `이용권 잔여 ${pointInfo.purchasedRemaining}회`
+                  : pointInfo.deducted > 0
+                    ? `오늘 ${pointInfo.deducted.toLocaleString()}P 사용`
+                    : '오늘 사용 없음'}
           </S.PointUsage>
-          {/* 무료 이용 배지 (free_usage=true일 때 표시) */}
-          {pointInfo.freeUsage && (
+
+          {/* 3) 소스 배지 */}
+          {pointInfo.source === 'GRADE_FREE' && (
             <S.FreeBadge>무료 이용</S.FreeBadge>
+          )}
+          {pointInfo.source === 'SUB_BONUS' && (
+            <S.FreeBadge>구독 보너스</S.FreeBadge>
+          )}
+          {pointInfo.source === 'PURCHASED' && (
+            <S.FreeBadge>이용권</S.FreeBadge>
           )}
         </S.ChatPointBar>
       )}
@@ -479,16 +503,30 @@ export default function ChatWindow() {
             &#x2715;
           </S.QuotaErrorClose>
 
-          {/* INSUFFICIENT_POINT: 포인트 부족 */}
+          {/* INSUFFICIENT_POINT: 포인트 부족 OR 포인트 서비스 일시 오류
+              2026-04-15: balance === -1 은 Agent 의 "Backend 포인트 서비스 연결 실패"
+              폴백 약속값. 이전에는 "잔액 -1P / 필요 0P" 처럼 노출되어 사용자에게 오해를
+              주었으므로, -1 감지 시 "포인트 시스템 일시 오류" 로 분기한다. */}
           {quotaError.error_code === 'INSUFFICIENT_POINT' && (
             <S.QuotaErrorContent>
-              <S.QuotaErrorTitle>포인트가 부족합니다</S.QuotaErrorTitle>
-              <S.QuotaErrorDesc>
-                현재 잔액: {quotaError.balance?.toLocaleString() ?? 0}P / 필요: {quotaError.cost?.toLocaleString() ?? 0}P
-              </S.QuotaErrorDesc>
-              <S.QuotaErrorLink href="/point">
-                포인트 충전하기 &rarr;
-              </S.QuotaErrorLink>
+              {quotaError.balance === -1 ? (
+                <>
+                  <S.QuotaErrorTitle>포인트 서비스 일시 오류</S.QuotaErrorTitle>
+                  <S.QuotaErrorDesc>
+                    잠시 후 다시 시도해주세요. 문제가 지속되면 고객센터로 문의해주세요.
+                  </S.QuotaErrorDesc>
+                </>
+              ) : (
+                <>
+                  <S.QuotaErrorTitle>포인트가 부족합니다</S.QuotaErrorTitle>
+                  <S.QuotaErrorDesc>
+                    현재 잔액: {quotaError.balance?.toLocaleString() ?? 0}P / 필요: {quotaError.cost?.toLocaleString() ?? 0}P
+                  </S.QuotaErrorDesc>
+                  <S.QuotaErrorLink href="/point">
+                    포인트 충전하기 &rarr;
+                  </S.QuotaErrorLink>
+                </>
+              )}
             </S.QuotaErrorContent>
           )}
 
@@ -659,53 +697,19 @@ export default function ChatWindow() {
           </S.ChatMsg>
         )}
 
-        {/* 후속 질문 힌트 칩 (clarification 이벤트 수신 시, 로딩 중에는 숨김) */}
+        {/*
+          후속 질문 + AI 생성 제안 카드 (clarification 이벤트 수신 시, 로딩 중에는 숨김).
+          2026-04-15: Claude Code 스타일 제안 카드 UI 를 별도 컴포넌트(ClarificationOptions)
+          로 분리. payload 는 {question, hints, primary_field, suggestions, allow_custom}.
+          카드/칩 클릭 시 해당 value 를 sendMessage 로 전송하고, sendMessage 내부에서
+          setClarification(null) 이 호출되므로 UI 는 자동으로 사라진다.
+        */}
         {!isLoading && clarification && (
-          <S.ChatMsg>
-            {/*
-              clarification 아바타: waving (추가 정보를 요청하며 손 흔들기).
-              isLoading이 false일 때만 렌더링하므로 항상 waving 고정.
-            */}
-            <S.MonggleAvatarWrapper>
-              <MonggleCharacter animation="waving" size="sm" />
-            </S.MonggleAvatarWrapper>
-
-            {/*
-              ClarificationWrapper: question + 칩 목록을 세로로 배치하는 외부 래퍼.
-              fadeIn 애니메이션이 적용되어 부드럽게 등장한다.
-            */}
-            <S.ClarificationWrapper>
-              {/* 후속 질문 텍스트 — clarification.question이 있을 때만 표시 */}
-              {clarification.question && (
-                <S.ClarificationQuestion>{clarification.question}</S.ClarificationQuestion>
-              )}
-
-              {/*
-                힌트 칩 목록.
-                SSE clarification 이벤트의 hints는 단순 string[] 배열이다.
-                각 칩 클릭 시 해당 힌트 텍스트를 그대로 sendMessage에 전달하고
-                clarification 상태를 초기화한다 (sendMessage 내부에서 setClarification(null) 호출됨).
-              */}
-              {Array.isArray(clarification.hints) && clarification.hints.length > 0 && (
-                <S.ClarificationChips>
-                  {clarification.hints.map((hint) => (
-                    <S.ClarificationChip
-                      key={hint}
-                      onClick={() => {
-                        // 힌트 칩 클릭: 해당 힌트 텍스트를 메시지로 전송.
-                        // sendMessage 내부에서 setClarification(null)을 호출하므로
-                        // 칩 UI는 자동으로 사라진다.
-                        sendMessage(hint);
-                      }}
-                      disabled={isLoading}
-                    >
-                      {hint}
-                    </S.ClarificationChip>
-                  ))}
-                </S.ClarificationChips>
-              )}
-            </S.ClarificationWrapper>
-          </S.ChatMsg>
+          <ClarificationOptions
+            clarification={clarification}
+            onSelect={(value) => sendMessage(value)}
+            disabled={isLoading}
+          />
         )}
 
         {/* 에러 메시지 */}

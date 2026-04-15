@@ -186,7 +186,9 @@ export default function RecommendationPage() {
           <S.CardList>
             {recommendations.map((rec) => (
               <RecommendationCard
-                key={rec.id}
+                // 2026-04-15: Backend `RecommendationHistoryResponse` 는 `recommendationLogId` 로 내려오므로
+                // `rec.id` 는 undefined 였음 → React key 중복 + 자식 컴포넌트의 피드백/토글 API 에 undefined FK 전달.
+                key={rec.recommendationLogId}
                 recommendation={rec}
                 onToggleWishlist={handleToggleWishlist}
                 onToggleWatched={handleToggleWatched}

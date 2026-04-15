@@ -31,6 +31,17 @@ const dotBounce = keyframes`
   40%           { transform: scale(1); }
 `;
 
+/**
+ * FAB 어텐션 펄스 — 2026-04-15.
+ * primary 컬러로 잔잔히 퍼지는 그림자 링을 만들어 사용자 주의를 끈다.
+ * 너무 빠르거나 강하면 산만하므로 2.4s 무한 반복, opacity 만 변동.
+ */
+const fabPulse = keyframes`
+  0%   { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 0 rgba(99, 102, 241, 0.55); }
+  70%  { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 14px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 0 rgba(99, 102, 241, 0); }
+`;
+
 /* ══════════════════════════════════════════
    래퍼 — 고정 위치
    ══════════════════════════════════════════ */
@@ -42,8 +53,13 @@ const dotBounce = keyframes`
  */
 export const Root = styled.div`
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  /*
+   * iOS 노치/홈 인디케이터 영역 회피.
+   * env(safe-area-inset-*) 는 viewport-fit=cover (index.html) 가 있어야 동작.
+   * iPhone X+ 에서 home indicator 영역(약 34px)에 FAB 가 가려지던 문제를 해결.
+   */
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   z-index: 900;
   display: flex;
   flex-direction: column;
@@ -51,8 +67,8 @@ export const Root = styled.div`
   gap: 12px;
 
   @media (max-width: 480px) {
-    right: 16px;
-    bottom: 16px;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -60,28 +76,53 @@ export const Root = styled.div`
    FAB (Floating Action Button)
    ══════════════════════════════════════════ */
 
-/** 플로팅 아이콘 버튼 — 닫힌 상태 */
+/**
+ * 플로팅 아이콘 버튼 — 닫힌 상태.
+ *
+ * 2026-04-15 가시성 강화:
+ *   - 크기 60→64 (탭하기 좋은 사이즈, FAB 표준 56~64)
+ *   - 단색 → primary 그라데이션(theme.gradients.primary) 으로 시인성 ↑
+ *   - 흰색 ring(border) 추가 — 어두운/밝은 배경 모두에서 분리감 확보
+ *   - 펄스 애니메이션(fabPulse) 으로 사용자 주의 환기 (호버 시 일시정지)
+ *   - hover 시 살짝 확대(scale 1.05) + glow 강화
+ *   - 폰트 26→28 — 말풍선 이모지 명료도 ↑
+ */
 export const Fab = styled.button`
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  border: none;
-  background: ${({ theme }) => theme.colors.primary};
+  border: 3px solid #fff;
+  background: ${({ theme }) => theme.gradients?.primary || theme.colors.primary};
   color: #fff;
-  font-size: 26px;
+  font-size: 28px;
+  line-height: 1;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 0 rgba(99, 102, 241, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: ${fabPulse} 2.4s ease-out infinite;
   transition: transform ${({ theme }) => theme.transitions.fast},
               box-shadow ${({ theme }) => theme.transitions.fast};
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    transform: translateY(-2px) scale(1.05);
+    /* hover 중에는 펄스를 멈춰 산만함 제거하고 강한 glow 로 대체 */
+    animation-play-state: paused;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28),
+                0 0 0 6px rgba(99, 102, 241, 0.25);
   }
-  &:active { transform: translateY(0); }
+  &:active { transform: translateY(0) scale(1.02); }
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28),
+                0 0 0 4px rgba(99, 102, 241, 0.55);
+  }
+
+  /* 사용자가 모션 감속을 선호하면 펄스 비활성 (접근성) */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `;
 
 /** FAB 뱃지 — 새 메시지 알림 점 (예: 최초 열기 전 상시 노출) */
@@ -104,7 +145,9 @@ export const FabBadge = styled.span`
 export const Panel = styled.div`
   width: 360px;
   height: 520px;
+  /* 100dvh — 모바일 address bar 동적 변화 대응 (vh 폴백) */
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   background: ${({ theme }) => theme.colors.bgSecondary};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.lg};
@@ -116,7 +159,14 @@ export const Panel = styled.div`
 
   @media (max-width: 480px) {
     width: calc(100vw - 32px);
-    height: calc(100vh - 120px);
+    /*
+     * 모바일에서는 패널이 거의 전체 화면을 차지.
+     * - 100dvh 로 address bar / 가상 키보드 변화에 대응 (vh 폴백 우선 선언)
+     * - 헤더(64px) + FAB(64px) + 여백(약 32px) = 120px 만큼 빼고 사용
+     * - safe-area-inset-bottom 만큼 추가로 빼서 홈 인디케이터 회피
+     */
+    height: calc(100vh - 120px - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - 120px - env(safe-area-inset-bottom, 0px));
   }
 `;
 

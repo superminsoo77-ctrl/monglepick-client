@@ -31,7 +31,9 @@ import { sendChatMessage } from '../api/chatApi';
  * @returns {string} status - 현재 처리 상태 메시지 (빈 문자열이면 대기 중)
  * @returns {boolean} isLoading - 응답 대기 중 여부
  * @returns {string|null} error - 에러 메시지
- * @returns {Object|null} clarification - 후속 질문 힌트 데이터 ({question, hints, primary_field})
+ * @returns {Object|null} clarification - 후속 질문 힌트 데이터
+ *   ({question, hints, primary_field, suggestions: [{text, value, reason, tags}], allow_custom})
+ *   - suggestions: Claude Code 스타일 AI 생성 제안 카드 (2026-04-15 추가)
  * @returns {Object|null} pointInfo - 포인트 정보 ({balance, deducted, freeUsage})
  * @returns {Object|null} quotaError - 쿼터/포인트 에러 ({error_code, message, ...상세 필드})
  * @returns {function} sendMessage - 메시지 전송 함수
@@ -55,7 +57,10 @@ export function useChat({ userId = '' } = {}) {
   const [isLoading, setIsLoading] = useState(false);
   // 에러 메시지
   const [error, setError] = useState(null);
-  // 후속 질문 힌트 데이터 ({question, hints: [{field, label, options}], primary_field})
+  // 후속 질문 힌트 데이터
+  // ({question, hints: [{field, label, options}], primary_field,
+  //   suggestions: [{text, value, reason, tags}], allow_custom})
+  // suggestions 는 Claude Code 스타일 AI 생성 제안 카드 (2026-04-15 추가).
   const [clarification, setClarification] = useState(null);
   // 포인트 차감/잔액 정보 ({balance: 잔액, deducted: 차감액, freeUsage: 무료 이용 여부})
   const [pointInfo, setPointInfo] = useState(null);
@@ -143,13 +148,21 @@ export function useChat({ userId = '' } = {}) {
             setClarification(data);
           },
 
-          // point_update 이벤트: 포인트 차감 결과 저장
-          // 서버에서 추천 완료 후 전달 ({balance, deducted, free_usage})
+          // point_update 이벤트: 포인트/쿼터 소비 결과 저장
+          // 2026-04-15 확장: check/consume 분리 이후 source 별 잔여 정보까지 전파
+          //   ({balance, deducted, source, daily_used, daily_limit,
+          //     sub_bonus_remaining, purchased_remaining, free_usage, message})
           onPointUpdate: (data) => {
             setPointInfo({
               balance: data.balance,
               deducted: data.deducted,
               freeUsage: data.free_usage || false,
+              source: data.source || 'GRADE_FREE',
+              dailyUsed: data.daily_used ?? null,
+              dailyLimit: data.daily_limit ?? null,
+              subBonusRemaining: data.sub_bonus_remaining ?? -1,
+              purchasedRemaining: data.purchased_remaining ?? 0,
+              message: data.message || '',
             });
           },
 

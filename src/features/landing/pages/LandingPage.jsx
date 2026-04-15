@@ -21,6 +21,41 @@ import {
 import IAModal from '../components/IAModal';
 import PlanningModal from '../components/PlanningModal';
 import DiagramModal from '../components/DiagramModal';
+import AgentInfoModal, { AGENT_MODAL_CONTENT } from '../components/AgentInfoModal';
+
+/* ── AI Agent 심층 카드 데이터 ──
+   각 카드는 클릭 시 AgentInfoModal 을 연다. id 는 AGENT_MODAL_CONTENT 의 키와 일치. */
+const AGENT_DEEP_CARDS = [
+  /* ── 전체 흐름을 가장 앞에 ── */
+  { id: 'e2eJourney', icon: '🛤️', title: 'End-to-End Journey', sub: '가입 → 콜드스타트 → 추천 → 결제 → 관람 → 리뷰 → 리워드 한 루프', color: '#7c6cf0' },
+  { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 16노드 · 4분기 흐름 · SSE 8 이벤트',          color: '#ef476f' },
+  { id: 'ragPipeline', icon: '🔎', title: 'RAG Pipeline',      sub: 'Qdrant+ES+Neo4j 병렬 · RRF k=60 · 4단계 완화 · MMR λ=0.7', color: '#f97316' },
+  { id: 'matchAgent', icon: '🎬', title: 'Movie Match v3',     sub: '7노드 · LLM 리랭커 + Centroid + Co-watched CF',          color: '#a78bfa' },
+  { id: 'contentAgent', icon: '🖼️', title: 'Content Analysis', sub: '포스터 분석 · 비속어 검출 · 패턴 분석',                  color: '#f97316' },
+  { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 큐레이션 + 퀴즈 자동 생성',                          color: '#ffd166' },
+  { id: 'llmStack',   icon: '🧠', title: 'Hybrid LLM Stack',   sub: 'EXAONE 32B · Qwen 35B · EXAONE 1.2B vLLM · Solar',       color: '#7c6cf0' },
+  { id: 'sseEvents',  icon: '📡', title: 'SSE Streaming',      sub: '8개 이벤트 · point_update v3.4 · clarification 카드',     color: '#118ab2' },
+  { id: 'memoryArch', icon: '🧊', title: 'Memory Architecture', sub: 'Redis 핫 캐시 + MySQL 아카이브 (write-behind)',         color: '#06d6a0' },
+  { id: 'recoScoring', icon: '⚖️', title: 'Reco Scoring',       sub: 'CF+CBF 동적 가중치 + MMR λ=0.7 + RRF k=60',              color: '#ef476f' },
+  { id: 'paymentFlow', icon: '💳', title: 'Payment & Saga',     sub: 'Toss v2 · 2-Phase · Orchestration Saga · 3회 재시도 100ms',  color: '#06d6a0' },
+  { id: 'recommendArch', icon: '🧮', title: 'Recommend Service', sub: 'FastAPI · Like Redis write-behind(60s) · Co-watched CF 5min', color: '#06d6a0' },
+  { id: 'coldStart',   icon: '❄️', title: 'Cold Start & Onboarding', sub: '리뷰 0건도 추천 · 월드컵 온보딩 · Kaggle 26M CF 캐시 보완', color: '#a78bfa' },
+  { id: 'jwtAuth',     icon: '🔑', title: 'JWT & Refresh Rotation', sub: 'Access 1h · Refresh 7d · DB 화이트리스트 · OAuth2 exchange', color: '#118ab2' },
+  { id: 'ocrTicket',   icon: '🎫', title: 'OCR 티켓 인증',    sub: '영수증 업로드 · 관리자 검토 큐 · 도장깨기 가중 · 추첨 응모',  color: '#ef476f' },
+  { id: 'aiQuiz',      icon: '❓', title: 'AI 퀴즈 생성',     sub: 'Solar 구조화 출력 → 관리자 검수 → APPROVED → PUBLISHED',      color: '#ffd166' },
+  { id: 'aiReviewVerification', icon: '🧐', title: 'AI 리뷰 검증', sub: '도장깨기 실관람 판별 · 4-Stage 임베딩+키워드+LLM (⏳ 스텁)', color: '#7c6cf0' },
+  { id: 'community',   icon: '👥', title: 'Community & Social', sub: '커뮤니티 · 리뷰 · AI 퀴즈 · 이상형 월드컵 · 소울메이트', color: '#118ab2' },
+  { id: 'rewards',     icon: '🎁', title: 'Rewards & Achievements', sub: '55개 리워드 정책 · 6등급 · 업적 · 도장깨기 · 티켓 추첨', color: '#ffd166' },
+  { id: 'gitStrategy', icon: '🌿', title: 'Git Branching',      sub: 'Git Flow · main/develop · feature PR · 조직 레포 직접',   color: '#ef476f' },
+  { id: 'cicd',        icon: '⚙️', title: 'CI / CD',            sub: 'GitHub Actions · gradle test · Vite build · deploy-prod', color: '#7c6cf0' },
+  { id: 'staging',     icon: '🏭', title: 'Staging & Production', sub: 'MacBook Air 스테이징 + 카카오 클라우드 4-VM 운영',     color: '#a78bfa' },
+  { id: 'projectMgmt', icon: '📌', title: 'Jira + Confluence',  sub: 'WBS 261건 · Jira 이슈 · Confluence 문서화 · MCP 연동',    color: '#f97316' },
+  /* ── 인프라 · 데이터 · 운영 (신규) ── */
+  { id: 'cloudInfra',  icon: '🏔️', title: 'Cloud & VM Security', sub: 'Kakao Cloud VPC · SSH 배스천 · Linux 하드닝 · TLS · 로드맵', color: '#06d6a0' },
+  { id: 'dataPipeline',icon: '🏭', title: 'Data Pipeline',     sub: '910K편 · TMDB/KOBIS/KMDb/Kaggle · Solar 임베딩 · 5DB 동기', color: '#f97316' },
+  { id: 'adminConsole',icon: '👑', title: 'Admin Console',      sub: '10탭 · 96 API · 운영 11서브탭 · 통계 12탭 · 감사 로그',   color: '#ef476f' },
+  { id: 'observability', icon: '🔭', title: 'Monitoring & Observability', sub: 'Prometheus · Grafana · ELK · Alertmanager · LangSmith', color: '#118ab2' },
+];
 
 /* ── 피처 데이터 ── */
 const FEATURES = [
@@ -130,6 +165,8 @@ export default function LandingPage() {
   const [isPlanningOpen, setIsPlanningOpen] = useState(false);
   /* 다이어그램 모달 — 열려있는 다이어그램 ID (null이면 닫힘) */
   const [openDiagram, setOpenDiagram] = useState(null);
+  /* AI Agent 심층 모달 — 열려있는 카드 ID (AGENT_MODAL_CONTENT 의 키) */
+  const [openAgentInfo, setOpenAgentInfo] = useState(null);
   const particlesRef = useRef(null);
   const featureTimerRef = useRef(null);
 
@@ -230,6 +267,7 @@ export default function LandingPage() {
         {/* 데스크톱/태블릿 — 가로 링크 (600px 이하에서 숨김) */}
         <S.NavLinks>
           <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
+          <a href="#lp-agent" onClick={e => scrollTo(e, 'lp-agent')}>AI Agent</a>
           <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
           <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
           <a href="#lp-tech" onClick={e => scrollTo(e, 'lp-tech')}>기술</a>
@@ -251,6 +289,7 @@ export default function LandingPage() {
       {/* 모바일 전체화면 메뉴 오버레이 */}
       <S.NavMobileMenu $isOpen={isMobileNavOpen}>
         <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
+        <a href="#lp-agent" onClick={e => scrollTo(e, 'lp-agent')}>AI Agent</a>
         <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
         <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
         <a href="#lp-tech" onClick={e => scrollTo(e, 'lp-tech')}>기술</a>
@@ -378,6 +417,41 @@ export default function LandingPage() {
               </S.ChatWindow>
             </S.Reveal>
           </S.ChatDemoLayout>
+        </S.Container>
+      </S.ChatDemo>
+
+      {/* ── AI Agent 심층 소개 ──
+          ChatDemo 가 "맛보기" 라면 이 섹션은 "엔진룸 투어".
+          8개 카드 클릭 시 AgentInfoModal(텍스트 중심 심층 모달) 오픈 */}
+      <S.ChatDemo id="lp-agent" style={{ paddingTop: 60, paddingBottom: 60 }}>
+        <S.Container>
+          <S.Reveal className="lp-reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
+            <S.SectionLabel>AI Agent · Deep Dive</S.SectionLabel>
+            <S.SectionTitle>
+              "오늘 우울해" 한 마디가<br />
+              <S.GradientText>추천 5편</S.GradientText>이 되기까지
+            </S.SectionTitle>
+            <S.SectionSubtitle style={{ margin: '12px auto 0' }}>
+              LangGraph 16노드, 4갈래 분기, RAG 하이브리드 검색, 4종 LLM 협업, SSE 8 이벤트 —
+              몽글픽 에이전트의 실제 동작을 카드별로 풀어드려요. 클릭하면 더 깊이 들어갑니다.
+            </S.SectionSubtitle>
+          </S.Reveal>
+
+          <S.Reveal className="lp-reveal" $delay="0.1s">
+            <S.DiagramCardGrid>
+              {AGENT_DEEP_CARDS.map((c) => (
+                <S.DiagramCard
+                  key={c.id}
+                  $color={c.color}
+                  onClick={() => setOpenAgentInfo(c.id)}
+                >
+                  <S.DiagramCardIcon $color={c.color}>{c.icon}</S.DiagramCardIcon>
+                  <S.DiagramCardTitle>{c.title}</S.DiagramCardTitle>
+                  <S.DiagramCardSub>{c.sub}</S.DiagramCardSub>
+                </S.DiagramCard>
+              ))}
+            </S.DiagramCardGrid>
+          </S.Reveal>
         </S.Container>
       </S.ChatDemo>
 
@@ -868,6 +942,13 @@ export default function LandingPage() {
           </S.FooterInner>
         </S.Container>
       </S.LpFooter>
+
+      {/* ── AI Agent 심층 정보 모달 (8종 동적 렌더) ── */}
+      <AgentInfoModal
+        isOpen={openAgentInfo !== null}
+        onClose={() => setOpenAgentInfo(null)}
+        content={openAgentInfo ? AGENT_MODAL_CONTENT[openAgentInfo] : null}
+      />
 
       {/* ── 정보구조도 모달 ── */}
       <IAModal isOpen={isIAOpen} onClose={() => setIsIAOpen(false)} />

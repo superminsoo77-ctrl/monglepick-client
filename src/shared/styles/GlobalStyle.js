@@ -198,9 +198,16 @@ const GlobalStyle = createGlobalStyle`
   }
 
   /* ── 루트/앱 레이아웃 (App.css 통합) ── */
+  /*
+   * 모바일 브라우저(iOS Safari, Chrome Android) 의 address bar 가 동적으로
+   * 보였다/숨겨졌다 하면서 100vh 가 실제 보이는 높이보다 커지는 문제가 있다.
+   * 100dvh (dynamic viewport height) 를 우선 사용하고, 미지원 브라우저는
+   * 100vh 로 폴백 (캐스케이드 순서 활용 — dvh 미지원이면 dvh 줄이 무시됨).
+   */
   #root {
     width: 100%;
     min-height: 100vh;
+    min-height: 100dvh;
     margin: 0;
     padding: 0;
   }
@@ -208,6 +215,7 @@ const GlobalStyle = createGlobalStyle`
   .app {
     width: 100%;
     height: 100vh;
+    height: 100dvh;
   }
 `;
 

@@ -10,6 +10,8 @@ import QuizPage from '../../quiz/pages/QuizPage';
 import PlaylistShareFeed from '../components/PlaylistShareFeed';
 // 2026-04-14 신규: 관리자가 등록한 OCR 실관람 인증 이벤트를 "실관람인증" 탭에 노출
 import OcrEventFeed from '../components/OcrEventFeed';
+// 2026-04-15 신규: 공지사항 탭 — 홈 배너 클릭 딥링크 대상. 상세는 아코디언 인라인 펼침.
+import NoticeFeed from '../components/NoticeFeed';
 import * as S from './CommunityPage.styled';
 
 const TABS = [
@@ -17,6 +19,9 @@ const TABS = [
   { id: 'playlist-share', label: '플레이리스트 공유' },
   { id: 'reviews', label: '실관람인증' },
   { id: 'quiz', label: '오늘의 퀴즈' },
+  // 2026-04-15: 공지사항 탭 추가. 홈 배너/슬라이드 클릭 시 이 탭으로 이동한다
+  // (linkUrl 이 없는 경우 한정, URL ?tab=notices&noticeId={id} 로 딥링크).
+  { id: 'notices', label: '공지사항' },
 ];
 
 const VALID_TAB_IDS = new Set(TABS.map((t) => t.id));
@@ -235,6 +240,13 @@ export default function CommunityPage() {
           {activeTab === 'reviews' && <OcrEventFeed />}
 
           {activeTab === 'quiz' && <QuizPage embedded />}
+
+          {/*
+            2026-04-15 공지사항 탭.
+            NoticeFeed 내부가 URL searchParams 의 noticeId 쿼리를 직접 읽어
+            딥링크 공지 하이라이트를 처리한다.
+          */}
+          {activeTab === 'notices' && <NoticeFeed />}
         </S.Content>
       </S.PageInner>
     </S.PageWrapper>

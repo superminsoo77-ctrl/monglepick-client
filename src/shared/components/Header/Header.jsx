@@ -348,8 +348,10 @@ export default function Header() {
           </S.AuthSection>
         </S.Nav>
 
-        {/* ── 테마 토글 (데스크톱) ── */}
-        <ThemeToggle />
+        {/* ── 테마 토글 (데스크톱 전용 — 모바일에서는 햄버거 메뉴 내부 MobileOnly 에서 렌더됨) ── */}
+        <S.DesktopOnly>
+          <ThemeToggle />
+        </S.DesktopOnly>
 
         {/*
           인증 영역 (데스크톱).

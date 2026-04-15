@@ -845,6 +845,83 @@ export const ClarificationChip = styled.button`
 `;
 
 /* ============================================================
+ * AI 생성 제안 카드 (SuggestedOption)
+ * ============================================================
+ * Claude Code 스타일 "질문 + 제안" UX (2026-04-15 신설).
+ * SSE clarification.suggestions 로 내려오는 카드 2~4개를 렌더링한다.
+ * 각 카드는 text(타이틀) + reason(부제) 을 세로로 쌓고, 클릭 시 value 가
+ * 채팅 입력으로 자동 전송된다.
+ */
+
+/** 제안 카드 컨테이너 — 세로 스택 (카드가 넓이를 차지) */
+export const SuggestionCards = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+/**
+ * 개별 제안 카드.
+ *
+ * 기본: 연한 보라 배경 + 좌측 강조 바. 버튼이라 onClick 가능.
+ * hover: 살짝 띄워서 클릭 가능함을 강조.
+ */
+export const SuggestionCard = styled.button`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid ${({ theme }) => theme.colors.primary}33;
+  border-left: 3px solid ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  cursor: pointer;
+  text-align: left;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  font-family: inherit;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}25;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+/** 제안 카드 타이틀 (짧은 라벨) */
+export const SuggestionTitle = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  line-height: 1.4;
+`;
+
+/** 제안 카드 부제 (reason) — 가벼운 톤 */
+export const SuggestionReason = styled.span`
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  line-height: 1.4;
+`;
+
+/** "직접 입력하셔도 돼요" 같은 허용 안내 텍스트 */
+export const SuggestionHelperText = styled.span`
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  margin-top: 2px;
+`;
+
+/* ============================================================
  * 입력 영역
  * ============================================================ */
 

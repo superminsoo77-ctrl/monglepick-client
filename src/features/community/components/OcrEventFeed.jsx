@@ -190,10 +190,21 @@ const FeedDesc = styled.p`
   color: ${({ theme }) => theme.colors.textMuted};
 `;
 
+/*
+ * 카드 그리드.
+ * - 데스크톱: minmax(260px, 1fr) 자동 다열
+ * - 모바일(≤480px): 1열 강제 + gap 축소 — 좁은 폭에서 카드 최소폭이 컨테이너를
+ *   초과하면 가로 스크롤이 발생하므로 안전하게 1열로 고정.
+ */
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 20px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 `;
 
 const Card = styled.div`

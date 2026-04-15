@@ -485,8 +485,12 @@ export const QUIZ_ENDPOINTS = {
  * 비로그인 허용 (Public API).
  */
 export const NOTICE_ENDPOINTS = {
-  /** 활성 공지 목록 조회 - GET (query: type? = BANNER/POPUP/MODAL) */
+  /** 활성 공지 목록 조회(홈 메인) - GET (query: type? = BANNER/POPUP/MODAL) */
   ACTIVE: `${API_VERSION}/notices`,
+  /** 커뮤니티 공지 탭 전체 활성 공지 페이징 - GET (query: page?, size?) */
+  LIST: `${API_VERSION}/notices/list`,
+  /** 공지 단건 상세 조회 - GET (id 파라미터 필요) */
+  DETAIL: (id) => `${API_VERSION}/notices/${id}`,
 };
 
 /**

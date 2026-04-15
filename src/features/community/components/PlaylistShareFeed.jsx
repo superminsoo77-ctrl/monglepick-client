@@ -21,10 +21,22 @@ import { formatRelativeTime } from '../../../shared/utils/formatters';
 
 /* ── 스타일 ── */
 
+/*
+ * 카드 그리드.
+ * - 데스크톱: minmax(300px, 1fr) 로 자동 다열
+ * - 모바일(≤480px): 1열 강제
+ *   기존 minmax(300px, 1fr) 는 320~360px 폭 기기에서 카드 최소폭(300px) 이
+ *   컨테이너보다 커져 가로 스크롤이 발생하던 버그가 있었다.
+ */
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 `;
 
 const Card = styled.div`
@@ -176,6 +188,17 @@ const ModalOverlay = styled.div`
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+
+  /*
+   * 모바일에서는 overlay padding 을 줄여 패널 가용 너비 확보.
+   * (기존 20px → 12px) — 320px 폭 기기에서 모달 좌우 여백이 너무 커서
+   * 본문 입력폼이 비좁아 보이던 문제 해소.
+   */
+  @media (max-width: 480px) {
+    padding: 12px;
+    /* iOS safe-area 회피 */
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
 `;
 
 const ModalPanel = styled.div`
@@ -184,9 +207,19 @@ const ModalPanel = styled.div`
   padding: 28px;
   width: 100%;
   max-width: 480px;
+  /* 패널이 화면을 넘기면 내부에서 스크롤되도록 */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
+
+  @media (max-width: 480px) {
+    padding: 20px;
+    border-radius: ${({ theme }) => theme.radius.lg};
+  }
 `;
 
 const ModalTitle = styled.h2`

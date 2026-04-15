@@ -52,7 +52,7 @@ export default function RecommendationCard({
     if (rating === 0) return;
     setIsSubmitting(true);
     try {
-      await onSubmitFeedback(recommendation.id, { rating, comment });
+      await onSubmitFeedback(recommendation.recommendationLogId, { rating, comment });
       setShowFeedback(false);
     } finally {
       setIsSubmitting(false);
@@ -90,9 +90,11 @@ export default function RecommendationCard({
           {movie.rating && ` · ★ ${Number(movie.rating).toFixed(1)}`}
         </S.Meta>
 
-        {/* 추천 이유 */}
-        {recommendation.explanation && (
-          <S.Explanation>{recommendation.explanation}</S.Explanation>
+        {/* 추천 이유 — 2026-04-15 정정: Backend RecommendationHistoryResponse 는 `reason` 필드.
+            기존 `explanation` 키는 SSE movie_card payload 에서만 사용되는 필드라 마이픽 조회 경로와
+            맞지 않아 이유 블록이 항상 숨겨졌었음. 둘 다 지원해 어느 쪽 호출에서도 노출. */}
+        {(recommendation.reason || recommendation.explanation) && (
+          <S.Explanation>{recommendation.reason || recommendation.explanation}</S.Explanation>
         )}
 
         {/* 추천 일시 */}
@@ -105,7 +107,7 @@ export default function RecommendationCard({
           <S.ActionBtn
             $variant="wishlist"
             $active={recommendation.wishlisted}
-            onClick={() => onToggleWishlist(recommendation.id)}
+            onClick={() => onToggleWishlist(recommendation.recommendationLogId)}
           >
             {recommendation.wishlisted ? '❤️ 찜' : '🤍 찜'}
           </S.ActionBtn>
@@ -113,7 +115,7 @@ export default function RecommendationCard({
           <S.ActionBtn
             $variant="watched"
             $active={recommendation.watched}
-            onClick={() => onToggleWatched(recommendation.id)}
+            onClick={() => onToggleWatched(recommendation.recommendationLogId)}
           >
             {recommendation.watched ? '✅ 봤어요' : '👀 봤어요'}
           </S.ActionBtn>

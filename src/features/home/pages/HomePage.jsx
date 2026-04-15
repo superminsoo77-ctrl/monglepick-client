@@ -7,7 +7,7 @@
  * - 빠른 채팅 진입: 추천 질문 카드
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
@@ -19,6 +19,13 @@ import { getPopularMovies, getLatestMovies } from '../../movie/api/movieApi';
 import { getActiveNotices } from '../../../shared/api/noticeApi';
 /* 히어로 우측 슬라이드 배너 위젯 — 관리자 등록 배너를 작게 노출 (2026-04-14 신규) */
 import SideSlideBanner from '../components/SideSlideBanner';
+/*
+  2026-04-15 신규:
+  - displayType=POPUP/MODAL 공지를 홈 진입 시 자동 표시하는 모달.
+  - localStorage 기반 "24시간 억제" / "영구 억제" 로 UX 방해 최소화.
+*/
+import NoticeAnnouncementModal from '../components/NoticeAnnouncementModal';
+import { isNoticeSuppressed } from '../../../shared/utils/noticeSuppression';
 /* styled-components — HomePage.styled.js */
 import * as S from './HomePage.styled';
 
@@ -68,6 +75,14 @@ export default function HomePage() {
   /** 앱 공지사항 목록 (backend GET /api/v1/notices — BANNER/POPUP/MODAL) */
   const [notices, setNotices] = useState([]);
 
+  /**
+   * 홈 진입 시 자동 표시되는 POPUP/MODAL 공지 큐 (2026-04-15).
+   * - MODAL 이 POPUP 보다 먼저, 같은 displayType 끼리는 priority DESC.
+   * - localStorage 에 "영구 억제/24시간 억제" 된 공지는 큐 생성 시 제거.
+   * - 큐의 0번 인덱스가 현재 화면에 떠 있는 공지이며, 닫으면 shift 로 다음 항목이 뜬다.
+   */
+  const [announcementQueue, setAnnouncementQueue] = useState([]);
+
   const navigate = useNavigate();
 
   /**
@@ -85,7 +100,9 @@ export default function HomePage() {
     const [popularResult, latestResult, noticeResult] = await Promise.allSettled([
       getPopularMovies(1, 8),
       getLatestMovies(1, 8),
-      getActiveNotices(),
+      // 2026-04-15: pinned=true 로 제한. 고정된 BANNER/POPUP/MODAL 만 홈에 노출한다.
+      // 고정되지 않은 공지는 커뮤니티 공지사항 탭에서만 조회 가능.
+      getActiveNotices({ pinned: true }),
     ]);
 
     /* 인기 영화 처리 */
@@ -133,6 +150,60 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadMovies();
   }, [loadMovies]);
+
+  /**
+   * 홈에 노출할 BANNER 공지만 추출 — 상단 카드 섹션용.
+   * 2026-04-15: 기존에는 displayType 구분 없이 전부 배너로 렌더해 "모달로
+   * 저장해도 배너로 뜸" 버그가 있었음. 이제 BANNER 만 여기로 분기된다.
+   * (Task 5 에서 isPinned=true 필터가 추가로 결합될 예정)
+   */
+  const bannerNotices = useMemo(
+    () => notices.filter((n) => n.displayType === 'BANNER'),
+    [notices],
+  );
+
+  /**
+   * POPUP/MODAL 공지 큐 생성 — notices 가 로드/변경될 때마다 재계산.
+   *
+   * <ol>
+   *   <li>POPUP/MODAL 만 필터</li>
+   *   <li>localStorage 억제(영구/24시간) 대상 제거</li>
+   *   <li>정렬: MODAL 먼저(중요) → 같은 타입 안에선 priority DESC</li>
+   * </ol>
+   *
+   * 비로그인 유저도 보이도록 localStorage 기반 억제(쿠키/JWT 의존 X).
+   */
+  useEffect(() => {
+    if (!Array.isArray(notices) || notices.length === 0) {
+      setAnnouncementQueue([]);
+      return;
+    }
+    const queue = notices
+      .filter((n) => n.displayType === 'POPUP' || n.displayType === 'MODAL')
+      .filter((n) => !isNoticeSuppressed(n.noticeId))
+      .sort((a, b) => {
+        // MODAL 을 우선 노출 (중요 공지). 동일 displayType 내에서는 priority DESC.
+        if (a.displayType !== b.displayType) {
+          return a.displayType === 'MODAL' ? -1 : 1;
+        }
+        return (b.priority ?? 0) - (a.priority ?? 0);
+      });
+    setAnnouncementQueue(queue);
+  }, [notices]);
+
+  /**
+   * 공지 팝업/모달 닫기 콜백 — 큐의 첫 항목을 제거해 다음 공지를 띄운다.
+   * 실제 localStorage 억제 처리는 NoticeAnnouncementModal 내부에서 수행.
+   */
+  const handleAnnouncementClose = useCallback(() => {
+    setAnnouncementQueue((prev) => prev.slice(1));
+  }, []);
+
+  /**
+   * 현재 화면에 노출 중인 공지 (큐의 0번). 없으면 null.
+   * variant 는 displayType 을 소문자로 변환해 NoticeAnnouncementModal 로 전달.
+   */
+  const currentAnnouncement = announcementQueue[0] ?? null;
 
   /**
    * 추천 질문 카드 클릭 시 채팅 페이지로 이동.
@@ -195,25 +266,49 @@ export default function HomePage() {
       */}
       <SideSlideBanner position="MAIN" />
 
-      {/* ── 공지사항 배너 섹션 — BANNER/POPUP/MODAL 활성 공지 표시 ── */}
-      {notices.length > 0 && (
+      {/* ── 공지사항 배너 섹션 — displayType === 'BANNER' 만 카드 노출 ──
+         2026-04-15 개편:
+         - 이전: displayType 구분 없이 전부 배너 카드로 렌더 → POPUP/MODAL 로 저장해도
+           배너처럼 보이던 버그.
+         - 이후: bannerNotices 로 필터링된 BANNER 만 여기 표시.
+           POPUP/MODAL 은 announcementQueue 로 넘어가 NoticeAnnouncementModal 로 노출.
+         - 클릭 동작: linkUrl 있으면 외부 새창, 없으면 커뮤니티 공지 탭 딥링크
+           (?tab=notices&noticeId=) 로 navigate — 상세는 NoticeFeed 한 곳에서만 관리. */}
+      {bannerNotices.length > 0 && (
         <S.NoticeBanner>
-          {notices.map((notice) => (
-            <S.NoticeCard
-              key={notice.noticeId}
-              href={notice.linkUrl || undefined}
-              target={notice.linkUrl ? '_blank' : undefined}
-              rel={notice.linkUrl ? 'noopener noreferrer' : undefined}
-            >
-              <S.NoticeTypeBadge>
-                {notice.displayType === 'MODAL' ? '중요' : '공지'}
-              </S.NoticeTypeBadge>
-              <S.NoticeTitle>{notice.title}</S.NoticeTitle>
-              <S.NoticeDate>
-                {notice.createdAt ? String(notice.createdAt).slice(0, 10) : ''}
-              </S.NoticeDate>
-            </S.NoticeCard>
-          ))}
+          {bannerNotices.map((notice) => {
+            // href 는 오른쪽 클릭 "링크 복사"/"새 탭에서 열기" 지원을 위해 항상 설정.
+            // linkUrl 이 있으면 외부 URL, 없으면 커뮤니티 딥링크 경로.
+            const communityDeeplink = `${ROUTES.COMMUNITY}?tab=notices&noticeId=${notice.noticeId}`;
+            const hasExternalLink = Boolean(notice.linkUrl);
+            const href = hasExternalLink ? notice.linkUrl : communityDeeplink;
+
+            const handleClick = (e) => {
+              if (hasExternalLink) return; // 외부 링크: 기본 동작(새 창) 유지
+              // 키보드 보조키(⌘/Ctrl/Shift/Middle) 는 브라우저 기본 동작(새 탭/새 창) 존중
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+              e.preventDefault();
+              navigate(communityDeeplink);
+            };
+
+            return (
+              <S.NoticeCard
+                key={notice.noticeId}
+                href={href}
+                target={hasExternalLink ? '_blank' : undefined}
+                rel={hasExternalLink ? 'noopener noreferrer' : undefined}
+                onClick={handleClick}
+              >
+                <S.NoticeTypeBadge>
+                  {notice.displayType === 'MODAL' ? '중요' : '공지'}
+                </S.NoticeTypeBadge>
+                <S.NoticeTitle>{notice.title}</S.NoticeTitle>
+                <S.NoticeDate>
+                  {notice.createdAt ? String(notice.createdAt).slice(0, 10) : ''}
+                </S.NoticeDate>
+              </S.NoticeCard>
+            );
+          })}
         </S.NoticeBanner>
       )}
 
@@ -283,6 +378,22 @@ export default function HomePage() {
           <MovieList movies={latestMovies} loading={isLatestLoading} />
         </S.MoviesInner>
       </S.Movies>
+
+      {/*
+        ── 홈 진입 시 자동 표시되는 POPUP/MODAL 공지 (2026-04-15 신규) ──
+        큐의 맨 앞 공지 하나만 표시되며, 닫으면 다음 항목으로 shift.
+        - POPUP: 배경/ESC/× 로 닫기 가능, [다시 보지 않기] / [닫기] 버튼
+        - MODAL: 배경/ESC 무시, [다시 보지 않기] / [확인했습니다] 버튼만 허용
+        - 억제 정책: "다시 보지 않기" = 영구 / "닫기·확인" = 24시간 (localStorage)
+      */}
+      {currentAnnouncement && (
+        <NoticeAnnouncementModal
+          key={currentAnnouncement.noticeId}
+          notice={currentAnnouncement}
+          variant={currentAnnouncement.displayType === 'MODAL' ? 'modal' : 'popup'}
+          onClose={handleAnnouncementClose}
+        />
+      )}
     </S.Wrapper>
   );
 }

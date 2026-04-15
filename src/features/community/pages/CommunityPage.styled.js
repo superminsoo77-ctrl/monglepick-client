@@ -48,6 +48,16 @@ export const PageWrapper = styled.div`
   width: 100%;
   padding: ${({ theme }) => theme.spacing.xl} ${({ theme }) => theme.spacing.lg};
   position: relative;
+  /*
+   * 자식 그리드/칩 행이 터치 가로 스크롤을 가질 수 있어,
+   * 페이지 자체가 가로 스크롤이 생기지 않도록 안전하게 차단.
+   */
+  overflow-x: hidden;
+
+  /* 모바일에서는 좌우 패딩을 줄여 콘텐츠 가용 너비 확보 */
+  ${media.mobile} {
+    padding: ${({ theme }) => `${theme.spacing.lg} ${theme.spacing.md}`};
+  }
 `;
 
 /** 내부 컨테이너 — 최대 폭(narrow) 제한 + fadeInUp 등장 */
@@ -88,6 +98,19 @@ export const Tabs = styled.div`
   gap: 0;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDefault};
   padding-bottom: 0;
+
+  /*
+   * 모바일에서 탭 4~5개가 한 줄에 안 들어가면 줄바꿈 대신 가로 스크롤로 처리.
+   * (줄바꿈되면 활성 탭 하단 바와 border-bottom 정렬이 흐트러짐)
+   */
+  ${media.tablet} {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    &::-webkit-scrollbar { display: none; }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 `;
 
 /**
@@ -96,6 +119,9 @@ export const Tabs = styled.div`
  * border-image 사용 시 border-radius가 적용되지 않으므로 상단 radius만 적용.
  */
 export const Tab = styled.button`
+  /* 가로 스크롤 환경에서 줄어들지 않도록 고정 */
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.xl};
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme, $active }) =>

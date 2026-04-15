@@ -1,5 +1,5 @@
 /**
- * SideSlideBanner styled-components — 2026-04-14 (placement v2).
+ * SideSlideBanner styled-components — 2026-04-15 (placement v3).
  *
  * 우측하단 플로팅 슬라이드 배너 위젯. 홈(/home) 어느 섹션을 보고 있어도
  * 시야 안에 항상 노출되도록 `position: fixed` 로 viewport 에 고정한다.
@@ -10,6 +10,12 @@
  *   - 모바일(≤480px)에서만 숨김 — 데스크톱/태블릿/모바일 대부분 노출
  *   - Hero 의 `overflow: hidden` 영향을 받지 않도록 Wrapper 바깥에서 렌더
  *   - `z-index` 99 — 헤더 TopLoadingBar(z:100) 보다 낮게, 일반 컨텐츠보다 위
+ *
+ * 2026-04-15 placement v3 변경 사항:
+ *   - 우측하단 SupportChatbotWidget(FAB 64×64, right:24/bottom:24, z:900)
+ *     과 영역이 겹쳐 챗봇 FAB 가 배너 위에 놓이는 시각 충돌이 발생.
+ *   - 배너를 챗봇 FAB 위쪽으로 띄우기 위해 `bottom` 을 FAB 높이 + 여백만큼
+ *     상향 조정 (데스크톱 100px / 태블릿 92px). 모바일은 기존대로 숨김.
  */
 
 import styled, { keyframes } from 'styled-components';
@@ -33,7 +39,11 @@ const fadeSlide = keyframes`
 export const Frame = styled.div`
   position: fixed;
   right: 20px;
-  bottom: 24px;
+  /*
+   * 챗봇 FAB(우측하단 64×64, bottom:24)와 겹치지 않도록 위로 띄움.
+   * 24(FAB 하단 여백) + 64(FAB 높이) + 12(분리 여백) = 100px.
+   */
+  bottom: 100px;
   width: 220px;
   height: 140px;
   z-index: 99;
@@ -58,7 +68,8 @@ export const Frame = styled.div`
     width: 180px;
     height: 116px;
     right: 12px;
-    bottom: 16px;
+    /* 태블릿 챗봇 FAB(bottom:24) 위로 — 24+64+12=100 */
+    bottom: 100px;
   }
 
   /*

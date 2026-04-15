@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/monglepick-favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover : iOS 노치 / Android 시스템 UI 영역까지 페이지가 확장되도록 허용.
+      이렇게 해야 CSS 의 env(safe-area-inset-*) 변수가 실제 값을 갖는다.
+      모바일 햄버거 메뉴(position: fixed) 가 홈 인디케이터/노치에 잘리지 않도록 하기 위해 필수.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>몽글픽 — AI 영화 추천 플랫폼</title>
     <!-- Google Fonts: 랜딩 페이지용 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -29,6 +29,10 @@ import { BANNER_ENDPOINTS } from '../constants/api';
 export async function getActiveBanners(position) {
   const params = {};
   if (position) params.position = position;
-  const { data } = await backendApi.get(BANNER_ENDPOINTS.ACTIVE, { params });
-  return data;
+  // backendApi 의 response interceptor 가 이미 response.data 를 추출해 반환한다
+  // (axiosInstance.js:381 — `(response) => response.data`).
+  // 따라서 여기서 다시 `const { data } = ...` 로 destructure 하면
+  // 배열의 .data 프로퍼티(undefined)를 반환하게 되어 항상 빈 데이터가 된다.
+  // 인터셉터 결과(=BannerResponse 배열)를 그대로 반환한다.
+  return await backendApi.get(BANNER_ENDPOINTS.ACTIVE, { params });
 }

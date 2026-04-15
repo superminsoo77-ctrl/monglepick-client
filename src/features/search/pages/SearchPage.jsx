@@ -838,7 +838,10 @@ export default function SearchPage() {
 
         setAutocompleteSuggestions(nextSuggestions);
         setAutocompleteDidYouMean(nextDidYouMean);
-        setActiveAutocompleteIndex(nextSuggestions.length > 0 ? 0 : -1);
+        // 기본 하이라이트 없음(-1): Enter 키는 사용자가 입력한 query 로 검색해야 하며,
+        // 자동완성 추천어는 사용자가 ArrowDown/클릭으로 명시 선택했을 때만 반영한다.
+        // (과거 첫 항목(0)을 자동 선택해 Enter 시 추천어로 치환되던 버그 수정)
+        setActiveAutocompleteIndex(-1);
         setIsAutocompleteOpen(
           (nextSuggestions.length > 0 || Boolean(nextDidYouMean))
             && document.activeElement === searchInputRef.current
