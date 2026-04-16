@@ -31,9 +31,8 @@ const AGENT_DEEP_CARDS = [
   { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 16노드 · 4분기 흐름 · SSE 8 이벤트',          color: '#ef476f' },
   { id: 'ragPipeline', icon: '🔎', title: 'RAG Pipeline',      sub: 'Qdrant+ES+Neo4j 병렬 · RRF k=60 · 4단계 완화 · MMR λ=0.7', color: '#f97316' },
   { id: 'matchAgent', icon: '🎬', title: 'Movie Match v3',     sub: '7노드 · LLM 리랭커 + Centroid + Co-watched CF',          color: '#a78bfa' },
-  { id: 'contentAgent', icon: '🖼️', title: 'Content Analysis', sub: '포스터 분석 · 비속어 검출 · 패턴 분석',                  color: '#f97316' },
-  { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 큐레이션 + 퀴즈 자동 생성',                          color: '#ffd166' },
-  { id: 'llmStack',   icon: '🧠', title: 'Hybrid LLM Stack',   sub: 'EXAONE 32B · Qwen 35B · EXAONE 1.2B vLLM · Solar',       color: '#7c6cf0' },
+  { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 테마별 큐레이션 · 단계별 진행 · 완주 뱃지',          color: '#ffd166' },
+  { id: 'llmStack',   icon: '🧠', title: 'Hybrid LLM Stack',   sub: 'Solar API(분류·추출·설명) + EXAONE 1.2B vLLM(최종 응답)', color: '#7c6cf0' },
   { id: 'sseEvents',  icon: '📡', title: 'SSE Streaming',      sub: '8개 이벤트 · point_update v3.4 · clarification 카드',     color: '#118ab2' },
   { id: 'memoryArch', icon: '🧊', title: 'Memory Architecture', sub: 'Redis 핫 캐시 + MySQL 아카이브 (write-behind)',         color: '#06d6a0' },
   { id: 'recoScoring', icon: '⚖️', title: 'Reco Scoring',       sub: 'CF+CBF 동적 가중치 + MMR λ=0.7 + RRF k=60',              color: '#ef476f' },
@@ -228,6 +227,26 @@ export default function LandingPage() {
   const [openAgentInfo, setOpenAgentInfo] = useState(null);
   const particlesRef = useRef(null);
   const featureTimerRef = useRef(null);
+  /* 벡터 임베딩 iframe — 스크롤 진입 시에만 로드 (메모리 크래시 방지) */
+  const [projectorVisible, setProjectorVisible] = useState(false);
+  const projectorRef = useRef(null);
+
+  /* 첫 접속 시 반드시 맨 상단으로 — iframe 로드가 스크롤을 끌어가는 것 방지 */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  /* 벡터 임베딩 iframe — 뷰포트 진입 시에만 src 설정 (WebGL 메모리 크래시 방지) */
+  useEffect(() => {
+    const el = projectorRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setProjectorVisible(true); observer.disconnect(); } },
+      { rootMargin: '300px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   /* 스크롤 시 네비게이션 배경 변경 */
   useEffect(() => {
@@ -476,41 +495,6 @@ export default function LandingPage() {
               </S.ChatWindow>
             </S.Reveal>
           </S.ChatDemoLayout>
-        </S.Container>
-      </S.ChatDemo>
-
-      {/* ── AI Agent 심층 소개 ──
-          ChatDemo 가 "맛보기" 라면 이 섹션은 "엔진룸 투어".
-          8개 카드 클릭 시 AgentInfoModal(텍스트 중심 심층 모달) 오픈 */}
-      <S.ChatDemo id="lp-agent" style={{ paddingTop: 60, paddingBottom: 60 }}>
-        <S.Container>
-          <S.Reveal className="lp-reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
-            <S.SectionLabel>AI Agent · Deep Dive</S.SectionLabel>
-            <S.SectionTitle>
-              "오늘 우울해" 한 마디가<br />
-              <S.GradientText>추천 5편</S.GradientText>이 되기까지
-            </S.SectionTitle>
-            <S.SectionSubtitle style={{ margin: '12px auto 0' }}>
-              LangGraph 16노드, 4갈래 분기, RAG 하이브리드 검색, 4종 LLM 협업, SSE 8 이벤트 —
-              몽글픽 에이전트의 실제 동작을 카드별로 풀어드려요. 클릭하면 더 깊이 들어갑니다.
-            </S.SectionSubtitle>
-          </S.Reveal>
-
-          <S.Reveal className="lp-reveal" $delay="0.1s">
-            <S.DiagramCardGrid>
-              {AGENT_DEEP_CARDS.map((c) => (
-                <S.DiagramCard
-                  key={c.id}
-                  $color={c.color}
-                  onClick={() => setOpenAgentInfo(c.id)}
-                >
-                  <S.DiagramCardIcon $color={c.color}>{c.icon}</S.DiagramCardIcon>
-                  <S.DiagramCardTitle>{c.title}</S.DiagramCardTitle>
-                  <S.DiagramCardSub>{c.sub}</S.DiagramCardSub>
-                </S.DiagramCard>
-              ))}
-            </S.DiagramCardGrid>
-          </S.Reveal>
         </S.Container>
       </S.ChatDemo>
 
@@ -828,9 +812,8 @@ export default function LandingPage() {
         </S.Container>
       </S.EmbeddingSection>
 
-      {/* ── 벡터 임베딩 시각화 (TensorFlow Projector — 실제 몽글픽 벡터 데이터) ──
-          Qdrant 에서 인기 3000편의 Upstage Solar 4096D 벡터를 200D 로 truncate 해
-          tensors.bytes + metadata.tsv 로 추출. TF Projector 가 PCA/t-SNE/UMAP 3D 투영.
+      {/* ── 벡터 임베딩 시각화 (TF Projector — 새 탭 링크) ──
+          WebGL iframe 은 메모리 과다로 페이지 크래시 유발 → 프리뷰 카드 + 새 탭 링크로 전환.
           ────────────────────────────────────────────────────────────── */}
       <S.EmbeddingSection>
         <S.Container>
@@ -842,21 +825,27 @@ export default function LandingPage() {
             </S.SectionSubtitle>
           </S.Reveal>
           <S.Reveal className="lp-reveal" $delay="0.15s">
-            <S.EmbeddingIframeWrap>
-              <iframe
-                src={TF_PROJECTOR_URL}
-                title="몽글픽 영화 임베딩 시각화 — TensorFlow Projector (3000편 × 200D)"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allow="fullscreen"
-                loading="lazy"
-              />
+            <S.EmbeddingIframeWrap ref={projectorRef}>
+              {projectorVisible ? (
+                <iframe
+                  src={TF_PROJECTOR_URL}
+                  title="몽글픽 영화 임베딩 시각화 — TensorFlow Projector (1,000편 × 200D)"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allow="fullscreen"
+                  loading="lazy"
+                />
+              ) : (
+                <S.ProjectorPlaceholder>
+                  <S.ProjectorIcon>🔮</S.ProjectorIcon>
+                  <div>스크롤하면 벡터 시각화가 로드됩니다...</div>
+                </S.ProjectorPlaceholder>
+              )}
             </S.EmbeddingIframeWrap>
             <S.EmbeddingNote>
-              TensorFlow Embedding Projector — PCA / t-SNE / UMAP 3D 시각화.
-              Qdrant 에서 추출한 3,000편 영화 벡터 (Upstage Solar 4096D → 200D truncation).
-              제목·장르·감독·무드·평점 메타데이터로 라벨링.
+              TensorFlow Embedding Projector — 1,000편 영화 벡터 (Solar 4096D → 200D).
+              PCA / t-SNE / UMAP 3D 시각화. 점 클릭으로 유사 영화 탐색.
             </S.EmbeddingNote>
           </S.Reveal>
         </S.Container>
@@ -1003,6 +992,33 @@ export default function LandingPage() {
                 ))}
               </S.DiagramCardGrid>
             </S.DiagramSection>
+          </S.Reveal>
+
+          {/* ── AI Agent Deep Dive (Architecture & Diagrams 바로 아래 배치) ── */}
+          <S.Reveal className="lp-reveal" style={{ textAlign: 'center', marginTop: 60, marginBottom: 36 }}>
+            <S.SectionLabel>AI Agent · Deep Dive</S.SectionLabel>
+            <S.SectionTitle>
+              "오늘 우울해" 한 마디가<br />
+              <S.GradientText>추천 5편</S.GradientText>이 되기까지
+            </S.SectionTitle>
+            <S.SectionSubtitle style={{ margin: '12px auto 0' }}>
+              몽글픽 에이전트가 어떻게 동작하는지 카드별로 풀어드려요. 클릭하면 더 깊이 들어갑니다.
+            </S.SectionSubtitle>
+          </S.Reveal>
+          <S.Reveal className="lp-reveal" $delay="0.1s">
+            <S.DiagramCardGrid>
+              {AGENT_DEEP_CARDS.map((c) => (
+                <S.DiagramCard
+                  key={c.id}
+                  $color={c.color}
+                  onClick={() => setOpenAgentInfo(c.id)}
+                >
+                  <S.DiagramCardIcon $color={c.color}>{c.icon}</S.DiagramCardIcon>
+                  <S.DiagramCardTitle>{c.title}</S.DiagramCardTitle>
+                  <S.DiagramCardSub>{c.sub}</S.DiagramCardSub>
+                </S.DiagramCard>
+              ))}
+            </S.DiagramCardGrid>
           </S.Reveal>
 
           {/* ── 팀원 GitHub ── */}

@@ -1751,11 +1751,11 @@ export const EmbeddingSection = styled(SectionBase)`
 export const EmbeddingIframeWrap = styled.div`
   position: relative;
   width: 100%;
-  height: 800px;
+  height: 900px;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid ${({ theme }) => theme.landing.border};
-  background: #111;
+  background: #fff;
   box-shadow: 0 0 60px rgba(124, 108, 240, 0.08);
 
   & > iframe {
@@ -1776,6 +1776,18 @@ export const EmbeddingIframeWrap = styled.div`
   }
 `;
 
+/** iframe 로드 전 플레이스홀더 */
+export const ProjectorPlaceholder = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: ${({ theme }) => theme.landing.textMuted};
+  font-size: 0.9rem;
+`;
+
 /** 하단 안내 텍스트 */
 export const EmbeddingNote = styled.p`
   text-align: center;
@@ -1784,6 +1796,90 @@ export const EmbeddingNote = styled.p`
   margin-top: 16px;
   opacity: 0.7;
   line-height: 1.6;
+`;
+
+/* ── TF Projector 프리뷰 카드 (iframe 대체, 새 탭 링크) ── */
+
+export const ProjectorCard = styled.a`
+  display: block;
+  text-decoration: none;
+  background: ${({ theme }) => theme.landing.bgGlass};
+  backdrop-filter: blur(20px);
+  border: 1px solid ${({ theme }) => theme.landing.border};
+  border-radius: 16px;
+  padding: 32px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.landing.borderHover};
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(124, 108, 240, 0.15);
+  }
+`;
+
+export const ProjectorCardInner = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 24px;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    text-align: center;
+  }
+`;
+
+export const ProjectorIcon = styled.div`
+  font-size: 3rem;
+  flex-shrink: 0;
+`;
+
+export const ProjectorInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+export const ProjectorTitle = styled.div`
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: ${LP_FONT_EN};
+  color: ${({ theme }) => theme.landing.textPrimary};
+  margin-bottom: 8px;
+`;
+
+export const ProjectorDesc = styled.div`
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.landing.textMuted};
+  line-height: 1.6;
+  margin-bottom: 12px;
+`;
+
+export const ProjectorMeta = styled.div`
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  & > span {
+    font-size: 0.75rem;
+    font-family: ${LP_FONT_EN};
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(124,108,240,0.15), rgba(88,166,255,0.15));
+    color: ${LP_ACCENT_CYAN};
+  }
+`;
+
+export const ProjectorArrow = styled.div`
+  font-size: 2rem;
+  color: ${({ theme }) => theme.landing.textMuted};
+  flex-shrink: 0;
+  transition: transform 0.3s;
+
+  ${ProjectorCard}:hover & {
+    transform: translateX(6px);
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 /* ================================================================
