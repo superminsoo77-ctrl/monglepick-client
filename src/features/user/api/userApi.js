@@ -244,6 +244,21 @@ export async function getRewatchCount(movieId) {
   return api.get(WATCH_HISTORY_ENDPOINTS.REWATCH_COUNT(movieId));
 }
 
+// ── 내가 쓴 글 ──
+
+/**
+ * 내가 작성한 게시글 목록을 페이징 조회한다.
+ *
+ * @param {Object} [options={}]
+ * @param {number} [options.page=0] - 페이지 번호 (0부터 시작)
+ * @param {number} [options.size=20] - 페이지 크기
+ * @returns {Promise<Object>} { posts, totalElements, totalPages }
+ */
+export async function getMyPosts({ page = 0, size = 20 } = {}) {
+  requireAuth();
+  return api.get(MYPAGE_ENDPOINTS.MY_POSTS, { params: { page, size } });
+}
+
 // ── 선호 설정 ──
 
 /**
