@@ -156,17 +156,24 @@ export default function MovieDetailCard({
           </S.Meta>
 
           {/* 장르 태그 */}
-          {movie.genres && movie.genres.length > 0 && (
-            <S.Genres>
-              {movie.genres.map((genre) => (
-                <S.GenreTag
-                  key={typeof genre === 'string' ? genre : (genre.name || genre.id)}
-                >
-                  {typeof genre === 'string' ? genre : genre.name}
-                </S.GenreTag>
-              ))}
-            </S.Genres>
-          )}
+          {(() => {
+            const genresArray = Array.isArray(movie.genres)
+              ? movie.genres
+              : typeof movie.genres === 'string'
+                ? movie.genres.split(',').map((s) => s.trim())
+                : [];
+            return genresArray.length > 0 ? (
+              <S.Genres>
+                {genresArray.map((genre) => (
+                  <S.GenreTag
+                    key={typeof genre === 'string' ? genre : (genre.name || genre.id)}
+                  >
+                    {typeof genre === 'string' ? genre : genre.name}
+                  </S.GenreTag>
+                ))}
+              </S.Genres>
+            ) : null;
+          })()}
 
           {/* 감독 */}
           {movie.director && (

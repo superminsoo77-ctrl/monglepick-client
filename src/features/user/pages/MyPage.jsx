@@ -5,11 +5,12 @@ import {
   getProfile,
   getWishlist,
   getMyReviews,
+  getMyPosts,
   updateProfile,
 } from '../api/userApi';
 /* 착용 아이템 API — 2026-04-14 신설 (C 방향). 프로필 상단에 아바타·배지 표시용. */
 import { getEquippedItems } from '../../point/api/userItemApi';
-import { ROUTES } from '../../../shared/constants/routes';
+import { ROUTES, buildPath } from '../../../shared/constants/routes';
 import { getGradeLabel } from '../../../shared/constants/grade';
 import MovieList from '../../../shared/components/MovieList/MovieList';
 import Loading from '../../../shared/components/Loading/Loading';
@@ -20,9 +21,18 @@ import * as S from './MyPage.styled';
 const REVIEW_PAGE_SIZE = 20;
 const PAGE_GROUP_SIZE = 10;
 
+const CATEGORY_LABEL = {
+  FREE: '자유',
+  DISCUSSION: '토론',
+  RECOMMENDATION: '추천',
+  NEWS: '뉴스',
+  PLAYLIST_SHARE: '플리공유',
+};
+
 const TABS = [
   { id: 'profile', label: '프로필' },
   { id: 'watch-history', label: '시청 이력' },
+  { id: 'my-posts', label: '내가 쓴 글' },
   { id: 'wishlist', label: '위시리스트' },
   { id: 'preferences', label: '선호 설정' },
 ];
@@ -255,6 +265,9 @@ export default function MyPagePage() {
     total: 0,
     totalPages: 0,
   });
+  const [myPosts, setMyPosts] = useState([]);
+  const [myPostsPage, setMyPostsPage] = useState(0);
+  const [myPostsPagination, setMyPostsPagination] = useState({ totalPages: 0, totalElements: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -340,6 +353,15 @@ export default function MyPagePage() {
             await loadMyReviews(reviewPage);
             break;
           }
+          case 'my-posts': {
+            const postsData = await getMyPosts({ page: myPostsPage, size: 10 });
+            setMyPosts(postsData?.content || []);
+            setMyPostsPagination({
+              totalPages: postsData?.totalPages ?? 0,
+              totalElements: postsData?.totalElements ?? 0,
+            });
+            break;
+          }
           case 'wishlist': {
             const wishlistData = await getWishlist();
             setWishlist(wishlistData?.wishlist || []);
@@ -356,7 +378,7 @@ export default function MyPagePage() {
     }
 
     loadTabData();
-  }, [activeTab, isAuthenticated, loadMyReviews, reviewPage]);
+  }, [activeTab, isAuthenticated, loadMyReviews, reviewPage, myPostsPage]);
 
   /**
    * 리뷰 수정/삭제 후에도 마이페이지 페이지네이션 숫자를 맞추기 위해
@@ -572,6 +594,61 @@ export default function MyPagePage() {
                     </S.PaginationBar>
                   )}
                 </S.MyReviewsSection>
+              )}
+            </div>
+          )}
+
+          {/* 내가 쓴 글 탭 */}
+          {activeTab === 'my-posts' && (
+            <div>
+              {isLoading ? (
+                <Loading message="게시글 로딩 중..." />
+              ) : myPosts.length === 0 ? (
+                <EmptyState
+                  icon="✏️"
+                  title="아직 작성한 게시글이 없습니다"
+                  description="커뮤니티에서 첫 글을 남겨보세요"
+                  actionLabel="커뮤니티 가기"
+                  onAction={() => navigate(ROUTES.COMMUNITY)}
+                />
+              ) : (
+                <S.MyPostsSection>
+                  {myPosts.map((post) => (
+                    <S.PostItem
+                      key={post.id}
+                      onClick={() => navigate(`/community/${post.id}`)}
+                    >
+                      <S.PostItemHeader>
+                        {post.category && (
+                          <S.PostCategoryBadge>
+                            {CATEGORY_LABEL[post.category] || post.category}
+                          </S.PostCategoryBadge>
+                        )}
+                        <S.PostItemTime>{post.createdAt ? post.createdAt.slice(0, 10) : ''}</S.PostItemTime>
+                      </S.PostItemHeader>
+                      <S.PostItemTitle>{post.title}</S.PostItemTitle>
+                      <S.PostItemMeta>
+                        <span>👁 {post.viewCount ?? 0}</span>
+                        <span>❤️ {post.likeCount ?? 0}</span>
+                      </S.PostItemMeta>
+                    </S.PostItem>
+                  ))}
+
+                  {myPostsPagination.totalPages > 1 && (
+                    <S.PaginationBar>
+                      {Array.from({ length: myPostsPagination.totalPages }, (_, i) => i).map((p) => (
+                        <S.PageButton
+                          key={p}
+                          type="button"
+                          $active={p === myPostsPage}
+                          onClick={() => setMyPostsPage(p)}
+                        >
+                          {p + 1}
+                        </S.PageButton>
+                      ))}
+                    </S.PaginationBar>
+                  )}
+                </S.MyPostsSection>
               )}
             </div>
           )}

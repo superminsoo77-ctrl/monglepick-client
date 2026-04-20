@@ -467,6 +467,67 @@ export const MyReviewsSection = styled.div`
   gap: ${({ theme }) => theme.spacing.lg};
 `;
 
+export const MyPostsSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+export const PostItem = styled.div`
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.glass.bg};
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.md};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    transform: translateY(-1px);
+    box-shadow: ${({ theme }) => theme.shadows.sm};
+  }
+`;
+
+export const PostItemHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-bottom: 6px;
+`;
+
+export const PostCategoryBadge = styled.span`
+  display: inline-block;
+  padding: 2px ${({ theme }) => theme.spacing.sm};
+  background-color: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.full};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const PostItemTime = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  margin-left: auto;
+`;
+
+export const PostItemTitle = styled.div`
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+export const PostItemMeta = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.md};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
 /**
  * 페이지 번호 바 — 10개 단위 페이지 묶음을 중앙에 정렬한다.
  */

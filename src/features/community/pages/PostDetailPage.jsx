@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPostDetail, deletePost, togglePostLike, reportPost } from '../api/communityApi';
 import { formatRelativeTime } from '../../../shared/utils/formatters';
@@ -7,6 +7,9 @@ import CommentSection from '../components/CommentSection';
 import ReportModal from '../components/ReportModal';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import * as S from './PostDetailPage.styled';
+
+const TOAST_DURATION = 3000;
+const TOAST_LEAVE_MS = 350;
 
 const CATEGORY_LABEL = {
   FREE: '자유',
@@ -29,6 +32,20 @@ export default function PostDetailPage() {
   const [likeCount, setLikeCount] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
+
+  const showToast = (message, type = 'success') => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, message, type, leaving: false }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => t.id === id ? { ...t, leaving: true } : t));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, TOAST_LEAVE_MS);
+    }, TOAST_DURATION);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -55,23 +72,21 @@ export default function PostDetailPage() {
     return () => { cancelled = true; };
   }, [postId]);
 
-  const handleDelete = async () => {
-    const confirmed = window.confirm('게시글을 삭제하시겠습니까?');
-    if (!confirmed) return;
-
+  const handleDeleteConfirmed = async () => {
+    setDeleteConfirm(false);
     setIsDeleting(true);
     try {
       await deletePost(postId);
       navigate('/community');
     } catch {
-      alert('삭제에 실패했습니다. 다시 시도해주세요.');
+      showToast('삭제에 실패했습니다. 다시 시도해주세요.', 'error');
       setIsDeleting(false);
     }
   };
 
   const handleLike = async () => {
     if (!user) {
-      alert('로그인이 필요합니다.');
+      showToast('로그인이 필요합니다.', 'warning');
       return;
     }
     if (isLiking) return;
@@ -87,7 +102,7 @@ export default function PostDetailPage() {
     } catch {
       setLiked((prev) => !prev);
       setLikeCount((prev) => liked ? prev + 1 : prev - 1);
-      alert('좋아요 처리에 실패했습니다.');
+      showToast('좋아요 처리에 실패했습니다.', 'error');
     } finally {
       setIsLiking(false);
     }
@@ -98,13 +113,13 @@ export default function PostDetailPage() {
   const handleReport = async ({ reason, detail }) => {
     try {
       await reportPost(postId, { reason, detail });
-      alert('신고가 접수되었습니다. 검토 후 조치하겠습니다.');
+      showToast('신고가 접수되었습니다. 검토 후 조치하겠습니다.', 'success');
     } catch (err) {
-      const status = err?.response?.status;
+      const status = err?.status ?? err?.response?.status;
       if (status === 409) {
-        alert('이미 신고한 게시글입니다.');
+        showToast('이미 신고한 게시글입니다.', 'warning');
       } else {
-        alert('신고 접수에 실패했습니다. 다시 시도해주세요.');
+        showToast('신고 접수에 실패했습니다. 다시 시도해주세요.', 'error');
       }
       throw err;
     }
@@ -151,7 +166,7 @@ export default function PostDetailPage() {
               </S.ReportButton>
             )}
             {isOwner && (
-              <S.DeleteButton onClick={handleDelete} disabled={isDeleting}>
+              <S.DeleteButton onClick={() => setDeleteConfirm(true)} disabled={isDeleting}>
                 {isDeleting ? '삭제 중...' : '삭제'}
               </S.DeleteButton>
             )}
@@ -201,6 +216,30 @@ export default function PostDetailPage() {
         onClose={() => setReportOpen(false)}
         onSubmit={handleReport}
       />
+
+      {deleteConfirm && (
+        <S.ConfirmOverlay onClick={() => setDeleteConfirm(false)}>
+          <S.ConfirmBox onClick={(e) => e.stopPropagation()}>
+            <S.ConfirmText>게시글을 삭제하시겠습니까?</S.ConfirmText>
+            <S.ConfirmButtons>
+              <S.ConfirmCancelBtn onClick={() => setDeleteConfirm(false)}>취소</S.ConfirmCancelBtn>
+              <S.ConfirmDeleteBtn onClick={handleDeleteConfirmed} disabled={isDeleting}>
+                {isDeleting ? '삭제 중...' : '삭제'}
+              </S.ConfirmDeleteBtn>
+            </S.ConfirmButtons>
+          </S.ConfirmBox>
+        </S.ConfirmOverlay>
+      )}
+
+      {toasts.length > 0 && (
+        <S.ToastContainer>
+          {toasts.map((t) => (
+            <S.Toast key={t.id} $type={t.type} $leaving={t.leaving}>
+              {t.message}
+            </S.Toast>
+          ))}
+        </S.ToastContainer>
+      )}
     </S.PageWrapper>
   );
 }

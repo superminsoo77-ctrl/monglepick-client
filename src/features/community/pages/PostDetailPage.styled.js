@@ -9,8 +9,54 @@
  * - AuthorBar: 작성자 + 액션 버튼 (수정/삭제)
  */
 
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { media } from '../../../shared/styles/media';
+
+const slideDown = keyframes`
+  from { transform: translateY(-100%) translateX(-50%); opacity: 0; }
+  to   { transform: translateY(0)     translateX(-50%); opacity: 1; }
+`;
+
+const slideUp = keyframes`
+  from { transform: translateY(0)     translateX(-50%); opacity: 1; }
+  to   { transform: translateY(-100%) translateX(-50%); opacity: 0; }
+`;
+
+const TYPE_COLORS = {
+  success: { bg: 'rgba(72,187,120,0.15)', border: 'rgba(72,187,120,0.4)', text: '#276749' },
+  warning: { bg: 'rgba(237,137,54,0.15)', border: 'rgba(237,137,54,0.4)', text: '#7b341e' },
+  error:   { bg: 'rgba(229,62,62,0.15)',  border: 'rgba(229,62,62,0.4)',  text: '#742a2a' },
+};
+
+export const ToastContainer = styled.div`
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+`;
+
+export const Toast = styled.div`
+  pointer-events: auto;
+  padding: 12px 20px;
+  border-radius: ${({ theme }) => theme.radius?.lg || '12px'};
+  background: ${({ $type }) => TYPE_COLORS[$type]?.bg || TYPE_COLORS.success.bg};
+  border: 1px solid ${({ $type }) => TYPE_COLORS[$type]?.border || TYPE_COLORS.success.border};
+  color: ${({ $type }) => TYPE_COLORS[$type]?.text || TYPE_COLORS.success.text};
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  font-size: ${({ theme }) => theme.typography?.textSm || '0.875rem'};
+  font-weight: ${({ theme }) => theme.typography?.fontSemibold || 600};
+  min-width: 220px;
+  max-width: 360px;
+  text-align: center;
+  animation: ${({ $leaving }) => ($leaving ? slideUp : slideDown)} 0.35s ease forwards;
+`;
 
 /** 페이지 외곽 래퍼 */
 export const PageWrapper = styled.main`
@@ -218,5 +264,79 @@ export const ImageItem = styled.div`
     border-radius: 8px;
     object-fit: contain;
     border: 1px solid ${({ theme }) => theme.colors.borderLight};
+  }
+`;
+
+export const ConfirmOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+export const ConfirmBox = styled.div`
+  background: ${({ theme }) => theme.glass.bg};
+  backdrop-filter: blur(12px);
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  padding: ${({ theme }) => theme.spacing.xl};
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+`;
+
+export const ConfirmText = styled.p`
+  font-size: ${({ theme }) => theme.typography.textBase};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  margin: 0 0 ${({ theme }) => theme.spacing.lg} 0;
+  line-height: 1.5;
+`;
+
+export const ConfirmButtons = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  justify-content: center;
+`;
+
+export const ConfirmCancelBtn = styled.button`
+  flex: 1;
+  padding: 10px 0;
+  background: transparent;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+export const ConfirmDeleteBtn = styled.button`
+  flex: 1;
+  padding: 10px 0;
+  background: #e53e3e;
+  border: 1px solid #e53e3e;
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: #fff;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    background: #c53030;
+    border-color: #c53030;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;

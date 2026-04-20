@@ -22,7 +22,7 @@ import {
  * @returns {Promise<Object>} 영화 상세 정보 객체
  */
 export async function getMovie(movieId) {
-  const movie = await recommendApi.get(MOVIE_ENDPOINTS.DETAIL(movieId));
+  const movie = await backendApi.get(MOVIE_ENDPOINTS.DETAIL(movieId));
   return {
     ...movie,
     id: movie.movie_id,
