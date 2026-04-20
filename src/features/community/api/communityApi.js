@@ -71,6 +71,10 @@ export async function togglePostLike(postId) {
   return api.post(COMMUNITY_ENDPOINTS.POST_LIKE(postId));
 }
 
+export async function reportPost(postId, reason) {
+  return api.post(COMMUNITY_ENDPOINTS.POST_REPORT(postId), { reason });
+}
+
 export async function getSharedPlaylists({ page = 1, size = 15 } = {}) {
   const data = await api.get(COMMUNITY_ENDPOINTS.SHARED_PLAYLISTS, {
     params: { page: Math.max(0, page - 1), size },
@@ -110,6 +114,18 @@ export async function uploadImages(files) {
  * @param {number} playlistId - 비공개로 전환할 플레이리스트 ID
  * @returns {Promise<void>}
  */
+export async function getMyPosts({ page = 1, size = 10 } = {}) {
+  const pageData = await api.get(COMMUNITY_ENDPOINTS.MY_POSTS, {
+    params: { page: Math.max(0, page - 1), size },
+  });
+  return {
+    posts: (pageData?.content ?? []).map(normalizePost),
+    total: pageData?.totalElements ?? 0,
+    totalPages: pageData?.totalPages ?? 0,
+    page: (pageData?.number ?? 0) + 1,
+  };
+}
+
 export async function deletePlaylistPost(playlistId) {
   return api.delete(`${COMMUNITY_ENDPOINTS.POSTS}/playlist/${playlistId}`);
 }

@@ -130,6 +130,8 @@ export const RECOMMEND_USER_ENDPOINTS = {
 export const COMMUNITY_ENDPOINTS = {
   /** 게시글 목록 조회 - GET */
   POSTS: `${API_VERSION}/posts`,
+  /** 내가 쓴 게시글 목록 조회 - GET (JWT 필수, 페이징) */
+  MY_POSTS: `${API_VERSION}/posts/me`,
   /** 게시글 상세 조회 - GET (id 파라미터 필요) */
   POST_DETAIL: (id) => `${API_VERSION}/posts/${id}`,
   /** 게시글 작성 - POST */
@@ -149,6 +151,8 @@ export const COMMUNITY_ENDPOINTS = {
    * 응답: { liked: boolean, likeCount: number }
    */
   POST_LIKE: (postId) => `${API_VERSION}/posts/${postId}/like`,
+  /** 게시글 신고 - POST (JWT 필수, body: { reason }) */
+  POST_REPORT: (postId) => `${API_VERSION}/posts/${postId}/report`,
   /**
    * 게시글 댓글 좋아요 토글 - POST (postId, commentId 파라미터 필요, JWT 필요)
    * 응답: { liked: boolean, likeCount: number }

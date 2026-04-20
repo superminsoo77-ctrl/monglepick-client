@@ -150,6 +150,138 @@ export const DeleteButton = styled.button`
   }
 `;
 
+export const ReportButton = styled.button`
+  margin-left: 8px;
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  color: ${({ theme }) => theme.colors.textMuted};
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #e53e3e;
+    color: #e53e3e;
+  }
+`;
+
+export const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 200;
+`;
+
+export const ModalBox = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  width: 100%;
+  max-width: 420px;
+  background: ${({ theme }) => theme.glass.bg};
+  backdrop-filter: blur(16px);
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  padding: ${({ theme }) => theme.spacing.xl};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+export const ModalTitle = styled.h3`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+export const ModalDesc = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
+export const PresetGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+export const PresetChip = styled.button`
+  padding: 6px 14px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid ${({ $active, theme }) => $active ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $active, theme }) => $active ? theme.colors.primaryLight : 'transparent'};
+  color: ${({ $active, theme }) => $active ? theme.colors.primary : theme.colors.textSecondary};
+  font-weight: ${({ $active, theme }) => $active ? theme.typography.fontSemibold : 'normal'};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+export const ModalTextarea = styled.textarea`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  resize: vertical;
+  box-sizing: border-box;
+
+  &::placeholder { color: ${({ theme }) => theme.colors.textMuted}; }
+  &:focus { outline: none; border-color: ${({ theme }) => theme.colors.primary}; }
+`;
+
+export const ModalError = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.error};
+`;
+
+export const ModalButtonRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  justify-content: flex-end;
+`;
+
+export const ModalCancelBtn = styled.button`
+  padding: 8px 18px;
+  background: none;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  &:hover { border-color: ${({ theme }) => theme.colors.textMuted}; }
+`;
+
+export const ModalConfirmBtn = styled.button`
+  padding: 8px 18px;
+  background: #e53e3e;
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: white;
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  transition: opacity 0.15s;
+
+  &:hover:not(:disabled) { opacity: 0.85; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
 export const LikeBar = styled.div`
   display: flex;
   justify-content: center;

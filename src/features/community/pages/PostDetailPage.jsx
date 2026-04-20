@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getPostDetail, deletePost, togglePostLike } from '../api/communityApi';
+import { getPostDetail, deletePost, togglePostLike, reportPost } from '../api/communityApi';
 import { formatRelativeTime } from '../../../shared/utils/formatters';
 import Loading from '../../../shared/components/Loading/Loading';
 import CommentSection from '../components/CommentSection';
@@ -27,6 +27,13 @@ export default function PostDetailPage() {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [reportDetail, setReportDetail] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportError, setReportError] = useState(null);
+
+  const REPORT_PRESETS = ['혐오 발언', '욕설', '광고/스팸', '음란물', '개인정보 노출', '기타'];
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +100,34 @@ export default function PostDetailPage() {
 
   const isOwner = user && post && user.id === post.authorId;
 
+  const reportReason = selectedPreset
+    ? selectedPreset === '기타'
+      ? reportDetail.trim()
+      : `${selectedPreset}${reportDetail.trim() ? ` - ${reportDetail.trim()}` : ''}`
+    : '';
+
+  const handleReport = async () => {
+    if (!reportReason) return;
+    setIsReporting(true);
+    setReportError(null);
+    try {
+      await reportPost(postId, reportReason);
+      setShowReportModal(false);
+      setSelectedPreset(null);
+      setReportDetail('');
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      const code = err?.code;
+      if (code === 'DUPLICATE_REPORT') {
+        setReportError('이미 신고한 게시글입니다.');
+      } else {
+        setReportError(err.message || '신고 처리 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <S.PageWrapper>
@@ -132,6 +167,11 @@ export default function PostDetailPage() {
               <S.DeleteButton onClick={handleDelete} disabled={isDeleting}>
                 {isDeleting ? '삭제 중...' : '삭제'}
               </S.DeleteButton>
+            )}
+            {!isOwner && user && (
+              <S.ReportButton onClick={() => { setShowReportModal(true); setReportError(null); }}>
+                🚨 신고
+              </S.ReportButton>
             )}
           </S.Header>
 
@@ -173,6 +213,51 @@ export default function PostDetailPage() {
         {/* 댓글 */}
         <CommentSection postId={postId} />
       </S.PageInner>
+
+      {/* 신고 모달 */}
+      {showReportModal && (
+        <>
+          <S.ModalOverlay onClick={() => { setShowReportModal(false); setSelectedPreset(null); setReportDetail(''); }} />
+          <S.ModalBox>
+            <S.ModalTitle>게시글 신고</S.ModalTitle>
+            <S.ModalDesc>신고 사유를 선택해주세요.</S.ModalDesc>
+            <S.PresetGrid>
+              {REPORT_PRESETS.map((preset) => (
+                <S.PresetChip
+                  key={preset}
+                  type="button"
+                  $active={selectedPreset === preset}
+                  onClick={() => { setSelectedPreset(preset); setReportDetail(''); setReportError(null); }}
+                >
+                  {preset}
+                </S.PresetChip>
+              ))}
+            </S.PresetGrid>
+            {selectedPreset && (
+              <S.ModalTextarea
+                placeholder={selectedPreset === '기타' ? '신고 사유를 직접 입력해주세요.' : '추가 설명 (선택)'}
+                value={reportDetail}
+                onChange={(e) => setReportDetail(e.target.value)}
+                rows={3}
+                maxLength={300}
+              />
+            )}
+            {reportError && <S.ModalError>{reportError}</S.ModalError>}
+            <S.ModalButtonRow>
+              <S.ModalCancelBtn type="button" onClick={() => { setShowReportModal(false); setSelectedPreset(null); setReportDetail(''); }}>
+                취소
+              </S.ModalCancelBtn>
+              <S.ModalConfirmBtn
+                type="button"
+                onClick={handleReport}
+                disabled={isReporting || !reportReason}
+              >
+                {isReporting ? '신고 중...' : '신고하기'}
+              </S.ModalConfirmBtn>
+            </S.ModalButtonRow>
+          </S.ModalBox>
+        </>
+      )}
     </S.PageWrapper>
   );
 }

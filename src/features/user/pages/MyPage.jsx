@@ -7,6 +7,7 @@ import {
   getMyReviews,
   updateProfile,
 } from '../api/userApi';
+import { getMyPosts } from '../../community/api/communityApi';
 /* 착용 아이템 API — 2026-04-14 신설 (C 방향). 프로필 상단에 아바타·배지 표시용. */
 import { getEquippedItems } from '../../point/api/userItemApi';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -24,6 +25,7 @@ const TABS = [
   { id: 'profile', label: '프로필' },
   { id: 'watch-history', label: '시청 이력' },
   { id: 'wishlist', label: '위시리스트' },
+  { id: 'my-posts', label: '내가 쓴 글' },
   { id: 'preferences', label: '선호 설정' },
 ];
 
@@ -259,6 +261,10 @@ export default function MyPagePage() {
   const [error, setError] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  const [myPosts, setMyPosts] = useState([]);
+  const [postPage, setPostPage] = useState(1);
+  const [postPagination, setPostPagination] = useState({ page: 1, total: 0, totalPages: 0 });
+
   /**
    * 착용 아바타 / 배지 (2026-04-14 신설, C 방향).
    *
@@ -345,6 +351,16 @@ export default function MyPagePage() {
             setWishlist(wishlistData?.wishlist || []);
             break;
           }
+          case 'my-posts': {
+            const postData = await getMyPosts({ page: postPage, size: 10 });
+            setMyPosts(postData?.posts || []);
+            setPostPagination({
+              page: postData?.page || postPage,
+              total: postData?.total || 0,
+              totalPages: postData?.totalPages || 0,
+            });
+            break;
+          }
           default:
             break;
         }
@@ -356,7 +372,7 @@ export default function MyPagePage() {
     }
 
     loadTabData();
-  }, [activeTab, isAuthenticated, loadMyReviews, reviewPage]);
+  }, [activeTab, isAuthenticated, loadMyReviews, reviewPage, postPage]);
 
   /**
    * 리뷰 수정/삭제 후에도 마이페이지 페이지네이션 숫자를 맞추기 위해
@@ -593,6 +609,54 @@ export default function MyPagePage() {
                   loading={isLoading}
                   title="찜한 영화"
                 />
+              )}
+            </div>
+          )}
+
+          {/* 내가 쓴 글 탭 */}
+          {activeTab === 'my-posts' && (
+            <div>
+              {isLoading ? (
+                <Loading message="작성한 글 로딩 중..." />
+              ) : myPosts.length === 0 ? (
+                <EmptyState
+                  icon="✏️"
+                  title="아직 작성한 글이 없습니다"
+                  description="커뮤니티에서 첫 글을 남겨보세요"
+                  actionLabel="커뮤니티 가기"
+                  onAction={() => navigate(ROUTES.COMMUNITY)}
+                />
+              ) : (
+                <S.MyReviewsSection>
+                  {myPosts.map((post) => (
+                    <S.PostItem
+                      key={post.id}
+                      onClick={() => navigate(`/community/${post.id}`)}
+                    >
+                      <S.PostItemTitle>{post.title}</S.PostItemTitle>
+                      <S.PostItemMeta>
+                        <span>{post.category}</span>
+                        <span>{post.createdAt?.slice(0, 10)}</span>
+                        <span>좋아요 {post.likeCount ?? 0}</span>
+                      </S.PostItemMeta>
+                    </S.PostItem>
+                  ))}
+
+                  {postPagination.totalPages > 1 && (
+                    <S.PaginationBar>
+                      {Array.from({ length: postPagination.totalPages }, (_, i) => i + 1).map((p) => (
+                        <S.PageButton
+                          key={p}
+                          type="button"
+                          $active={p === postPagination.page}
+                          onClick={() => setPostPage(p)}
+                        >
+                          {p}
+                        </S.PageButton>
+                      ))}
+                    </S.PaginationBar>
+                  )}
+                </S.MyReviewsSection>
               )}
             </div>
           )}
