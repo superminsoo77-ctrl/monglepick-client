@@ -330,6 +330,45 @@ export const PageBtn = styled.button`
     cursor: not-allowed;
   }
 `;
+/** 카테고리 + 정렬을 한 줄로 묶는 래퍼 */
+export const FilterRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.sm};
+  flex-wrap: wrap;
+`;
+
+/** 정렬 칩 행 */
+export const SortChipRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  flex-shrink: 0;
+`;
+
+/** 정렬 칩 — 활성 시 테두리+텍스트 primary, 비활성 시 muted */
+export const SortChip = styled.button`
+  padding: ${({ theme }) => `${theme.spacing.xs} ${theme.spacing.md}`};
+  background: transparent;
+  color: ${({ $active, theme }) =>
+    $active ? theme.colors.primary : theme.colors.textMuted};
+  border: 1px solid ${({ $active, theme }) =>
+    $active ? theme.colors.primary : theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ $active, theme }) =>
+    $active ? theme.typography.fontSemibold : theme.typography.fontMedium};
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
 export const SearchForm = styled.form`
   display: flex;
   gap: ${({ theme }) => theme.spacing.sm};
