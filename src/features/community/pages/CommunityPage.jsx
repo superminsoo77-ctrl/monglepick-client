@@ -34,6 +34,12 @@ const CATEGORY_FILTERS = [
   { id: 'NEWS', label: '뉴스' },
 ];
 
+const SORT_OPTIONS = [
+  { id: 'latest', label: '최신순' },
+  { id: 'likes', label: '좋아요순' },
+  { id: 'views', label: '조회수순' },
+];
+
 export default function CommunityPage() {
   const { showAlert } = useModal();
   const { showReward } = useRewardToast();
@@ -48,6 +54,7 @@ export default function CommunityPage() {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [category, setCategory] = useState('all');
+  const [sort, setSort] = useState('latest');
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,7 +83,7 @@ export default function CommunityPage() {
     async function loadPosts() {
       setIsLoading(true);
       try {
-        const result = await getPosts({ page: currentPage, size: 5, category, keyword });
+        const result = await getPosts({ page: currentPage, size: 5, category, keyword, sort });
         setPosts(result?.posts || []);
         setTotalPages(result?.totalPages || 1);
       } catch (err) {
@@ -90,13 +97,18 @@ export default function CommunityPage() {
     if (activeTab === 'posts') {
       loadPosts();
     }
-  }, [activeTab, category, currentPage, keyword, refreshTrigger]); // ✅ refreshTrigger 추가
+  }, [activeTab, category, sort, currentPage, keyword, refreshTrigger]); // ✅ refreshTrigger 추가
 
   const handleCategoryChange = (id) => {
     setCategory(id);
     setCurrentPage(1);
     setKeyword('');
     setSearchInput('');
+  };
+
+  const handleSortChange = (id) => {
+    setSort(id);
+    setCurrentPage(1);
   };
 
   const handleSearch = (e) => {
@@ -162,20 +174,35 @@ export default function CommunityPage() {
                 <S.SearchBtn type="submit">🔍</S.SearchBtn>
               </S.SearchForm>
 
-              <S.CategoryChipRow role="tablist" aria-label="게시글 카테고리 필터">
-                {CATEGORY_FILTERS.map((c) => (
-                  <S.CategoryChip
-                    key={c.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={category === c.id}
-                    $active={category === c.id}
-                    onClick={() => handleCategoryChange(c.id)}
-                  >
-                    {c.label}
-                  </S.CategoryChip>
-                ))}
-              </S.CategoryChipRow>
+              <S.FilterRow>
+                <S.CategoryChipRow role="tablist" aria-label="게시글 카테고리 필터">
+                  {CATEGORY_FILTERS.map((c) => (
+                    <S.CategoryChip
+                      key={c.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={category === c.id}
+                      $active={category === c.id}
+                      onClick={() => handleCategoryChange(c.id)}
+                    >
+                      {c.label}
+                    </S.CategoryChip>
+                  ))}
+                </S.CategoryChipRow>
+
+                <S.SortChipRow aria-label="정렬 방식">
+                  {SORT_OPTIONS.map((s) => (
+                    <S.SortChip
+                      key={s.id}
+                      type="button"
+                      $active={sort === s.id}
+                      onClick={() => handleSortChange(s.id)}
+                    >
+                      {s.label}
+                    </S.SortChip>
+                  ))}
+                </S.SortChipRow>
+              </S.FilterRow>
 
               {!showForm && isAuthenticated && (
                 <S.WriteButtonRow>
