@@ -1,9 +1,15 @@
 /**
  * 도장깨기 리뷰 작성/조회/재인증 페이지.
  *
- * - 작성 모드  (readOnly=false, resubmit=false): 리뷰 텍스트 입력 후 제출 → course_review 저장
- * - 읽기 모드  (readOnly=true):                  이미 제출한 리뷰를 API에서 불러와 읽기 전용으로 표시
- * - 재인증 모드 (resubmit=true):                 관리자 반려 사유 표시 + 새 리뷰 작성 후 재제출
+ * 모드 분기 (location.state 기준):
+ * - 작성    (readOnly=false, resubmit=false): 리뷰 제출 → AI 검증 → 결과 표시
+ * - 읽기    (readOnly=true):                  기존 리뷰 불러와 읽기 전용 표시
+ * - 재인증  (resubmit=true):                  관리자 반려 사유 표시 + 재제출 → AI 검증
+ *
+ * AI 검증 결과 (handleSubmit):
+ * - AUTO_VERIFIED  → 성공 알림 + 코스 상세로 이동
+ * - NEEDS_REVIEW   → 검토 중 안내 + 코스 상세로 이동 (pending 상태)
+ * - AUTO_REJECTED  → 페이지에 AI 반려 사유 배너 표시, 수정 후 재제출 가능
  *
  * URL: /stamp/:courseId/review/:movieId
  *
@@ -14,7 +20,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 import { ROUTES, buildPath } from '../../../shared/constants/routes';
-import { completeMovie, getMovieReview } from '../api/roadmapApi';
+import { completeMovie, verifyReview, applyVerifyResult, getMovieReview } from '../api/roadmapApi';
+import useAuthStore from '../../../shared/stores/useAuthStore';
 import * as S from './StampReviewPage.styled';
 
 const MAX_LENGTH = 500;
@@ -24,6 +31,7 @@ export default function StampReviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showAlert } = useModal();
+  const user = useAuthStore((s) => s.user);
 
   /* navigate 시 state로 영화 제목/코스 제목/모드 전달받음 */
   const movieTitle = location.state?.movieTitle || '영화';
@@ -37,6 +45,8 @@ export default function StampReviewPage() {
   /* readOnly 또는 resubmit(이전 리뷰 프리필)일 때 로딩 */
   const [isLoadingReview, setIsLoadingReview] = useState(readOnly || resubmit);
   const [reviewLoadError, setReviewLoadError] = useState(false);
+  /** AI 자동 반려 시 페이지에 표시할 사유 (AUTO_REJECTED) */
+  const [aiRationale, setAiRationale] = useState('');
 
   /** 읽기/재인증 모드 진입 시 기존 리뷰 로드 */
   useEffect(() => {
@@ -82,23 +92,103 @@ export default function StampReviewPage() {
     navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
   };
 
-  /** 리뷰 제출 (작성/재인증 모드) */
+  /**
+   * 리뷰 제출 (작성/재인증 모드) — 3단계 흐름:
+   * 1. Spring Boot에 리뷰 저장 → verificationId, moviePlot 수신
+   * 2. FastAPI에 직접 AI 검증 요청 → review_status 수신
+   * 3. Spring Boot에 AI 결과 전달 → DB 업데이트 + 진행률 반영
+   */
   const handleSubmit = async () => {
     if (!reviewText.trim()) {
       showAlert({ title: '안내', message: '리뷰를 작성해 주세요.', type: 'info' });
       return;
     }
     setIsSubmitting(true);
+    setAiRationale('');
     try {
-      await completeMovie(courseId, movieId, reviewText.trim());
-      showAlert({
-        title: resubmit ? '재인증 완료!' : '도장 완료!',
-        message: resubmit
-          ? `'${movieTitle}' 재인증이 제출되었어요. 검토 후 반영됩니다.`
-          : `'${movieTitle}' 영화 도장을 찍었어요!`,
-        type: 'success',
-      });
-      navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+      /* ── Step 1: Spring Boot에 리뷰 저장 ── */
+      const saveRes = await completeMovie(courseId, movieId, reviewText.trim());
+
+      // 이미 인증된 영화 (moviePlot=null, reviewStatus != PENDING)
+      if (!saveRes?.moviePlot && saveRes?.reviewStatus && saveRes.reviewStatus !== 'PENDING') {
+        showAlert({ title: '안내', message: '이미 인증이 처리된 영화입니다.', type: 'info' });
+        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+        return;
+      }
+
+      const verificationId = saveRes?.verificationId;
+      const moviePlot = saveRes?.moviePlot || '';
+      const userId = user?.id || user?.userId;
+
+      /* ── Step 2: FastAPI에 직접 AI 검증 요청 ── */
+      let aiResult = null;
+      try {
+        aiResult = await verifyReview({ verificationId, userId, courseId, movieId, reviewText: reviewText.trim(), moviePlot });
+      } catch {
+        // FastAPI 미응답 → PENDING 상태로 유지, 코스 상세로 이동
+        showAlert({
+          title: '제출 완료',
+          message: '리뷰가 제출되었어요. AI 검토 후 결과가 반영될 예정이에요.',
+          type: 'info',
+        });
+        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+        return;
+      }
+
+      const verificationStatus = aiResult?.review_status ?? 'PENDING';
+
+      /* ── Step 3: Spring Boot에 AI 결과 전달 (best-effort) ── */
+      try {
+        await applyVerifyResult(courseId, movieId, {
+          verificationId,
+          reviewStatus: verificationStatus,
+          rationale: aiResult?.rationale ?? null,
+          similarityScore: aiResult?.similarity_score ?? null,
+          matchedKeywords: aiResult?.matched_keywords ?? null,
+          confidence: aiResult?.confidence ?? null,
+        });
+      } catch (applyErr) {
+        // DB 동기화 실패해도 사용자에게는 AI 결과를 정상 표시
+        console.warn('AI 결과 DB 적용 실패:', applyErr?.message);
+      }
+
+      /* ── AI 결과에 따른 UI 분기 ── */
+      if (verificationStatus === 'AUTO_VERIFIED') {
+        showAlert({
+          title: resubmit ? '재인증 완료!' : '도장 완료!',
+          message: `'${movieTitle}' 영화 도장을 찍었어요!`,
+          type: 'success',
+        });
+        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+
+      } else if (verificationStatus === 'NEEDS_REVIEW') {
+        showAlert({
+          title: '검토 중',
+          message: '리뷰가 제출되었어요. AI 검토 결과 관리자가 확인 중이에요. 잠시 후 반영됩니다.',
+          type: 'info',
+        });
+        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+
+      } else if (verificationStatus === 'AUTO_REJECTED') {
+        const rationale =
+          aiResult?.rationale ||
+          '영화 내용과 관련 없는 리뷰로 판단되었어요. 영화의 인물, 장면, 줄거리를 바탕으로 다시 작성해 주세요.';
+        setAiRationale(rationale);
+        showAlert({
+          title: 'AI 검증 반려',
+          message: '리뷰가 영화 내용과 맞지 않아 반려되었어요. 아래 사유를 확인하고 수정해 주세요.',
+          type: 'error',
+        });
+
+      } else {
+        // PENDING 또는 알 수 없는 상태
+        showAlert({
+          title: '제출 완료',
+          message: '리뷰가 제출되었어요. 검토 후 인증이 반영될 예정이에요.',
+          type: 'info',
+        });
+        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+      }
     } catch (err) {
       showAlert({
         title: '오류',
@@ -123,7 +213,7 @@ export default function StampReviewPage() {
         <S.MovieName>🎬 {movieTitle}</S.MovieName>
       </S.Header>
 
-      {/* 반려 사유 배너 (재인증 모드에서만 표시) */}
+      {/* 관리자 반려 사유 배너 (재인증 모드) */}
       {resubmit && (
         <S.RejectionBanner>
           <S.RejectionTitle>반려 사유</S.RejectionTitle>
@@ -133,24 +223,35 @@ export default function StampReviewPage() {
         </S.RejectionBanner>
       )}
 
+      {/* AI 자동 반려 사유 배너 (제출 후 AUTO_REJECTED) */}
+      {aiRationale && (
+        <S.RejectionBanner>
+          <S.RejectionTitle>AI 검증 반려 사유</S.RejectionTitle>
+          <S.RejectionReason>{aiRationale}</S.RejectionReason>
+        </S.RejectionBanner>
+      )}
+
       <S.Card>
         <S.Label>
           {readOnly
             ? '작성한 리뷰'
             : resubmit
             ? '수정할 리뷰를 작성해 주세요.'
+            : aiRationale
+            ? '리뷰를 수정하여 다시 제출해 주세요.'
             : '이 영화를 보고 느낀 점을 자유롭게 적어주세요.'}
         </S.Label>
-        {isEditable && !resubmit && (
+        {isEditable && !resubmit && !aiRationale && (
           <S.Hint>
             줄거리, 인상적인 장면, 감독의 연출 방식, 배우의 연기 등
             영화와 관련된 내용이라면 무엇이든 좋아요.
           </S.Hint>
         )}
         {resubmit && (
-          <S.Hint>
-            반려 사유를 참고하여 리뷰를 보완한 후 다시 제출해 주세요.
-          </S.Hint>
+          <S.Hint>반려 사유를 참고하여 리뷰를 보완한 후 다시 제출해 주세요.</S.Hint>
+        )}
+        {aiRationale && (
+          <S.Hint>위 AI 반려 사유를 참고하여 영화 내용을 구체적으로 작성해 주세요.</S.Hint>
         )}
 
         {isLoadingReview ? (
@@ -176,7 +277,7 @@ export default function StampReviewPage() {
             onChange={isEditable ? (e) => setReviewText(e.target.value) : undefined}
             readOnly={!isEditable}
             maxLength={isEditable ? MAX_LENGTH : undefined}
-            autoFocus={isEditable}
+            autoFocus={isEditable && !aiRationale}
             style={!isEditable ? { cursor: 'default', opacity: 0.85 } : undefined}
           />
         )}
@@ -198,9 +299,9 @@ export default function StampReviewPage() {
             disabled={isSubmitting || !reviewText.trim()}
           >
             {isSubmitting
-              ? '저장 중...'
-              : resubmit
-              ? '재인증 제출'
+              ? 'AI 검증 중...'
+              : resubmit || aiRationale
+              ? '재제출'
               : '도장 찍기 완료'}
           </S.SubmitBtn>
         )}

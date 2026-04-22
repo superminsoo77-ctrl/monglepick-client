@@ -86,6 +86,8 @@ export default function RoadmapPage() {
   const [completedMovieIds, setCompletedMovieIds] = useState(new Set());
   /** 반려된 영화 맵: movieId(string) → rejectionReason(string) */
   const [rejectedMovieMap, setRejectedMovieMap] = useState({});
+  /** 관리자 검토 대기 중인 영화 ID 세트 */
+  const [pendingMovieIds, setPendingMovieIds] = useState(new Set());
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -100,6 +102,7 @@ export default function RoadmapPage() {
       const data = await getCourses({
         theme: activeTab === 'all' ? (selectedCategory || undefined) : undefined,
       });
+      console.log('[DEBUG] getCourses response:', data);
       setCourses(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
       console.error('[Roadmap] 코스 로드 실패:', err.message);
@@ -116,6 +119,7 @@ export default function RoadmapPage() {
     setIsDetailLoading(true);
     try {
       const data = await getCourseDetail(courseId);
+      console.log('[DEBUG] getCourseDetail response:', data);
       setDetail(data);
       /* 완료된 영화 ID 세트 생성 — 백엔드 completedMovieIds 배열 (문자열 ID) */
       const completed = new Set((data.completedMovieIds || []).map(String));
@@ -127,6 +131,9 @@ export default function RoadmapPage() {
         if (id) rejectedMap[id] = item.rejectionReason ?? item.reason ?? '';
       });
       setRejectedMovieMap(rejectedMap);
+      /* 검토 대기 중인 영화 ID 세트 */
+      const pending = new Set((data.pendingMovieIds || []).map(String));
+      setPendingMovieIds(pending);
     } catch {
       showAlert({ title: '오류', message: '코스를 불러올 수 없습니다.', type: 'error' });
       /* 진입 경로에 따라 목록으로 복귀 (stamp 모드면 /stamp, 아니면 /roadmap) */
@@ -169,8 +176,9 @@ export default function RoadmapPage() {
    * - 미완료      → 리뷰 작성 페이지로 이동
    * - 완료        → 작성한 리뷰 조회 페이지로 이동 (읽기 전용)
    * - 반려(rejected) → 반려 사유 + 재인증 폼 페이지로 이동
+   * - 검토 중(pending) → 제출한 리뷰 읽기 전용 조회
    */
-  const handleCheckboxClick = (movieId, movieTitle, isCompleted, isRejected, rejectionReason) => {
+  const handleCheckboxClick = (movieId, movieTitle, isCompleted, isRejected, rejectionReason, isPending) => {
     if (!detail) return;
     navigate(
       buildPath(ROUTES.STAMP_REVIEW, { courseId: detail.id, movieId }),
@@ -178,7 +186,7 @@ export default function RoadmapPage() {
         state: {
           movieTitle,
           courseTitle: detail.title,
-          readOnly: isCompleted && !isRejected,
+          readOnly: (isCompleted && !isRejected) || isPending,
           resubmit: isRejected,
           rejectionReason: rejectionReason || '',
         },
@@ -232,16 +240,21 @@ export default function RoadmapPage() {
                   const isCompleted = completedMovieIds.has(String(mid));
                   const rejectionReason = rejectedMovieMap[String(mid)];
                   const isRejected = !!rejectionReason;
+                  const isPending = pendingMovieIds.has(String(mid));
 
                   const btnLabel = isCompleted
                     ? '✓ 인증완료'
                     : isRejected
                     ? '✗ 반려됨'
+                    : isPending
+                    ? '⏳ 검토 중'
                     : '시청 인증';
                   const btnTitle = isCompleted
                     ? '내 리뷰 보기'
                     : isRejected
                     ? '반려 사유 확인 및 재인증'
+                    : isPending
+                    ? '관리자 검토 중 — 클릭하여 제출한 리뷰 보기'
                     : !detail.started
                     ? '코스를 먼저 시작해 주세요'
                     : '시청 인증하기';
@@ -263,8 +276,9 @@ export default function RoadmapPage() {
                       <S.VerifyBtn
                         $done={isCompleted}
                         $rejected={isRejected}
-                        onClick={() => detail.started && handleCheckboxClick(mid, movie.title, isCompleted, isRejected, rejectionReason)}
-                        disabled={!detail.started}
+                        $pending={isPending}
+                        onClick={() => (detail.started || isPending || isRejected) && handleCheckboxClick(mid, movie.title, isCompleted, isRejected, rejectionReason, isPending)}
+                        disabled={!detail.started && !isPending && !isRejected}
                         title={btnTitle}
                       >
                         {btnLabel}

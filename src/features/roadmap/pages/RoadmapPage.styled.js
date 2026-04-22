@@ -294,23 +294,26 @@ export const MovieItem = styled.div`
   }
 `;
 
-/** 시청 인증 버튼 — $done(완료), $rejected(반려), 기본(미인증) */
+/** 시청 인증 버튼 — $done(완료), $rejected(반려), $pending(검토 중), 기본(미인증) */
 export const VerifyBtn = styled.button`
   padding: 6px 12px;
   border-radius: ${({ theme }) => theme.radius.full};
-  border: 1.5px solid ${({ $done, $rejected, theme }) => {
+  border: 1.5px solid ${({ $done, $rejected, $pending, theme }) => {
     if ($done) return theme.colors.success;
     if ($rejected) return theme.colors.error;
+    if ($pending) return theme.colors.warning;
     return theme.colors.primary;
   }};
-  background: ${({ $done, $rejected, theme }) => {
+  background: ${({ $done, $rejected, $pending, theme }) => {
     if ($done) return `${theme.colors.success}18`;
     if ($rejected) return `${theme.colors.error}15`;
+    if ($pending) return `${theme.colors.warning}15`;
     return 'transparent';
   }};
-  color: ${({ $done, $rejected, theme }) => {
+  color: ${({ $done, $rejected, $pending, theme }) => {
     if ($done) return theme.colors.success;
     if ($rejected) return theme.colors.error;
+    if ($pending) return theme.colors.warning;
     return theme.colors.primary;
   }};
   font-size: ${({ theme }) => theme.typography.textXs};
@@ -321,9 +324,10 @@ export const VerifyBtn = styled.button`
   transition: all ${({ theme }) => theme.transitions.fast};
 
   &:not(:disabled):hover {
-    background: ${({ $done, $rejected, theme }) => {
+    background: ${({ $done, $rejected, $pending, theme }) => {
       if ($done) return theme.colors.success;
       if ($rejected) return theme.colors.error;
+      if ($pending) return theme.colors.warning;
       return theme.colors.primary;
     }};
     color: #fff;
