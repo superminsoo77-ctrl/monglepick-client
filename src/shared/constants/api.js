@@ -494,8 +494,6 @@ export const ROADMAP_ENDPOINTS = {
   COMPLETE_MOVIE: (courseId, movieId) => `${API_VERSION}/roadmap/courses/${courseId}/movies/${movieId}/complete`,
   /** 영화 리뷰 조회 - GET (path: courseId, movieId) */
   MOVIE_REVIEW: (courseId, movieId) => `${API_VERSION}/roadmap/courses/${courseId}/movies/${movieId}/review`,
-  /** FastAPI AI 검증 결과 적용 - PATCH (path: courseId, movieId) */
-  VERIFY_RESULT: (courseId, movieId) => `${API_VERSION}/roadmap/courses/${courseId}/movies/${movieId}/verify-result`,
 };
 
 /**

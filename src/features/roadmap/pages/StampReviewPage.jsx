@@ -20,8 +20,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 import { ROUTES, buildPath } from '../../../shared/constants/routes';
-import { completeMovie, verifyReview, applyVerifyResult, getMovieReview } from '../api/roadmapApi';
-import useAuthStore from '../../../shared/stores/useAuthStore';
+import { completeMovie, getMovieReview } from '../api/roadmapApi';
 import * as S from './StampReviewPage.styled';
 
 const MAX_LENGTH = 500;
@@ -31,7 +30,6 @@ export default function StampReviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showAlert } = useModal();
-  const user = useAuthStore((s) => s.user);
 
   /* navigate 시 state로 영화 제목/코스 제목/모드 전달받음 */
   const movieTitle = location.state?.movieTitle || '영화';
@@ -93,10 +91,11 @@ export default function StampReviewPage() {
   };
 
   /**
-   * 리뷰 제출 (작성/재인증 모드) — 3단계 흐름:
-   * 1. Spring Boot에 리뷰 저장 → verificationId, moviePlot 수신
-   * 2. FastAPI에 직접 AI 검증 요청 → review_status 수신
-   * 3. Spring Boot에 AI 결과 전달 → DB 업데이트 + 진행률 반영
+   * 리뷰 제출 (작성/재인증 모드) — Backend 단일 호출 플로우.
+   *
+   * 2026-04-22 보안 패치: 기존 3-step (Client→Backend→Agent→Backend) 플로우는
+   * 사용자가 AUTO_VERIFIED 결과를 위조해서 전달하면 AI 우회가 가능한 취약점이 있었다.
+   * 이제 Backend 가 트랜잭션 내부에서 Agent 를 직접 호출하고 판정까지 완료해서 돌려준다.
    */
   const handleSubmit = async () => {
     if (!reviewText.trim()) {
@@ -106,54 +105,12 @@ export default function StampReviewPage() {
     setIsSubmitting(true);
     setAiRationale('');
     try {
-      /* ── Step 1: Spring Boot에 리뷰 저장 ── */
-      const saveRes = await completeMovie(courseId, movieId, reviewText.trim());
+      const result = await completeMovie(courseId, movieId, reviewText.trim());
 
-      // 이미 인증된 영화 (moviePlot=null, reviewStatus != PENDING)
-      if (!saveRes?.moviePlot && saveRes?.reviewStatus && saveRes.reviewStatus !== 'PENDING') {
-        showAlert({ title: '안내', message: '이미 인증이 처리된 영화입니다.', type: 'info' });
-        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
-        return;
-      }
+      const reviewStatus = result?.reviewStatus ?? 'PENDING';
+      const agentAvailable = result?.agentAvailable !== false;
 
-      const verificationId = saveRes?.verificationId;
-      const moviePlot = saveRes?.moviePlot || '';
-      const userId = user?.id || user?.userId;
-
-      /* ── Step 2: FastAPI에 직접 AI 검증 요청 ── */
-      let aiResult = null;
-      try {
-        aiResult = await verifyReview({ verificationId, userId, courseId, movieId, reviewText: reviewText.trim(), moviePlot });
-      } catch {
-        // FastAPI 미응답 → PENDING 상태로 유지, 코스 상세로 이동
-        showAlert({
-          title: '제출 완료',
-          message: '리뷰가 제출되었어요. AI 검토 후 결과가 반영될 예정이에요.',
-          type: 'info',
-        });
-        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
-        return;
-      }
-
-      const verificationStatus = aiResult?.review_status ?? 'PENDING';
-
-      /* ── Step 3: Spring Boot에 AI 결과 전달 (best-effort) ── */
-      try {
-        await applyVerifyResult(courseId, movieId, {
-          verificationId,
-          reviewStatus: verificationStatus,
-          rationale: aiResult?.rationale ?? null,
-          similarityScore: aiResult?.similarity_score ?? null,
-          matchedKeywords: aiResult?.matched_keywords ?? null,
-          confidence: aiResult?.confidence ?? null,
-        });
-      } catch (applyErr) {
-        // DB 동기화 실패해도 사용자에게는 AI 결과를 정상 표시
-        console.warn('AI 결과 DB 적용 실패:', applyErr?.message);
-      }
-
-      /* ── AI 결과에 따른 UI 분기 ── */
-      if (verificationStatus === 'AUTO_VERIFIED') {
+      if (reviewStatus === 'AUTO_VERIFIED') {
         showAlert({
           title: resubmit ? '재인증 완료!' : '도장 완료!',
           message: `'${movieTitle}' 영화 도장을 찍었어요!`,
@@ -161,17 +118,17 @@ export default function StampReviewPage() {
         });
         navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
 
-      } else if (verificationStatus === 'NEEDS_REVIEW') {
+      } else if (reviewStatus === 'NEEDS_REVIEW') {
         showAlert({
           title: '검토 중',
-          message: '리뷰가 제출되었어요. AI 검토 결과 관리자가 확인 중이에요. 잠시 후 반영됩니다.',
+          message: '리뷰가 제출되었어요. AI 판단이 애매하여 관리자가 확인 중이에요. 잠시 후 반영됩니다.',
           type: 'info',
         });
         navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
 
-      } else if (verificationStatus === 'AUTO_REJECTED') {
+      } else if (reviewStatus === 'AUTO_REJECTED') {
         const rationale =
-          aiResult?.rationale ||
+          result?.rationale ||
           '영화 내용과 관련 없는 리뷰로 판단되었어요. 영화의 인물, 장면, 줄거리를 바탕으로 다시 작성해 주세요.';
         setAiRationale(rationale);
         showAlert({
@@ -181,10 +138,12 @@ export default function StampReviewPage() {
         });
 
       } else {
-        // PENDING 또는 알 수 없는 상태
+        // PENDING — Agent 장애 또는 이미 인증된 영화
         showAlert({
           title: '제출 완료',
-          message: '리뷰가 제출되었어요. 검토 후 인증이 반영될 예정이에요.',
+          message: agentAvailable
+            ? '리뷰가 제출되었어요. 검토 후 인증이 반영될 예정이에요.'
+            : '리뷰가 제출되었어요. AI 검토가 일시적으로 불가능해 잠시 후 관리자가 확인할 예정이에요.',
           type: 'info',
         });
         navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
