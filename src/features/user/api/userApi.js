@@ -17,6 +17,8 @@ import {
   WATCH_HISTORY_ENDPOINTS,
 } from '../../../shared/constants/api';
 
+const MIN_VISIBLE_FAVORITE_GENRE_COUNT = 100;
+
 function normalizeWishlistMovie(movie) {
   if (!movie) {
     return null;
@@ -65,6 +67,44 @@ function normalizeFavoriteMovie(item) {
     priority: item.priority ?? 0,
     createdAt: item.created_at || item.createdAt || null,
     movie: normalizeWishlistMovie(item.movie),
+  };
+}
+
+function normalizeFavoriteGenreOption(item) {
+  if (!item) {
+    return null;
+  }
+
+  const genreId = Number(item.genre_id ?? item.genreId);
+  if (!Number.isFinite(genreId)) {
+    return null;
+  }
+
+  return {
+    genreId,
+    genreCode: item.genre_code || item.genreCode,
+    genreName: item.genre_name || item.genreName,
+    contentsCount: item.contents_count ?? item.contentsCount ?? 0,
+  };
+}
+
+function normalizeFavoriteGenre(item) {
+  if (!item) {
+    return null;
+  }
+
+  const genre = normalizeFavoriteGenreOption(item.genre);
+  const genreId = Number(item.genre_id ?? item.genreId ?? genre?.genreId);
+  if (!genre || !Number.isFinite(genreId)) {
+    return null;
+  }
+
+  return {
+    favGenreId: item.fav_genre_id || item.favGenreId,
+    genreId,
+    priority: item.priority ?? 0,
+    createdAt: item.created_at || item.createdAt || null,
+    genre,
   };
 }
 
@@ -240,6 +280,59 @@ export async function reorderFavoriteMovies(movieIds) {
     favoriteMovies: (result?.favorite_movies || []).map(normalizeFavoriteMovie).filter(Boolean),
     total: result?.total || 0,
     maxCount: result?.max_count || 9,
+  };
+}
+
+// ── 선호 장르 ──
+
+/**
+ * 사용자의 선호 장르 목록과 선택 가능한 장르 옵션을 조회한다.
+ *
+ * @returns {Promise<{availableGenres: Array, selectedGenres: Array, selectedGenreIds: Array<number>}>}
+ */
+export async function getFavoriteGenres() {
+  requireAuth();
+  const result = await recommendApi.get(RECOMMEND_USER_ENDPOINTS.FAVORITE_GENRES);
+
+  const availableGenres = (result?.available_genres || result?.availableGenres || [])
+    .map(normalizeFavoriteGenreOption)
+    .filter((item) => item?.contentsCount >= MIN_VISIBLE_FAVORITE_GENRE_COUNT)
+    .filter(Boolean);
+  const selectedGenres = (result?.selected_genres || result?.selectedGenres || [])
+    .map(normalizeFavoriteGenre)
+    .filter(Boolean);
+
+  return {
+    availableGenres,
+    selectedGenres,
+    selectedGenreIds: selectedGenres.map((item) => item.genreId),
+  };
+}
+
+/**
+ * 사용자가 선택한 선호 장르 목록을 저장한다.
+ *
+ * @param {Array<number>} genreIds - 저장할 장르 ID 목록 (선택 순서 포함)
+ * @returns {Promise<{availableGenres: Array, selectedGenres: Array, selectedGenreIds: Array<number>}>}
+ */
+export async function saveFavoriteGenres(genreIds) {
+  requireAuth();
+  const result = await recommendApi.put(RECOMMEND_USER_ENDPOINTS.FAVORITE_GENRES, {
+    genre_ids: genreIds,
+  });
+
+  const availableGenres = (result?.available_genres || result?.availableGenres || [])
+    .map(normalizeFavoriteGenreOption)
+    .filter((item) => item?.contentsCount >= MIN_VISIBLE_FAVORITE_GENRE_COUNT)
+    .filter(Boolean);
+  const selectedGenres = (result?.selected_genres || result?.selectedGenres || [])
+    .map(normalizeFavoriteGenre)
+    .filter(Boolean);
+
+  return {
+    availableGenres,
+    selectedGenres,
+    selectedGenreIds: selectedGenres.map((item) => item.genreId),
   };
 }
 

@@ -3,12 +3,14 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import {
+  getFavoriteGenres,
   getFavoriteMovies,
   getProfile,
   getWishlist,
   getMyReviews,
   getMyPosts,
   reorderFavoriteMovies,
+  saveFavoriteGenres,
   saveFavoriteMovies,
   updateProfile,
 } from '../api/userApi';
@@ -102,9 +104,9 @@ function normalizeFavoriteMovieCandidate(movie) {
   };
 }
 
-function areMovieIdListsEqual(left, right) {
+function areOrderedListsEqual(left, right) {
   if (left.length !== right.length) return false;
-  return left.every((movieId, index) => movieId === right[index]);
+  return left.every((item, index) => item === right[index]);
 }
 
 function moveArrayItem(items, fromIndex, toIndex) {
@@ -353,7 +355,7 @@ function FavoriteMovieModal({ initialMovies = [], onClose, onSave }) {
     [selectedMovies],
   );
   const isDirty = useMemo(
-    () => !areMovieIdListsEqual(initialMovieIds, selectedMovieIds),
+    () => !areOrderedListsEqual(initialMovieIds, selectedMovieIds),
     [initialMovieIds, selectedMovieIds],
   );
 
@@ -618,6 +620,12 @@ export default function MyPagePage() {
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
   const [profile, setProfile] = useState(null);
   const [wishlist, setWishlist] = useState([]);
+  const [favoriteGenreCatalog, setFavoriteGenreCatalog] = useState([]);
+  const [selectedFavoriteGenres, setSelectedFavoriteGenres] = useState([]);
+  const [savedFavoriteGenreIds, setSavedFavoriteGenreIds] = useState([]);
+  const [isFavoriteGenreSaving, setIsFavoriteGenreSaving] = useState(false);
+  const [draggedFavoriteGenreId, setDraggedFavoriteGenreId] = useState(null);
+  const [dragOverFavoriteGenreId, setDragOverFavoriteGenreId] = useState(null);
   const [favoriteMovies, setFavoriteMovies] = useState([]);
   const [savedFavoriteMovieIds, setSavedFavoriteMovieIds] = useState([]);
   const [favoriteMovieMaxCount, setFavoriteMovieMaxCount] = useState(MAX_FAVORITE_MOVIES);
@@ -655,13 +663,26 @@ export default function MyPagePage() {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const authLoading = useAuthStore((s) => s.isLoading);
+  const favoriteGenreDragSuppressUntilRef = useRef(0);
 
   const favoriteMovieIds = useMemo(
     () => favoriteMovies.map((item) => item.movieId),
     [favoriteMovies],
   );
+  const selectedFavoriteGenreIds = useMemo(
+    () => selectedFavoriteGenres.map((genre) => genre.genreId),
+    [selectedFavoriteGenres],
+  );
+  const availableFavoriteGenres = useMemo(
+    () => favoriteGenreCatalog.filter((genre) => !selectedFavoriteGenreIds.includes(genre.genreId)),
+    [favoriteGenreCatalog, selectedFavoriteGenreIds],
+  );
+  const isFavoriteGenreDirty = useMemo(
+    () => !areOrderedListsEqual(savedFavoriteGenreIds, selectedFavoriteGenreIds),
+    [savedFavoriteGenreIds, selectedFavoriteGenreIds],
+  );
   const isFavoriteOrderDirty = useMemo(
-    () => !areMovieIdListsEqual(savedFavoriteMovieIds, favoriteMovieIds),
+    () => !areOrderedListsEqual(savedFavoriteMovieIds, favoriteMovieIds),
     [favoriteMovieIds, savedFavoriteMovieIds],
   );
   const favoriteMovieSlots = useMemo(() => {
@@ -715,6 +736,17 @@ export default function MyPagePage() {
     });
   }, []);
 
+  const applyFavoriteGenreResponse = useCallback((response) => {
+    const nextFavoriteGenreCatalog = response?.availableGenres || [];
+    const nextSelectedFavoriteGenres = (response?.selectedGenres || [])
+      .map((item) => item.genre)
+      .filter(Boolean);
+
+    setFavoriteGenreCatalog(nextFavoriteGenreCatalog);
+    setSelectedFavoriteGenres(nextSelectedFavoriteGenres);
+    setSavedFavoriteGenreIds(nextSelectedFavoriteGenres.map((genre) => genre.genreId));
+  }, []);
+
   const applyFavoriteMovieResponse = useCallback((response) => {
     const nextFavoriteMovies = (response?.favoriteMovies || []).map((item) => ({
       ...item,
@@ -729,6 +761,11 @@ export default function MyPagePage() {
     const favoriteMovieData = await getFavoriteMovies();
     applyFavoriteMovieResponse(favoriteMovieData);
   }, [applyFavoriteMovieResponse]);
+
+  const loadFavoriteGenres = useCallback(async () => {
+    const favoriteGenreData = await getFavoriteGenres();
+    applyFavoriteGenreResponse(favoriteGenreData);
+  }, [applyFavoriteGenreResponse]);
 
   /* 마운트 시 착용 아이템 로드 — 탭 전환과 무관하게 항상 헤더에 반영 */
   useEffect(() => {
@@ -768,7 +805,7 @@ export default function MyPagePage() {
             break;
           }
           case 'preferences': {
-            await loadFavoriteMovies();
+            await Promise.all([loadFavoriteGenres(), loadFavoriteMovies()]);
             break;
           }
           default:
@@ -782,7 +819,7 @@ export default function MyPagePage() {
     }
 
     loadTabData();
-  }, [activeTab, isAuthenticated, loadFavoriteMovies, loadMyReviews, reviewPage, myPostsPage]);
+  }, [activeTab, isAuthenticated, loadFavoriteGenres, loadFavoriteMovies, loadMyReviews, reviewPage, myPostsPage]);
 
   /**
    * 리뷰 수정/삭제 후에도 마이페이지 페이지네이션 숫자를 맞추기 위해
@@ -844,6 +881,81 @@ export default function MyPagePage() {
     const response = await saveFavoriteMovies(movieIds);
     applyFavoriteMovieResponse(response);
   }, [applyFavoriteMovieResponse]);
+
+  const handleFavoriteGenreSelect = useCallback((genre) => {
+    setSelectedFavoriteGenres((prevGenres) => {
+      if (prevGenres.some((item) => item.genreId === genre.genreId)) {
+        return prevGenres;
+      }
+
+      return [...prevGenres, genre];
+    });
+  }, []);
+
+  const handleFavoriteGenreRemove = useCallback((genreId) => {
+    setSelectedFavoriteGenres((prevGenres) =>
+      prevGenres.filter((genre) => genre.genreId !== genreId));
+  }, []);
+
+  const handleFavoriteGenreChipClick = useCallback((genreId) => {
+    if (Date.now() < favoriteGenreDragSuppressUntilRef.current) {
+      return;
+    }
+
+    handleFavoriteGenreRemove(genreId);
+  }, [handleFavoriteGenreRemove]);
+
+  const handleFavoriteGenreDragStart = useCallback((genreId) => {
+    favoriteGenreDragSuppressUntilRef.current = Date.now() + 250;
+    setDraggedFavoriteGenreId(genreId);
+    setDragOverFavoriteGenreId(genreId);
+  }, []);
+
+  const handleFavoriteGenreDrop = useCallback((targetGenreId) => {
+    favoriteGenreDragSuppressUntilRef.current = Date.now() + 250;
+
+    if (!draggedFavoriteGenreId || draggedFavoriteGenreId === targetGenreId) {
+      setDraggedFavoriteGenreId(null);
+      setDragOverFavoriteGenreId(null);
+      return;
+    }
+
+    setSelectedFavoriteGenres((prevGenres) => {
+      const fromIndex = prevGenres.findIndex((genre) => genre.genreId === draggedFavoriteGenreId);
+      const toIndex = prevGenres.findIndex((genre) => genre.genreId === targetGenreId);
+
+      if (fromIndex < 0 || toIndex < 0) {
+        return prevGenres;
+      }
+
+      return moveArrayItem(prevGenres, fromIndex, toIndex);
+    });
+
+    setDraggedFavoriteGenreId(null);
+    setDragOverFavoriteGenreId(null);
+  }, [draggedFavoriteGenreId]);
+
+  const handleFavoriteGenreDragEnd = useCallback(() => {
+    favoriteGenreDragSuppressUntilRef.current = Date.now() + 250;
+    setDraggedFavoriteGenreId(null);
+    setDragOverFavoriteGenreId(null);
+  }, []);
+
+  const handleFavoriteGenreSave = useCallback(async () => {
+    setIsFavoriteGenreSaving(true);
+    try {
+      const response = await saveFavoriteGenres(selectedFavoriteGenreIds);
+      applyFavoriteGenreResponse(response);
+    } catch (err) {
+      await showAlert({
+        title: '선호 장르 저장 실패',
+        message: err.message || '선호 장르 저장에 실패했습니다.',
+        type: 'error',
+      });
+    } finally {
+      setIsFavoriteGenreSaving(false);
+    }
+  }, [applyFavoriteGenreResponse, selectedFavoriteGenreIds, showAlert]);
 
   const handleFavoriteOrderSave = useCallback(async () => {
     setIsFavoriteOrderSaving(true);
@@ -1139,21 +1251,97 @@ export default function MyPagePage() {
           {activeTab === 'preferences' && (
             <S.PreferencesSection>
               <S.PreferencesCard>
-                <S.PreferencesTitle>선호 장르</S.PreferencesTitle>
+                <S.FavoriteMoviesHeader>
+                  <div>
+                    <S.PreferencesTitle>선호 장르</S.PreferencesTitle>
+                    <S.PreferencesHint>
+                      장르를 고르면 아래 `선택된 장르` 영역으로 이동합니다. 순서를 조정한 뒤
+                      오른쪽 `저장하기`를 눌러야 DB에 반영됩니다.
+                    </S.PreferencesHint>
+                  </div>
+                  <S.FavoriteMoviesHeaderActions>
+                    <S.FavoriteMoviesOrderSaveButton
+                      type="button"
+                      onClick={() => {
+                        void handleFavoriteGenreSave();
+                      }}
+                      disabled={!isFavoriteGenreDirty || isFavoriteGenreSaving}
+                    >
+                      {isFavoriteGenreSaving ? '저장 중...' : '저장하기'}
+                    </S.FavoriteMoviesOrderSaveButton>
+                  </S.FavoriteMoviesHeaderActions>
+                </S.FavoriteMoviesHeader>
+
+                <S.PreferencesTitle as="h4">선택된 장르</S.PreferencesTitle>
                 <S.PreferencesHint>
-                  좋아하는 장르를 선택하면 더 정확한 추천을 받을 수 있습니다.
-                  <br />
-                  <span style={{ fontSize: '0.85em' }}>이 기능은 준비 중입니다.</span>
+                  {selectedFavoriteGenres.length > 0
+                    ? `${selectedFavoriteGenres.length}개 선택됨. 드래그해서 priority를 바꾸고, 다시 클릭하면 제거됩니다.`
+                    : '아직 선택한 장르가 없습니다.'}
                 </S.PreferencesHint>
-                <S.PreferencesTags>
-                  {['액션', '코미디', '드라마', '로맨스', 'SF', '스릴러', '공포', '애니메이션', '판타지', '범죄', '다큐멘터리', '가족'].map(
-                    (genre) => (
-                      <S.PreferencesTag key={genre} disabled title="준비 중">
-                        {genre}
+
+                {selectedFavoriteGenres.length > 0 ? (
+                  <S.PreferencesTags>
+                    {selectedFavoriteGenres.map((genre) => {
+                      const isDragging = draggedFavoriteGenreId === genre.genreId;
+                      const isDragOver = dragOverFavoriteGenreId === genre.genreId
+                        && draggedFavoriteGenreId
+                        && draggedFavoriteGenreId !== genre.genreId;
+
+                      return (
+                        <S.PreferencesTag
+                          key={genre.genreId}
+                          type="button"
+                          draggable={selectedFavoriteGenres.length > 1}
+                          $active
+                          $draggable={selectedFavoriteGenres.length > 1}
+                          $dragging={isDragging}
+                          $dragOver={Boolean(isDragOver)}
+                          onClick={() => handleFavoriteGenreChipClick(genre.genreId)}
+                          onDragStart={() => handleFavoriteGenreDragStart(genre.genreId)}
+                          onDragEnd={handleFavoriteGenreDragEnd}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            setDragOverFavoriteGenreId(genre.genreId);
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            handleFavoriteGenreDrop(genre.genreId);
+                          }}
+                          aria-pressed="true"
+                          title="드래그해서 순서 변경, 클릭해서 제거"
+                        >
+                          {genre.genreName}
+                        </S.PreferencesTag>
+                      );
+                    })}
+                  </S.PreferencesTags>
+                ) : (
+                  <S.SelectedGenreEmpty>
+                    장르를 선택하면 이 영역으로 올라오고, 드래그로 우선순위를 조정할 수 있습니다.
+                  </S.SelectedGenreEmpty>
+                )}
+
+                <S.PreferencesTitle as="h4">장르 목록</S.PreferencesTitle>
+                <S.PreferencesHint>
+                  선호하는 장르를 선택해주세요.
+                </S.PreferencesHint>
+
+                {availableFavoriteGenres.length > 0 ? (
+                  <S.PreferencesTags>
+                    {availableFavoriteGenres.map((genre) => (
+                      <S.PreferencesTag
+                        key={genre.genreId}
+                        type="button"
+                        onClick={() => handleFavoriteGenreSelect(genre)}
+                        aria-pressed="false"
+                      >
+                        {genre.genreName}
                       </S.PreferencesTag>
-                    ),
-                  )}
-                </S.PreferencesTags>
+                    ))}
+                  </S.PreferencesTags>
+                ) : (
+                  <S.PreferencesHint>추가로 선택할 수 있는 장르가 없습니다.</S.PreferencesHint>
+                )}
               </S.PreferencesCard>
 
               <S.PreferencesCard>
