@@ -210,7 +210,7 @@ function EditProfileModal({ profile, onClose, onSaved }) {
 
   const displayInitial = nickname?.charAt(0) || user?.nickname?.charAt(0) || 'U';
 
-  return (
+  const modalContent = (
     <>
       <S.ModalOverlay onClick={onClose} />
       <S.ModalContainer role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
@@ -328,6 +328,8 @@ function EditProfileModal({ profile, onClose, onSaved }) {
       </S.ModalContainer>
     </>
   );
+
+  return createPortal(modalContent, document.body);
 }
 
 /* ── 최애 영화 선택 모달 ── */
