@@ -618,6 +618,7 @@ export default function MyPagePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { showAlert } = useModal();
+  const onboardingMission = location.state?.onboardingMission || null;
 
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
   const [profile, setProfile] = useState(null);
@@ -687,6 +688,38 @@ export default function MyPagePage() {
     () => !areOrderedListsEqual(savedFavoriteMovieIds, favoriteMovieIds),
     [favoriteMovieIds, savedFavoriteMovieIds],
   );
+  const shouldShowOnboardingReturn = useMemo(() => {
+    if (activeTab !== 'preferences' || location.state?.returnTo !== ROUTES.ONBOARDING) {
+      return false;
+    }
+
+    if (onboardingMission === 'favoriteGenres') {
+      return savedFavoriteGenreIds.length > 0;
+    }
+
+    if (onboardingMission === 'favoriteMovies') {
+      return savedFavoriteMovieIds.length > 0;
+    }
+
+    return savedFavoriteGenreIds.length > 0 || savedFavoriteMovieIds.length > 0;
+  }, [
+    activeTab,
+    location.state?.returnTo,
+    onboardingMission,
+    savedFavoriteGenreIds.length,
+    savedFavoriteMovieIds.length,
+  ]);
+  const onboardingReturnDescription = useMemo(() => {
+    if (onboardingMission === 'favoriteGenres') {
+      return '선호 장르 저장이 끝났다면 시작 미션 페이지로 돌아가 체크 상태를 확인하세요.';
+    }
+
+    if (onboardingMission === 'favoriteMovies') {
+      return '최애 영화 저장이 끝났다면 시작 미션 페이지로 돌아가 체크 상태를 확인하세요.';
+    }
+
+    return '저장이 끝났다면 시작 미션 페이지로 돌아가 진행 상태를 확인하세요.';
+  }, [onboardingMission]);
   const favoriteMovieSlots = useMemo(() => {
     const filledSlots = favoriteMovies.slice(0, FAVORITE_GRID_SIZE);
     const emptySlots = Array.from(
@@ -770,6 +803,12 @@ export default function MyPagePage() {
   }, [applyFavoriteGenreResponse]);
 
   /* 마운트 시 착용 아이템 로드 — 탭 전환과 무관하게 항상 헤더에 반영 */
+  useEffect(() => {
+    if (location.state?.activeTab && location.state.activeTab !== activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [activeTab, location.state?.activeTab]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     loadEquippedItems();
@@ -980,9 +1019,11 @@ export default function MyPagePage() {
       state: {
         backTo: ROUTES.MYPAGE,
         backTab: 'preferences',
+        returnTo: location.state?.returnTo,
+        onboardingMission,
       },
     });
-  }, [navigate]);
+  }, [location.state?.returnTo, navigate, onboardingMission]);
 
   const handleFavoriteDragStart = useCallback((movieId) => {
     setDraggedFavoriteMovieId(movieId);
@@ -1252,6 +1293,21 @@ export default function MyPagePage() {
           {/* 선호 설정 탭 */}
           {activeTab === 'preferences' && (
             <S.PreferencesSection>
+              {shouldShowOnboardingReturn && (
+                <S.OnboardingReturnCard>
+                  <div>
+                    <S.PreferencesTitle as="h4">시작 미션으로 돌아가기</S.PreferencesTitle>
+                    <S.PreferencesHint>{onboardingReturnDescription}</S.PreferencesHint>
+                  </div>
+                  <S.OnboardingReturnButton
+                    type="button"
+                    onClick={() => navigate(ROUTES.ONBOARDING)}
+                  >
+                    시작 미션 페이지로 돌아가기
+                  </S.OnboardingReturnButton>
+                </S.OnboardingReturnCard>
+              )}
+
               <S.PreferencesCard>
                 <S.FavoriteMoviesHeader>
                   <div>

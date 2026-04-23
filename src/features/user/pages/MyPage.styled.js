@@ -458,6 +458,39 @@ export const PreferencesSection = styled.div`
   gap: ${({ theme }) => theme.spacing.lg};
 `;
 
+export const OnboardingReturnCard = styled.div`
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.primaryLight};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  padding: ${({ theme }) => theme.spacing.lg};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+
+  ${mediaMobile} {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
+export const OnboardingReturnButton = styled.button`
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.lg}`};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: none;
+  background: ${({ theme }) => theme.gradients.primary};
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  cursor: pointer;
+  transition: transform ${({ theme }) => theme.transitions.fast}, opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+  }
+`;
+
 export const SelectedGenreEmpty = styled.div`
   border: 1px dashed ${({ theme }) => theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.lg};

@@ -68,7 +68,11 @@ export default function MovieDetailPage() {
   const handleGoBack = () => {
     if (location.state?.backTo) {
       navigate(location.state.backTo, {
-        state: location.state?.backTab ? { activeTab: location.state.backTab } : undefined,
+        state: {
+          ...(location.state?.backTab ? { activeTab: location.state.backTab } : {}),
+          ...(location.state?.returnTo ? { returnTo: location.state.returnTo } : {}),
+          ...(location.state?.onboardingMission ? { onboardingMission: location.state.onboardingMission } : {}),
+        },
       });
       return;
     }

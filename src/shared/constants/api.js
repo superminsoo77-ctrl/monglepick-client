@@ -480,6 +480,15 @@ export const RECOMMEND_WORLDCUP_ENDPOINTS = {
 };
 
 /**
+ * Recommend 시작 미션 온보딩 엔드포인트.
+ * recommend(FastAPI)의 미션 상태 조회를 처리한다.
+ */
+export const RECOMMEND_ONBOARDING_ENDPOINTS = {
+  /** 시작 미션 상태 조회 - GET */
+  STATUS: `${API_V2_VERSION}/onboarding/status`,
+};
+
+/**
  * 로드맵(Roadmap) 관련 엔드포인트.
  * 영화 학습 코스/로드맵을 처리한다.
  */

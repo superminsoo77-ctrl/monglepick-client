@@ -44,6 +44,8 @@ import OAuthCallbackPage from '../features/auth/pages/OAuthCallbackPage';
 import OAuthCookiePage from '../features/auth/pages/OAuthCookiePage';
 /* 채팅 윈도우 컴포넌트 — features/chat에서 가져옴 */
 import ChatWindow from '../features/chat/components/ChatWindow';
+/* 회원가입 직후 시작 미션 온보딩 페이지 */
+import OnboardingPage from '../features/onboarding/pages/OnboardingPage';
 
 /* ── MainLayout 포함 페이지 (Header/Footer 있음) ── */
 /* 홈 페이지 — features/home에서 가져옴 */
@@ -131,6 +133,18 @@ function App() {
 
         {/* 회원가입 페이지 — 레이아웃 없이 단독 표시 */}
         <Route path="/signup" element={<SignUpPage />} />
+
+        {/* 회원가입 직후 시작 미션 온보딩 페이지 */}
+        <Route
+          path="/onboarding"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <OnboardingPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
 
         {/* OAuth 콜백 페이지 — 구 방식: 인가 코드 직접 처리 (fallback) */}
         <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 import { buildPath, ROUTES } from '../../../shared/constants/routes';
 import {
@@ -40,6 +40,7 @@ function getLandingSubtitle(phase) {
 }
 
 export default function WorldcupPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { showAlert } = useModal();
 
@@ -347,6 +348,7 @@ export default function WorldcupPage() {
   const selectedCategoryRoundSummary = selectedCategory?.availableRoundSizes
     ?.map(formatRoundLabel)
     ?.join(', ') || '';
+  const shouldShowOnboardingReturn = location.state?.returnTo === ROUTES.ONBOARDING;
 
   return (
     <S.Container>
@@ -632,6 +634,14 @@ export default function WorldcupPage() {
           )}
 
           <S.ResultActionRow>
+            {shouldShowOnboardingReturn && (
+              <S.SecondaryActionButton
+                type="button"
+                onClick={() => navigate(ROUTES.ONBOARDING)}
+              >
+                시작 미션 페이지로 돌아가기
+              </S.SecondaryActionButton>
+            )}
             <S.SecondaryActionButton type="button" onClick={handleRestart}>
               다시 하기
             </S.SecondaryActionButton>
