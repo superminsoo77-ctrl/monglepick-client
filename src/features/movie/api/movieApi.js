@@ -149,6 +149,7 @@ export async function searchMovies({
   sort = 'relevance',
   page = 1,
   size = 20,
+  saveHistory = false,
 }) {
   /* FastAPI 검색 파라미터 구성 */
   const params = { page, size, search_type: searchType };
@@ -165,6 +166,7 @@ export async function searchMovies({
     params.sort_by = 'release_date';
     params.sort_order = 'desc';
   }
+  if (saveHistory) params.save_history = true;
 
   const data = await recommendApi.get(MOVIE_ENDPOINTS.SEARCH, { params });
   return {

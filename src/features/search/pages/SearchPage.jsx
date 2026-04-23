@@ -465,6 +465,7 @@ export default function SearchPage() {
         searchType: currentSearchType,
         genre: queryText && searchGenre !== '전체' ? searchGenre : '',
         genres: isGenreDiscoverySearch ? normalizedDiscoveryGenres : [],
+        saveHistory: true,
         // 기준 정렬은 검색 시점에만 서버에 전달하고, 이후 토글 변경은 프론트 재정렬로 처리합니다.
         sort: baseSort,
         page,
