@@ -24,7 +24,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
-import { submitOcrVerification, uploadImages } from '../../community/api/communityApi';
+import { submitOcrVerification, uploadImages, analyzeOcrImage } from '../../community/api/communityApi';
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8MB — 영수증 이미지 여유있게
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -35,18 +35,18 @@ export default function OcrVerificationModal({
   onClose,
   onSuccess,
 }) {
-  /* 업로드된 영수증 미리보기 URL (blob 은 선택 직후, 서버 URL 은 업로드 성공 시) */
+  /* 업로드된 영수증 미리보기 URL */
   const [previewUrl, setPreviewUrl] = useState(null);
-  /* 업로드된 서버 URL — 최종 제출 바디에 들어갈 값 */
+  /* 업로드된 서버 URL */
   const [uploadedUrl, setUploadedUrl] = useState(null);
-  /* 관람일(선택) — 자유 텍스트 */
-  const [watchDate, setWatchDate] = useState('');
-  /* 영수증에 찍힌 영화명(선택) */
-  const [movieName, setMovieName] = useState('');
-  /* 업로드/제출 진행 상태 */
+  /* OCR 분석 결과 */
+  const [ocrResult, setOcrResult] = useState(null);
+  /* 진행 상태 */
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  /* 사용자 노출용 에러/성공 메시지 */
+  const [submitted, setSubmitted] = useState(false);
+  /* 에러 메시지 */
   const [error, setError] = useState(null);
 
   /** 파일 입력 ref — 업로드 버튼 클릭 시 file dialog 트리거 */
@@ -55,13 +55,13 @@ export default function OcrVerificationModal({
   /** 모달 열림 ↔ 닫힘 전이 시 상태 리셋 + body 스크롤 잠금 */
   useEffect(() => {
     if (!isOpen) {
-      // 닫힐 때 내부 상태 초기화 — 다음 오픈에서 깨끗한 폼 보장
       setPreviewUrl(null);
       setUploadedUrl(null);
-      setWatchDate('');
-      setMovieName('');
+      setOcrResult(null);
       setUploading(false);
+      setAnalyzing(false);
       setSubmitting(false);
+      setSubmitted(false);
       setError(null);
       return;
     }
@@ -71,28 +71,46 @@ export default function OcrVerificationModal({
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
-  /** ESC 키로 닫기 — 제출 중에는 잠금 */
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape' && !submitting && !uploading) {
+      if (e.key === 'Escape' && !submitting && !uploading && !analyzing) {
         onClose?.();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, submitting, uploading, onClose]);
+  }, [isOpen, submitting, uploading, analyzing, onClose]);
 
   if (!isOpen || !event) return null;
 
-  /** 파일 선택 변경 핸들러 — validation + 즉시 업로드 */
+  /* 제출 완료 화면 */
+  if (submitted) {
+    return createPortal(
+      <Overlay role="presentation">
+        <Dialog role="dialog" aria-modal="true">
+          <SuccessBody>
+            <SuccessEmoji aria-hidden="true">🎉</SuccessEmoji>
+            <SuccessTitle>제출 완료!</SuccessTitle>
+            <SuccessMsg>
+              영수증이 정상적으로 접수되었습니다.<br />
+              관리자 검토 후 리워드가 지급됩니다.
+            </SuccessMsg>
+          </SuccessBody>
+        </Dialog>
+      </Overlay>,
+      document.body,
+    );
+  }
+
+  /** 파일 선택 → 업로드 → OCR 분석 자동 실행 */
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setError(null);
+    setOcrResult(null);
 
-    // 1) 유효성 — 타입/크기
     if (!ALLOWED_MIME.includes(file.type)) {
       setError('지원하지 않는 이미지 형식입니다. (JPG/PNG/WEBP/HEIC)');
       return;
@@ -102,30 +120,43 @@ export default function OcrVerificationModal({
       return;
     }
 
-    // 2) 즉시 미리보기 (blob URL) — 업로드 중에도 사용자가 확인할 수 있도록
+    // 1) 즉시 미리보기
     const blobUrl = URL.createObjectURL(file);
     setPreviewUrl(blobUrl);
     setUploadedUrl(null);
 
-    // 3) 서버 업로드 — 기존 /api/v1/images/upload 재사용
+    // 2) 서버 업로드
     setUploading(true);
+    let serverUrl = null;
     try {
       const urls = await uploadImages([file]);
-      const serverUrl = Array.isArray(urls) ? urls[0] : urls;
-      if (!serverUrl) {
-        throw new Error('이미지 업로드 응답에 URL 이 없습니다.');
-      }
+      serverUrl = Array.isArray(urls) ? urls[0] : urls;
+      if (!serverUrl) throw new Error('이미지 업로드 응답에 URL이 없습니다.');
       setUploadedUrl(serverUrl);
     } catch (err) {
       console.error('[OCR 인증] 이미지 업로드 실패:', err);
       setError(err?.message || '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
       setPreviewUrl(null);
+      setUploading(false);
+      return;
     } finally {
       setUploading(false);
     }
+
+    // 3) OCR 분석 — 업로드 성공 후 자동 실행
+    setAnalyzing(true);
+    try {
+      const result = await analyzeOcrImage(serverUrl);
+      setOcrResult(result);
+    } catch (err) {
+      console.warn('[OCR 인증] 분석 실패 (제출은 가능):', err);
+      // 분석 실패는 제출을 막지 않음 — 관리자가 직접 확인
+      setOcrResult(null);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
-  /** 제출 핸들러 — Backend POST /ocr-events/{eventId}/verify */
   const handleSubmit = async () => {
     if (!uploadedUrl) {
       setError('영수증 이미지를 먼저 업로드해주세요.');
@@ -136,36 +167,38 @@ export default function OcrVerificationModal({
     try {
       const result = await submitOcrVerification(event.eventId, {
         imageUrl: uploadedUrl,
-        watchDate: watchDate?.trim() || undefined,
-        movieName: movieName?.trim() || undefined,
+        extractedMovieName: ocrResult?.movieName?.value ?? null,
+        extractedWatchDate: ocrResult?.watchDate?.value ?? null,
+        extractedHeadcount: ocrResult?.headcount?.value ?? null,
+        ocrConfidence: ocrResult?.ocrConfidence ?? null,
+        extractedSeat: ocrResult?.seat?.value ?? null,
+        extractedTheater: ocrResult?.theater?.value ?? null,
+        extractedVenue: ocrResult?.venue?.value ?? null,
+        extractedScreeningTime: ocrResult?.screeningTime?.value ?? null,
+        extractedWatchedAt: ocrResult?.watchedAt?.value ?? null,
+        parsedText: ocrResult?.parsedText ?? null,
       });
-      // 성공 콜백 — 부모에서 토스트/알림 처리
-      onSuccess?.(result);
+      setSubmitted(true);
+      setTimeout(() => onSuccess?.(result), 2000);
     } catch (err) {
-      // 백엔드 에러 메시지 우선 노출 — ApiResponse 래퍼 에러 포맷(error.message)
-      const message =
-        err?.response?.data?.error?.message ||
-        err?.message ||
-        '인증 제출에 실패했습니다.';
-      // 중복(409) 시 특화 안내
-      if (err?.response?.status === 409) {
+      const status = err?.status ?? err?.response?.status;
+      if (status === 409) {
         setError('이미 이 이벤트에 인증을 제출하셨습니다.');
       } else {
-        setError(message);
+        setError(err?.response?.data?.error?.message || err?.message || '인증 제출에 실패했습니다.');
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  /** 오버레이(바깥 영역) 클릭 시 닫기 — 제출/업로드 중에는 잠금 */
   const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget && !submitting && !uploading) {
+    if (e.target === e.currentTarget && !submitting && !uploading && !analyzing) {
       onClose?.();
     }
   };
 
-  const busy = uploading || submitting;
+  const busy = uploading || analyzing || submitting;
 
   return createPortal(
     <Overlay onClick={handleOverlayClick} role="presentation">
@@ -205,6 +238,7 @@ export default function OcrVerificationModal({
               </UploadPlaceholder>
             )}
             {uploading && <UploadOverlay>업로드 중...</UploadOverlay>}
+            {analyzing && <UploadOverlay>영수증 분석 중...</UploadOverlay>}
           </UploadZone>
           <HiddenFileInput
             ref={fileInputRef}
@@ -213,27 +247,53 @@ export default function OcrVerificationModal({
             onChange={handleFileChange}
           />
 
-          <FieldLabel htmlFor="ocr-watch-date">관람일 (선택)</FieldLabel>
-          <TextInput
-            id="ocr-watch-date"
-            type="text"
-            placeholder="예: 2026-04-10 또는 4월 10일"
-            value={watchDate}
-            onChange={(e) => setWatchDate(e.target.value)}
-            disabled={busy}
-            maxLength={50}
-          />
+          {/* OCR 분석 결과 */}
+          {ocrResult && (() => {
+            const status = ocrResult.status ?? 'FAILED';
+            const isFailed  = status === 'FAILED';
+            const isPartial = status === 'PARTIAL_SUCCESS';
+            // 날짜+시간 조합(watchedAt)이 있으면 "관람일시"로, 없으면 "관람일"로 표시
+            const dateField = ocrResult.watchedAt?.ok
+              ? { label: '관람일시', field: ocrResult.watchedAt,  fmt: v => v }
+              : { label: '관람일',   field: ocrResult.watchDate,  fmt: v => v };
+            const fields = [
+              { label: '영화명',   field: ocrResult.movieName,  fmt: v => v },
+              dateField,
+              { label: '인원 수',  field: ocrResult.headcount,  fmt: v => `${v}명` },
+              { label: '좌석',     field: ocrResult.seat,        fmt: v => v },
+              { label: '상영관',   field: ocrResult.theater,     fmt: v => v },
+              { label: '영화관',   field: ocrResult.venue,       fmt: v => v },
+            ];
+            const okCount = fields.filter(f => f.field?.ok).length;
 
-          <FieldLabel htmlFor="ocr-movie-name">영수증에 적힌 영화명 (선택)</FieldLabel>
-          <TextInput
-            id="ocr-movie-name"
-            type="text"
-            placeholder="관리자 검토에 도움이 됩니다"
-            value={movieName}
-            onChange={(e) => setMovieName(e.target.value)}
-            disabled={busy}
-            maxLength={200}
-          />
+            return (
+              <OcrResultBox $partial={isPartial} $fail={isFailed}>
+                <OcrResultTitle>
+                  {isFailed   ? '⚠️ 추출 실패' :
+                   isPartial  ? `⚡ 일부 정보만 추출되었습니다 (${okCount}/6 항목)` :
+                                '✅ 분석 완료'}
+                </OcrResultTitle>
+                {fields.map(({ label, field, fmt }) => (
+                  <OcrRow key={label}>
+                    <OcrStatusIcon $ok={field?.ok ?? false}>{field?.ok ? '✓' : '✗'}</OcrStatusIcon>
+                    <OcrLabel>{label}</OcrLabel>
+                    <OcrValue $empty={!field?.ok}>
+                      {field?.ok ? fmt(field.value) : '미추출'}
+                    </OcrValue>
+                  </OcrRow>
+                ))}
+                {ocrResult.ocrConfidence != null && (
+                  <OcrRow>
+                    <OcrStatusIcon $ok={null} />
+                    <OcrLabel>신뢰도</OcrLabel>
+                    <OcrConfidence $pct={Math.round(ocrResult.ocrConfidence * 100)}>
+                      {Math.round(ocrResult.ocrConfidence * 100)}%
+                    </OcrConfidence>
+                  </OcrRow>
+                )}
+              </OcrResultBox>
+            );
+          })()}
 
           {error && <ErrorBox role="alert">{error}</ErrorBox>}
 
@@ -251,7 +311,7 @@ export default function OcrVerificationModal({
             onClick={handleSubmit}
             disabled={busy || !uploadedUrl}
           >
-            {submitting ? '제출 중...' : '인증 제출'}
+            {uploading ? '업로드 중...' : analyzing ? '분석 중...' : submitting ? '제출 중...' : '인증 제출'}
           </PrimaryButton>
         </Footer>
       </Dialog>
@@ -474,6 +534,67 @@ const ErrorBox = styled.div`
   border-left: 3px solid ${({ theme }) => theme.colors.error};
 `;
 
+const OcrResultBox = styled.div`
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-left: 3px solid ${({ $fail, $partial, theme }) =>
+    $fail    ? theme.colors.error :
+    $partial ? theme.colors.warning :
+               theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.sm};
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const OcrResultTitle = styled.div`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  margin-bottom: 2px;
+`;
+
+const OcrStatusIcon = styled.span`
+  font-size: 10px;
+  font-weight: bold;
+  width: 14px;
+  flex-shrink: 0;
+  color: ${({ $ok, theme }) =>
+    $ok === true  ? theme.colors.success :
+    $ok === false ? theme.colors.error :
+                    'transparent'};
+`;
+
+const OcrRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+const OcrLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  min-width: 60px;
+  flex-shrink: 0;
+`;
+
+const OcrValue = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ $empty, theme }) => $empty ? theme.colors.textMuted : theme.colors.textPrimary};
+  font-style: ${({ $empty }) => $empty ? 'italic' : 'normal'};
+`;
+
+const OcrConfidence = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ $pct, theme }) =>
+    $pct >= 80 ? theme.colors.success :
+    $pct >= 50 ? theme.colors.warning :
+    theme.colors.error};
+`;
+
 const Notice = styled.div`
   margin-top: ${({ theme }) => theme.spacing.xs};
   padding: ${({ theme }) => theme.spacing.sm};
@@ -523,4 +644,32 @@ const PrimaryButton = styled.button`
 
   &:hover:not(:disabled) { filter: brightness(1.08); }
   &:disabled { opacity: 0.55; cursor: not-allowed; }
+`;
+
+const SuccessBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.xl};
+  min-height: 240px;
+  text-align: center;
+`;
+
+const SuccessEmoji = styled.div`
+  font-size: 56px;
+  line-height: 1;
+`;
+
+const SuccessTitle = styled.div`
+  font-size: ${({ theme }) => theme.typography.textXl};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+const SuccessMsg = styled.div`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  line-height: 1.6;
 `;

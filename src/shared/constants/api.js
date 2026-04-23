@@ -182,9 +182,15 @@ export const COMMUNITY_ENDPOINTS = {
    */
   OCR_EVENT_BY_MOVIE: (movieId) => `${API_VERSION}/ocr-events/by-movie/${movieId}`,
   /**
+   * OCR 영수증 분석 - POST (JWT 필수).
+   * Python OCR 서비스가 이미지를 분석해 영화명/관람일/인원수/신뢰도를 추출한다.
+   * 바디: { imageUrl }
+   * 반환: { extractedMovieName, extractedWatchDate, extractedHeadcount, ocrConfidence }
+   */
+  OCR_ANALYZE: `${API_VERSION}/ocr-events/analyze`,
+  /**
    * 2026-04-14 신규: OCR 실관람 인증 제출 - POST (JWT 필수).
-   * 영수증 이미지 업로드 후 받은 URL 을 imageUrl 로 전달.
-   * 바디: { imageUrl, watchDate?, movieName? }
+   * 바디: { imageUrl, extractedMovieName?, extractedWatchDate?, extractedHeadcount?, ocrConfidence? }
    */
   OCR_VERIFY: (eventId) => `${API_VERSION}/ocr-events/${eventId}/verify`,
 };

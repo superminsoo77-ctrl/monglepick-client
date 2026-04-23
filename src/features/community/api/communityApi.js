@@ -165,6 +165,21 @@ export async function getOcrEventByMovie(movieId) {
 }
 
 /**
+ * OCR 영수증 이미지 분석 — Python OCR 서비스 호출.
+ *
+ * 이미지 업로드 완료 후 서버 URL 을 전달하면, 백엔드가 Python FastAPI 로 분석을 위임하고
+ * 추출 결과(영화명/관람일/인원수/신뢰도)를 반환한다.
+ *
+ * @param {string} imageUrl - 업로드된 영수증 이미지 서버 URL
+ * @returns {Promise<{extractedMovieName:string|null, extractedWatchDate:string|null, extractedHeadcount:number|null, ocrConfidence:number|null}>}
+ */
+export async function analyzeOcrImage(imageUrl) {
+  // EasyOCR 3-variant 처리가 최대 ~90초 소요 — 기본 30초 timeout 개별 오버라이드
+  const wrapper = await api.post(COMMUNITY_ENDPOINTS.OCR_ANALYZE, { imageUrl }, { timeout: 150000 });
+  return wrapper?.data ?? wrapper;
+}
+
+/**
  * OCR 실관람 인증 제출 (2026-04-14 신규).
  *
  * 1) `uploadImages()` 로 영수증 이미지를 먼저 업로드해 URL 을 얻는다.
