@@ -119,6 +119,8 @@ export const RECOMMEND_USER_ENDPOINTS = {
   WISHLIST: `${API_V2_VERSION}/users/me/wishlist`,
   /** 내 리뷰 목록 조회 - GET */
   MY_REVIEWS: `${API_V2_VERSION}/users/me/reviews`,
+  /** 내 선호 장르 목록 조회/저장 - GET, PUT */
+  FAVORITE_GENRES: `${API_V2_VERSION}/users/me/favorite-genres`,
   /** 내 최애 영화 목록 조회/저장 - GET, PUT */
   FAVORITE_MOVIES: `${API_V2_VERSION}/users/me/favorite-movies`,
   /** 내 최애 영화 순서 저장 - PUT */
@@ -475,6 +477,15 @@ export const RECOMMEND_WORLDCUP_ENDPOINTS = {
   SUBMIT: `${API_VERSION}/onboarding/worldcup`,
   /** 완료 결과 조회 - GET */
   RESULT: `${API_VERSION}/onboarding/worldcup/result`,
+};
+
+/**
+ * Recommend 시작 미션 온보딩 엔드포인트.
+ * recommend(FastAPI)의 미션 상태 조회를 처리한다.
+ */
+export const RECOMMEND_ONBOARDING_ENDPOINTS = {
+  /** 시작 미션 상태 조회 - GET */
+  STATUS: `${API_V2_VERSION}/onboarding/status`,
 };
 
 /**

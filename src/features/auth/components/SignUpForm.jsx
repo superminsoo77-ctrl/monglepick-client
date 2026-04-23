@@ -64,7 +64,7 @@ const STRENGTH_LABEL = {
   '':     '',
 };
 
-export default function SignUpForm() {
+export default function SignUpForm({ onSignupSuccess }) {
   /* 폼 입력값 상태 */
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
@@ -158,6 +158,12 @@ export default function SignUpForm() {
         marketingAgreed,
       });
 
+      /*
+       * 부모 SignUpPage의 "이미 인증됨 → 홈으로 이동" 가드가
+       * 회원가입 직후 온보딩 이동을 덮어쓰지 않도록 먼저 알려준다.
+       */
+      onSignupSuccess?.();
+
       /* 가입 성공 시 자동 로그인 처리 */
       login({
         accessToken:  response.accessToken,
@@ -175,8 +181,8 @@ export default function SignUpForm() {
         showReward(response.signupBonusPoints, '회원가입 보너스');
       }
 
-      /* 홈 페이지로 리다이렉트 */
-      navigate(ROUTES.HOME);
+      /* 시작 미션 온보딩 페이지로 리다이렉트 */
+      navigate(ROUTES.ONBOARDING, { replace: true });
     } catch (err) {
       /* 에러 코드별 사용자 친화적 메시지 분기 */
       if (err.code === 'A001') {

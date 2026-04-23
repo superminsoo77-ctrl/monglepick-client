@@ -39,6 +39,9 @@ export const ROUTES = {
   /** 회원가입 페이지 */
   SIGNUP: '/signup',
 
+  /** 회원가입 직후 시작 미션 온보딩 페이지 */
+  ONBOARDING: '/onboarding',
+
   /** OAuth 콜백 페이지 — 구 방식: 인가 코드 직접 처리 (동적 파라미터 :provider) */
   OAUTH_CALLBACK: '/auth/callback/:provider',
 

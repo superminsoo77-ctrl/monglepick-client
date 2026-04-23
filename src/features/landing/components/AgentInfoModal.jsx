@@ -486,6 +486,7 @@ const NoteIcon = styled.span`
    모든 수치/구조는 CLAUDE.md + docs/AI_Agent_설계_및_구현계획서.md 기준.
 */
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const AGENT_MODAL_CONTENT = {
 
   /* ─────────── 1. Chat Agent 16노드 ─────────── */

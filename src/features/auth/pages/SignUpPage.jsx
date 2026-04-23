@@ -8,7 +8,7 @@
  * - 배경에 그라데이션 원 장식 2개 (decorative circles)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
@@ -23,15 +23,16 @@ export default function SignUpPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const isLoading = useAuthStore((s) => s.isLoading);
   const navigate = useNavigate();
+  const [isSignupRedirecting, setIsSignupRedirecting] = useState(false);
 
   /**
    * 이미 인증된 사용자는 홈으로 리다이렉트.
    */
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated && !isSignupRedirecting) {
       navigate(ROUTES.HOME, { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, isSignupRedirecting, navigate]);
 
   return (
     <S.SignUpPageWrapper>
@@ -39,7 +40,7 @@ export default function SignUpPage() {
       <S.Orb1 aria-hidden="true" />
       <S.Orb2 aria-hidden="true" />
       <S.Orb3 aria-hidden="true" />
-      <SignUpForm />
+      <SignUpForm onSignupSuccess={() => setIsSignupRedirecting(true)} />
     </S.SignUpPageWrapper>
   );
 }

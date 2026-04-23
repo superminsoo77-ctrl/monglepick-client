@@ -76,12 +76,12 @@ export default function HomePage() {
   const [notices, setNotices] = useState([]);
 
   /**
-   * 홈 진입 시 자동 표시되는 POPUP/MODAL 공지 큐 (2026-04-15).
-   * - MODAL 이 POPUP 보다 먼저, 같은 displayType 끼리는 priority DESC.
-   * - localStorage 에 "영구 억제/24시간 억제" 된 공지는 큐 생성 시 제거.
-   * - 큐의 0번 인덱스가 현재 화면에 떠 있는 공지이며, 닫으면 shift 로 다음 항목이 뜬다.
+   * 현재 세션에서 이미 닫은 공지 ID 목록.
+   *
+   * 공지 큐는 notices 로부터 파생 계산하고, 닫기 동작만 별도 상태로 관리한다.
+   * 이렇게 하면 effect 내부의 동기 setState 없이도 동일한 UI 흐름을 유지할 수 있다.
    */
-  const [announcementQueue, setAnnouncementQueue] = useState([]);
+  const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState([]);
 
   const navigate = useNavigate();
 
@@ -131,9 +131,11 @@ export default function HomePage() {
 
     /* 공지사항 처리 — 실패해도 무시 (공지가 없어도 홈은 정상 작동) */
     if (noticeResult.status === 'fulfilled') {
+      setDismissedAnnouncementIds([]);
       setNotices(noticeResult.value ?? []);
     } else {
       console.error('[HomePage] 공지사항 로드 실패:', noticeResult.reason);
+      setDismissedAnnouncementIds([]);
       setNotices([]);
     }
   }, []);
@@ -163,24 +165,24 @@ export default function HomePage() {
   );
 
   /**
-   * POPUP/MODAL 공지 큐 생성 — notices 가 로드/변경될 때마다 재계산.
+   * POPUP/MODAL 공지 큐 생성 — notices 변경 시 파생 계산.
    *
    * <ol>
    *   <li>POPUP/MODAL 만 필터</li>
    *   <li>localStorage 억제(영구/24시간) 대상 제거</li>
+   *   <li>현재 세션에서 이미 닫은 공지 제거</li>
    *   <li>정렬: MODAL 먼저(중요) → 같은 타입 안에선 priority DESC</li>
    * </ol>
-   *
-   * 비로그인 유저도 보이도록 localStorage 기반 억제(쿠키/JWT 의존 X).
    */
-  useEffect(() => {
+  const announcementQueue = useMemo(() => {
     if (!Array.isArray(notices) || notices.length === 0) {
-      setAnnouncementQueue([]);
-      return;
+      return [];
     }
-    const queue = notices
+
+    return notices
       .filter((n) => n.displayType === 'POPUP' || n.displayType === 'MODAL')
       .filter((n) => !isNoticeSuppressed(n.noticeId))
+      .filter((n) => !dismissedAnnouncementIds.includes(n.noticeId))
       .sort((a, b) => {
         // MODAL 을 우선 노출 (중요 공지). 동일 displayType 내에서는 priority DESC.
         if (a.displayType !== b.displayType) {
@@ -188,22 +190,25 @@ export default function HomePage() {
         }
         return (b.priority ?? 0) - (a.priority ?? 0);
       });
-    setAnnouncementQueue(queue);
-  }, [notices]);
-
-  /**
-   * 공지 팝업/모달 닫기 콜백 — 큐의 첫 항목을 제거해 다음 공지를 띄운다.
-   * 실제 localStorage 억제 처리는 NoticeAnnouncementModal 내부에서 수행.
-   */
-  const handleAnnouncementClose = useCallback(() => {
-    setAnnouncementQueue((prev) => prev.slice(1));
-  }, []);
+  }, [dismissedAnnouncementIds, notices]);
 
   /**
    * 현재 화면에 노출 중인 공지 (큐의 0번). 없으면 null.
    * variant 는 displayType 을 소문자로 변환해 NoticeAnnouncementModal 로 전달.
    */
   const currentAnnouncement = announcementQueue[0] ?? null;
+
+  /**
+   * 공지 팝업/모달 닫기 콜백 — 현재 공지를 닫힘 목록에 추가해 다음 공지를 띄운다.
+   * 실제 localStorage 억제 처리는 NoticeAnnouncementModal 내부에서 수행.
+   */
+  const handleAnnouncementClose = useCallback(() => {
+    if (!currentAnnouncement?.noticeId) {
+      return;
+    }
+
+    setDismissedAnnouncementIds((prev) => [...prev, currentAnnouncement.noticeId]);
+  }, [currentAnnouncement]);
 
   /**
    * 추천 질문 카드 클릭 시 채팅 페이지로 이동.

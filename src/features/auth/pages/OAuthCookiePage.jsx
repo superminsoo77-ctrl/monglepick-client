@@ -73,8 +73,8 @@ export default function OAuthCookiePage() {
           showReward(bonus, '회원가입 보너스');
         }
 
-        // 홈으로 리다이렉트
-        navigate(ROUTES.HOME, { replace: true });
+        // 신규 OAuth 가입이면 시작 미션, 기존 사용자는 홈으로 이동
+        navigate(bonus > 0 ? ROUTES.ONBOARDING : ROUTES.HOME, { replace: true });
       } catch (err) {
         setError(err.message || '소셜 로그인 토큰 교환에 실패했습니다.');
         setIsProcessing(false);

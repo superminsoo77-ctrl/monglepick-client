@@ -458,6 +458,49 @@ export const PreferencesSection = styled.div`
   gap: ${({ theme }) => theme.spacing.lg};
 `;
 
+export const OnboardingReturnCard = styled.div`
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.primaryLight};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  padding: ${({ theme }) => theme.spacing.lg};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+
+  ${mediaMobile} {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
+export const OnboardingReturnButton = styled.button`
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.lg}`};
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: none;
+  background: ${({ theme }) => theme.gradients.primary};
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  cursor: pointer;
+  transition: transform ${({ theme }) => theme.transitions.fast}, opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+  }
+`;
+
+export const SelectedGenreEmpty = styled.div`
+  border: 1px dashed ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  color: ${({ theme }) => theme.colors.textMuted};
+  padding: ${({ theme }) => theme.spacing.lg};
+  text-align: center;
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
 export const FavoriteMoviesHeader = styled.div`
   display: flex;
   align-items: flex-start;
@@ -1294,8 +1337,13 @@ export const PreferencesTag = styled.button`
   color: ${({ theme }) => theme.colors.textSecondary};
   background-color: ${({ theme }) => theme.colors.bgElevated};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  cursor: pointer;
+  cursor: ${({ $draggable }) => ($draggable ? 'grab' : 'pointer')};
   transition: all ${({ theme }) => theme.transitions.fast};
+  opacity: ${({ $dragging }) => ($dragging ? 0.55 : 1)};
+
+  &:active {
+    cursor: ${({ $draggable }) => ($draggable ? 'grabbing' : 'pointer')};
+  }
 
   &:hover {
     border-color: ${({ theme }) => theme.colors.primary};
@@ -1312,5 +1360,12 @@ export const PreferencesTag = styled.button`
       background: ${theme.gradients.primary};
       border-color: transparent;
       color: white;
+    `}
+
+  ${({ $dragOver, theme }) =>
+    $dragOver &&
+    css`
+      box-shadow: ${theme.glows.primary};
+      transform: translateY(-1px) scale(1.03);
     `}
 `;
