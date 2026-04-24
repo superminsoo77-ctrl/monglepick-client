@@ -198,7 +198,32 @@ export default function SupportPage() {
     try {
       const categoryValue = CATEGORY_FILTERS[faqCategoryIdx]?.value;
       const data = await getFaqs(categoryValue);
-      setFaqs(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setFaqs(list);
+
+      /*
+       * 서버 응답에 포함된 userFeedback 을 피드백 맵에 병합.
+       *
+       * 로그인 사용자가 이미 피드백한 FAQ 는 백엔드가 "helpful"/"not_helpful" 을 내려주며,
+       * 이를 UI 상태 코드("helpful"/"notHelpful") 로 변환해 faqFeedbackMap 에 주입한다.
+       * 새로고침 후에도 이미 남긴 피드백 FAQ 는 감사 메시지로 표시되어 재클릭 → 409 Conflict
+       * 를 구조적으로 차단한다. (서버가 단일 진실 원본)
+       *
+       * 카테고리 변경 시 응답에 포함되지 않은 FAQ 는 기존 맵 항목을 보존해야 하므로
+       * spread 로 병합한다. 비로그인 호출이거나 미제출 FAQ 는 userFeedback=null 이 오므로
+       * 굳이 null 을 맵에 쓰지 않는다(기존 값이 있으면 유지).
+       */
+      setFaqFeedbackMap((prev) => {
+        const next = { ...prev };
+        for (const faq of list) {
+          if (faq?.userFeedback === 'helpful') {
+            next[faq.id] = 'helpful';
+          } else if (faq?.userFeedback === 'not_helpful') {
+            next[faq.id] = 'notHelpful';
+          }
+        }
+        return next;
+      });
     } catch (err) {
       console.warn('FAQ 조회 실패, 플레이스홀더 데이터 사용:', err.message);
       const categoryValue = CATEGORY_FILTERS[faqCategoryIdx]?.value;
@@ -282,16 +307,31 @@ export default function SupportPage() {
     setOpenFaqIds(new Set());
   };
 
-  /** FAQ 피드백 제출 */
+  /**
+   * FAQ 피드백 제출.
+   *
+   * 정상 응답 시: 피드백 맵을 업데이트해 감사 메시지로 치환한다.
+   * 409 Conflict (FAQ_FEEDBACK_DUPLICATE) 수신 시: 서버 기준 이미 피드백이 존재한다는
+   * 뜻이므로 에러로 처리하지 않고 UI 도 완료 상태로 전환한다. 이는 서버가 단일 진실 원본
+   * 이며, 다른 세션/기기에서 이미 피드백을 제출한 뒤 현재 탭이 오래된 상태를 보여주던
+   * 경우를 방어한다. helpful 방향은 응답에 없지만 클릭한 버튼을 그대로 반영한다 —
+   * loadFaqs 가 다음 렌더 시 서버 상태로 정합성을 보정한다.
+   * 나머지 에러는 기존대로 재시도 안내.
+   */
   const handleFaqFeedback = async (faqId, helpful) => {
     if (!isAuthenticated || feedbackLoadingId) return;
     setFeedbackLoadingId(faqId);
     try {
       await submitFaqFeedback(faqId, helpful);
       setFaqFeedbackMap((prev) => ({ ...prev, [faqId]: helpful ? 'helpful' : 'notHelpful' }));
-    } catch {
-      /* 실패 시 UI 업데이트 하지 않음 — 사용자가 재시도 가능 */
-      setError('피드백 제출에 실패했습니다. 다시 시도해주세요.');
+    } catch (err) {
+      if (err?.status === 409) {
+        /* 서버에 이미 기록된 피드백 — UI 만 완료 상태로 맞춰 중복 시도를 차단한다 */
+        setFaqFeedbackMap((prev) => ({ ...prev, [faqId]: helpful ? 'helpful' : 'notHelpful' }));
+      } else {
+        /* 실패 시 UI 업데이트 하지 않음 — 사용자가 재시도 가능 */
+        setError('피드백 제출에 실패했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setFeedbackLoadingId(null);
     }

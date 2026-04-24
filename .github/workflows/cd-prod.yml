@@ -22,6 +22,9 @@
 #
 # 필요 GitHub Secrets:
 #   DEPLOY_SSH_KEY / VM1_HOST / VM_USER / VITE_API_BASE_URL_PROD
+#   VITE_KAKAO_JAVASCRIPT_KEY — 카카오맵 JS SDK 키 (외부 지도 연동, 2026-04-24).
+#                                Vite 는 빌드 타임에 번들 인라인이므로 본 워크플로우에서 주입 필수.
+#                                도메인 바인딩 키 — 콘솔 플랫폼 > Web 에 운영 도메인 등록 필요.
 #   SLACK_WEBHOOK_URL (선택) — 설정 시 배포 완료/실패 시 슬랙 채널로 알림 전송.
 #                              미설정이면 notify 잡이 안전하게 스킵된다.
 #
@@ -62,8 +65,13 @@ jobs:
         continue-on-error: true
         run: npm run lint
       - name: Build (production)
+        # Vite 는 import.meta.env.VITE_* 를 빌드 타임에 번들에 인라인한다.
+        # → VM1 런타임 .env 로는 해결 불가, 반드시 이 스텝의 env 블록에 주입해야 한다.
+        # VITE_KAKAO_JAVASCRIPT_KEY 는 카카오맵 JS SDK 도메인 바인딩 키이므로
+        # 번들에 박혀도 타 도메인 사용은 차단됨 (Developers 콘솔 플랫폼 > Web 등록 도메인 전제).
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
+          VITE_KAKAO_JAVASCRIPT_KEY: ${{ secrets.VITE_KAKAO_JAVASCRIPT_KEY }}
           VITE_APP_ENV: production
         run: npm run build
       - name: Pack dist as tarball

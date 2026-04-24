@@ -53,9 +53,10 @@ const DEFAULT_MAX_INPUT_LENGTH = 200;
 /**
  * 메시지에 영화관/예매 의도 키워드가 포함됐는지 휴리스틱 감지.
  * theater/booking 의도일 가능성이 높을 때만 좌표 권한을 요청해 사용자 마찰을 줄인다.
- * 추천(recommend) 의도까지 매번 위치를 묻지 않도록 보수적으로 매칭.
+ * 추천(recommend) 의도까지 매번 위치를 묻지 않도록 보수적으로 매칭하되,
+ * "근처/주변/가까운" 처럼 위치 기반 탐색을 암시하는 표현도 포함해 권한 유도 확률을 높인다.
  */
-const THEATER_INTENT_RE = /(영화관|상영관|극장|cgv|롯데시네마|메가박스|예매)/i;
+const THEATER_INTENT_RE = /(영화관|상영관|극장|cgv|롯데시네마|메가박스|예매|근처|주변|가까운|가까이)/i;
 function detectsTheaterIntent(text) {
   if (!text) return false;
   return THEATER_INTENT_RE.test(text);
