@@ -415,6 +415,93 @@ export default function ChatWindow() {
   // 글자수 비율 (0.0 ~ 1.0+) — CharCount $ratio prop 전달용
   const charRatio = inputText.length / maxInputLength;
 
+  // 2026-04-24: 빈 상태(메시지 0건)일 때는 입력창을 하단 고정 대신 ChatWelcome 내부
+  // (칩 바로 아래) 에 임베드해 "첫 질문 시작"의 시각적 초점을 중앙으로 모은다.
+  // 메시지가 한 건이라도 생기면 하단 고정 모드로 복귀.
+  const isEmpty = messages.length === 0;
+
+  /**
+   * 입력 영역 JSX — 빈 상태일 때 ChatWelcome 내부에, 아닐 때 하단 고정 영역에 재사용.
+   * DOM 위치가 바뀌어도 inputText/attachedImage 는 상위 state 이므로 값 유지.
+   * ref(inputRef/fileInputRef) 는 mount 시점의 textarea 에 자동 재할당된다.
+   * $variant='embedded' 일 때 ChatInputWrapper 의 border-top 을 제거하고 카드 형태로 전환.
+   */
+  const inputSection = (
+    <S.ChatInputWrapper $variant={isEmpty ? 'embedded' : 'bottom'}>
+      {/* 이미지 미리보기 (첨부된 이미지가 있을 때) */}
+      {attachedImage && (
+        <S.ImagePreviewWrapper>
+          <S.ImagePreviewImg
+            src={attachedImage.preview}
+            alt="첨부 이미지 미리보기"
+          />
+          <S.ImagePreviewRemoveBtn onClick={handleRemoveImage} title="이미지 제거">
+            ✕
+          </S.ImagePreviewRemoveBtn>
+        </S.ImagePreviewWrapper>
+      )}
+      <S.InputContainer>
+        {/* 숨겨진 파일 입력 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          onChange={handleImageSelect}
+          style={{ display: 'none' }}
+        />
+        {/* 이미지 첨부 버튼 */}
+        <S.InputBtn
+          $variant="attach"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          title="이미지 첨부"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </S.InputBtn>
+        {/* textarea 래퍼 (글자수 카운터를 우하단에 배치하기 위한 relative 컨테이너) */}
+        <S.TextareaWrapper>
+          <S.Textarea
+            ref={inputRef}
+            value={inputText}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder="영화에 대해 물어보세요..."
+            rows={1}
+            disabled={isLoading}
+          />
+          {/* 글자수 카운터 (입력 중일 때 표시, 비율에 따라 색상 변경) */}
+          {inputText.length > 0 && (
+            <S.CharCount $ratio={charRatio}>
+              {inputText.length}/{maxInputLength}
+            </S.CharCount>
+          )}
+        </S.TextareaWrapper>
+        {isLoading ? (
+          <S.InputBtn $variant="cancel" onClick={cancelRequest} title="요청 취소">
+            ■
+          </S.InputBtn>
+        ) : (
+          <S.InputBtn
+            $variant="send"
+            onClick={handleSend}
+            disabled={
+              (!inputText.trim() && !attachedImage) ||
+              inputText.length > maxInputLength
+            }
+            title="전송"
+          >
+            ↑
+          </S.InputBtn>
+        )}
+      </S.InputContainer>
+    </S.ChatInputWrapper>
+  );
+
   return (
     <S.ChatWindowWrapper
       $isDragging={isDragging}
@@ -611,6 +698,9 @@ export default function ChatWindow() {
                 </S.WelcomeSuggestionBtn>
               ))}
             </S.WelcomeSuggestions>
+            {/* 2026-04-24: 빈 상태에서는 입력창을 칩 바로 아래에 임베드.
+                ChatGPT/Claude 스타일로 "첫 질문 시작"의 시각적 초점을 중앙에 모은다. */}
+            {inputSection}
           </S.ChatWelcome>
         )}
 
@@ -793,80 +883,10 @@ export default function ChatWindow() {
         <div ref={messagesEndRef} />
       </S.ChatMessages>
 
-      {/* ── 입력 영역 ── */}
-      <S.ChatInputWrapper>
-        {/* 이미지 미리보기 (첨부된 이미지가 있을 때) */}
-        {attachedImage && (
-          <S.ImagePreviewWrapper>
-            <S.ImagePreviewImg
-              src={attachedImage.preview}
-              alt="첨부 이미지 미리보기"
-            />
-            <S.ImagePreviewRemoveBtn onClick={handleRemoveImage} title="이미지 제거">
-              ✕
-            </S.ImagePreviewRemoveBtn>
-          </S.ImagePreviewWrapper>
-        )}
-        <S.InputContainer>
-          {/* 숨겨진 파일 입력 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            onChange={handleImageSelect}
-            style={{ display: 'none' }}
-          />
-          {/* 이미지 첨부 버튼 */}
-          <S.InputBtn
-            $variant="attach"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            title="이미지 첨부"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </S.InputBtn>
-          {/* textarea 래퍼 (글자수 카운터를 우하단에 배치하기 위한 relative 컨테이너) */}
-          <S.TextareaWrapper>
-            <S.Textarea
-              ref={inputRef}
-              value={inputText}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder="영화에 대해 물어보세요..."
-              rows={1}
-              disabled={isLoading}
-            />
-            {/* 글자수 카운터 (입력 중일 때 표시, 비율에 따라 색상 변경) */}
-            {inputText.length > 0 && (
-              <S.CharCount $ratio={charRatio}>
-                {inputText.length}/{maxInputLength}
-              </S.CharCount>
-            )}
-          </S.TextareaWrapper>
-          {isLoading ? (
-            <S.InputBtn $variant="cancel" onClick={cancelRequest} title="요청 취소">
-              ■
-            </S.InputBtn>
-          ) : (
-            <S.InputBtn
-              $variant="send"
-              onClick={handleSend}
-              disabled={
-                (!inputText.trim() && !attachedImage) ||
-                inputText.length > maxInputLength
-              }
-              title="전송"
-            >
-              ↑
-            </S.InputBtn>
-          )}
-        </S.InputContainer>
-      </S.ChatInputWrapper>
+      {/* ── 입력 영역 ──
+          2026-04-24: 빈 상태에서는 ChatWelcome 내부에 임베드되므로 여기서는 생략.
+          메시지가 한 건이라도 있으면 하단 고정 모드로 복귀한다. */}
+      {!isEmpty && inputSection}
 
       {/* 드래그 오버레이 (이미지 드래그 중 표시) */}
       {isDragging && (

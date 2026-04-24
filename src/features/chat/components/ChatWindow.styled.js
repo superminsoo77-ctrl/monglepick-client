@@ -411,16 +411,17 @@ export const ChatMessages = styled.main`
 /**
  * 메시지가 없을 때 표시되는 환영 영역.
  *
- * 2026-04-23 개편: 기존 justify-content: center 로는 MainLayout Header(64) + 도구바(44)
- * + 입력창(~100) 공제 후 남은 영역의 세로 중앙에 배치돼, 낮은 뷰포트에서 추천 칩이 viewport
- * 아래로 밀려 사용자가 "안 보인다" 고 피드백. 상단 정렬로 바꿔 칩이 항상 화면 상단 1/3 근처에
- * 위치하도록 한다.
+ * 2026-04-23: 기존 justify-content: center 였던 것을 flex-start 로 변경 — 하단 고정 입력창과
+ *   공제된 잔여 영역의 중앙에 칩만 배치되면 낮은 뷰포트에서 칩이 밀려난다는 피드백.
+ * 2026-04-24: 빈 상태 입력창을 ChatWelcome 내부(칩 아래)로 임베드 — 칩+입력창이 한 덩어리가
+ *   되어 세로 중앙 정렬해도 자연스럽게 상단에 가깝게 배치된다. justify-content: center 복귀.
+ *   뷰포트가 짧으면 ChatMessages 의 overflow-y: auto 로 스크롤 가능하므로 밀림 이슈 없음.
  */
 export const ChatWelcome = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex: 1;
   text-align: center;
   padding: 24px 20px 40px;
@@ -1073,12 +1074,32 @@ export const SuggestionHelperText = styled.span`
  * 입력 영역
  * ============================================================ */
 
-/** 하단 입력 영역 전체 래퍼 (flex-shrink: 0 → 높이 고정) */
+/**
+ * 하단 입력 영역 전체 래퍼.
+ *
+ * $variant='bottom' (기본, 메시지 존재 시): 하단 고정 — border-top + flex-shrink:0 로 높이 고정.
+ * $variant='embedded' (2026-04-24, 빈 상태): ChatWelcome 내부 칩 아래에 카드 형태로 임베드.
+ *   border-top 제거, 전체 테두리 + 라운드로 감싸서 칩과 동일한 시각 톤으로 맞춘다.
+ *   max-width 로 과도한 가로 확장 방지.
+ */
 export const ChatInputWrapper = styled.footer`
   padding: 12px 16px;
   background-color: ${({ theme }) => theme.colors.bgMain};
-  border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  flex-shrink: 0;
+
+  ${({ $variant = 'bottom', theme }) =>
+    $variant === 'embedded'
+      ? css`
+          width: 100%;
+          max-width: 560px;
+          margin: 12px auto 0;
+          border: 1px solid ${theme.colors.borderDefault};
+          border-radius: 20px;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        `
+      : css`
+          border-top: 1px solid ${theme.colors.borderDefault};
+          flex-shrink: 0;
+        `}
 `;
 
 /** 이미지 미리보기 래퍼 (relative → 제거 버튼 absolute 기준) */
