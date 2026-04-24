@@ -8,15 +8,12 @@
  * - 배경에 그라데이션 원 장식 2개 (decorative circles)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-/* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
-/* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
-/* 로그인 폼 — 같은 feature 내의 components에서 가져옴 */
+import { getSuspendedReason, clearSuspendedReason } from '../../../shared/utils/storage';
 import LoginForm from '../components/LoginForm';
-/* styled-components — LoginPage 전용 스타일 */
 import * as S from './LoginPage.styled';
 
 export default function LoginPage() {
@@ -24,9 +21,16 @@ export default function LoginPage() {
   const isLoading = useAuthStore((s) => s.isLoading);
   const navigate = useNavigate();
 
-  /**
-   * 이미 인증된 사용자는 홈으로 리다이렉트.
-   */
+  /* lazy initializer — 렌더 전 1회 실행, useEffect setState 경고 없음 */
+  const [suspendedMessage] = useState(() => {
+    const reason = getSuspendedReason();
+    if (reason) {
+      clearSuspendedReason();
+      return reason;
+    }
+    return null;
+  });
+
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       navigate(ROUTES.HOME, { replace: true });
@@ -35,10 +39,14 @@ export default function LoginPage() {
 
   return (
     <S.LoginPageWrapper>
-      {/* 배경 장식 — Floating Orb 3개 (보라/시안/핑크) */}
       <S.Orb1 aria-hidden="true" />
       <S.Orb2 aria-hidden="true" />
       <S.Orb3 aria-hidden="true" />
+      {suspendedMessage && (
+        <S.SuspendedBanner role="alert">
+          🚫 {suspendedMessage}
+        </S.SuspendedBanner>
+      )}
       <LoginForm />
     </S.LoginPageWrapper>
   );

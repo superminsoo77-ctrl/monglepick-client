@@ -126,12 +126,24 @@ function moveArrayItem(items, fromIndex, toIndex) {
   return nextItems;
 }
 
+// Backend returns profileImage (Jackson camelCase of profile_image column).
+// Normalize to profileImageUrl so all display code uses one consistent key.
+function normalizeProfileData(data) {
+  if (!data) return null;
+  return {
+    ...data,
+    profileImageUrl: data.profileImageUrl ?? data.profileImage ?? data.profile_image ?? null,
+  };
+}
+
 /* ── 프로필 수정 모달 ── */
 function EditProfileModal({ profile, onClose, onSaved }) {
   const user = useAuthStore((s) => s.user);
 
   const [nickname, setNickname] = useState(profile?.nickname || user?.nickname || '');
   const [profileImageUrl, setProfileImageUrl] = useState(profile?.profileImageUrl || '');
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(profile?.profileImageUrl || null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -161,7 +173,8 @@ function EditProfileModal({ profile, onClose, onSaved }) {
     if (nickname && (nickname.length < 2 || nickname.length > 20)) {
       errors.nickname = '닉네임은 2자 이상 20자 이하여야 합니다';
     }
-    if (profileImageUrl && profileImageUrl.length > 500) {
+    // validate URL length only when URL is used (no file selected)
+    if (!profileImageFile && profileImageUrl && profileImageUrl.length > 500) {
       errors.profileImageUrl = '이미지 URL은 500자를 초과할 수 없습니다';
     }
     const isChangingPassword = newPassword || currentPassword;
@@ -190,19 +203,41 @@ function EditProfileModal({ profile, onClose, onSaved }) {
     setFieldErrors({});
 
     /* 변경된 필드만 포함 (null 필드는 백엔드에서 무시) */
-    const payload = {};
-    if (nickname !== (profile?.nickname || user?.nickname || '')) {
-      payload.nickname = nickname || null;
-    }
-    if (profileImageUrl !== (profile?.profileImageUrl || '')) {
-      payload.profileImageUrl = profileImageUrl || null;
-    }
-    if (newPassword && currentPassword) {
-      payload.currentPassword = currentPassword;
-      payload.newPassword = newPassword;
+    // If a file is selected, send FormData (multipart). Otherwise send JSON.
+    let payload = {};
+    const useFile = !!profileImageFile;
+
+    if (useFile) {
+      payload = new FormData();
+      // append file under 'profileImage' field (backend should accept multipart)
+      payload.append('profileImage', profileImageFile);
+      // append other fields as string values
+      if (nickname !== (profile?.nickname || user?.nickname || '')) {
+        payload.append('nickname', nickname || '');
+      }
+      if (newPassword && currentPassword) {
+        payload.append('currentPassword', currentPassword);
+        payload.append('newPassword', newPassword);
+      }
+    } else {
+      if (nickname !== (profile?.nickname || user?.nickname || '')) {
+        payload.nickname = nickname || null;
+      }
+      if (profileImageUrl !== (profile?.profileImageUrl || '')) {
+        payload.profileImageUrl = profileImageUrl || null;
+      }
+      if (newPassword && currentPassword) {
+        payload.currentPassword = currentPassword;
+        payload.newPassword = newPassword;
+      }
     }
 
-    if (Object.keys(payload).length === 0) {
+    // FormData.keys() is iterable but Object.keys(formData) always returns [].
+    // Check emptiness separately based on payload type.
+    const isEmpty = payload instanceof FormData
+      ? ![...payload.keys()].length
+      : Object.keys(payload).length === 0;
+    if (isEmpty) {
       onClose();
       return;
     }
@@ -252,25 +287,69 @@ function EditProfileModal({ profile, onClose, onSaved }) {
             </S.FormField>
 
             <S.FormField>
-              <S.FormLabel htmlFor="edit-image-url">프로필 이미지 URL</S.FormLabel>
+              <S.FormLabel>프로필 이미지</S.FormLabel>
               <S.AvatarPreviewRow>
-                <S.AvatarPreviewImg $src={profileImageUrl || null}>
-                  {!profileImageUrl && displayInitial}
+                <S.AvatarPreviewImg $src={imagePreviewUrl || null}>
+                  {!imagePreviewUrl && displayInitial}
                 </S.AvatarPreviewImg>
-                <S.FormInput
-                  id="edit-image-url"
-                  type="url"
-                  value={profileImageUrl}
-                  onChange={(e) => setProfileImageUrl(e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  $error={!!fieldErrors.profileImageUrl}
-                  style={{ flex: 1 }}
-                />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    id="edit-image-file"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png"
+                    onChange={(e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (!f) {
+                        setProfileImageFile(null);
+                        setImagePreviewUrl(profileImageUrl || null);
+                        return;
+                      }
+
+                      // validate type
+                      const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+                      if (!allowed.includes(f.type)) {
+                        setFieldErrors((prev) => ({ ...prev, profileImageUrl: 'JPG/JPEG/PNG 파일만 업로드할 수 있습니다' }));
+                        e.target.value = '';
+                        return;
+                      }
+
+                      // optional: max size 5MB
+                      const MAX_MB = 5;
+                      if (f.size > MAX_MB * 1024 * 1024) {
+                        setFieldErrors((prev) => ({ ...prev, profileImageUrl: `파일 크기는 ${MAX_MB}MB 이하만 허용됩니다` }));
+                        e.target.value = '';
+                        return;
+                      }
+
+                      setFieldErrors((prev) => ({ ...prev, profileImageUrl: undefined }));
+                      setProfileImageFile(f);
+                      const url = URL.createObjectURL(f);
+                      setImagePreviewUrl(url);
+                      // clear profileImageUrl string since file takes precedence
+                      setProfileImageUrl('');
+                    }}
+                  />
+
+                  <S.FormInput
+                    id="edit-image-url"
+                    type="url"
+                    value={profileImageUrl}
+                    onChange={(e) => {
+                      setProfileImageUrl(e.target.value);
+                      setProfileImageFile(null);
+                      // show preview from URL if possible
+                      setImagePreviewUrl(e.target.value || null);
+                    }}
+                    placeholder="또는 이미지 URL 입력 (https://...)"
+                    $error={!!fieldErrors.profileImageUrl}
+                    style={{ width: '100%' }}
+                  />
+                </div>
               </S.AvatarPreviewRow>
               {fieldErrors.profileImageUrl ? (
                 <S.FormHelperText $error>{fieldErrors.profileImageUrl}</S.FormHelperText>
               ) : (
-                <S.FormHelperText>이미지 URL을 입력하면 미리보기가 표시됩니다</S.FormHelperText>
+                <S.FormHelperText>JPG/JPEG/PNG 파일 업로드 또는 이미지 URL 입력</S.FormHelperText>
               )}
             </S.FormField>
           </S.ModalSection>
@@ -854,7 +933,7 @@ export default function MyPagePage() {
         switch (activeTab) {
           case 'profile': {
             const profileData = await getProfile();
-            setProfile(profileData);
+            setProfile(normalizeProfileData(profileData));
             break;
           }
           case 'watch-history': {
@@ -939,14 +1018,23 @@ export default function MyPagePage() {
     (_, index) => pageGroupStart + index,
   );
 
-  function handleProfileSaved(updated) {
-    setProfile(updated);
-    /* Zustand store + localStorage 동기화 */
-    if (updated?.nickname || updated?.profileImageUrl) {
-      updateUser({ ...user, ...updated });
-    }
+  async function handleProfileSaved(updated) {
+    const normalized = normalizeProfileData(updated);
+    setProfile(normalized);
+    updateUser({ ...user, ...normalized });
     /* 2026-04-23 PR-3: 로컬 state 가 아니라 URL 쿼리(?modal 제거) 로 모달 닫기 */
     closeEditModal();
+
+    // Re-fetch to guarantee the header Avatar shows the persisted image URL.
+    try {
+      const fresh = normalizeProfileData(await getProfile());
+      setProfile(fresh);
+      if (fresh?.profileImageUrl) {
+        updateUser({ ...user, ...fresh });
+      }
+    } catch {
+      /* keep the already-normalized PATCH response */
+    }
   }
 
   const handleFavoriteMoviesSaved = useCallback(async (movieIds) => {

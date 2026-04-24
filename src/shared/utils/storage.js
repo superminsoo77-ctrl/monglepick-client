@@ -194,6 +194,40 @@ export function removeUser() {
   return safeRemoveItem(USER_KEY);
 }
 
+// ── 계정 정지 사유 관련 (sessionStorage — 브라우저 탭 닫으면 자동 소멸) ──
+
+const SUSPENDED_KEY = 'monglepick_suspended_reason';
+
+/**
+ * 계정 정지 사유를 sessionStorage에 저장한다.
+ * axiosInstance가 A011 에러 감지 시 호출하며, 로그인 페이지에서 읽어 표시한다.
+ */
+export function setSuspendedReason(reason) {
+  try {
+    sessionStorage.setItem(SUSPENDED_KEY, reason);
+  } catch { /* 무시 */ }
+}
+
+/**
+ * 저장된 계정 정지 사유를 가져온다. 없으면 null 반환.
+ */
+export function getSuspendedReason() {
+  try {
+    return sessionStorage.getItem(SUSPENDED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 저장된 계정 정지 사유를 삭제한다. 로그인 페이지가 읽은 직후 호출한다.
+ */
+export function clearSuspendedReason() {
+  try {
+    sessionStorage.removeItem(SUSPENDED_KEY);
+  } catch { /* 무시 */ }
+}
+
 /**
  * 모든 몽글픽 관련 localStorage 데이터를 삭제한다.
  * 로그아웃 시 호출하여 완전한 상태 초기화를 수행한다.

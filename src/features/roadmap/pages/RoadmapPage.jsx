@@ -52,6 +52,7 @@ const CATEGORY_ICONS = {
 const TABS = [
   { key: 'all', label: '전체 코스' },
   { key: 'inprogress', label: '진행 중' },
+  { key: 'completed', label: '완료' },
 ];
 
 export default function RoadmapPage() {
@@ -302,9 +303,21 @@ export default function RoadmapPage() {
   }
 
   /* ── 목록 뷰 ── */
-  const visibleCourses = activeTab === 'inprogress'
-    ? courses.filter((c) => (c.progressPercent || 0) > 0 || c.started)
-    : courses;
+  const visibleCourses = (() => {
+    if (activeTab === 'inprogress') {
+      // 진행 중: 진행률이 0보다 크고 100 미만이거나 시작했지만 아직 완료되지 않음
+      return courses.filter((c) => {
+        const p = c.progressPercent || 0;
+        return (p > 0 && p < 100) || (c.started && p < 100);
+      });
+    }
+    if (activeTab === 'completed') {
+      // 완료: 진행률이 100% 이상
+      return courses.filter((c) => (c.progressPercent || 0) >= 100);
+    }
+    // 전체
+    return courses;
+  })();
 
   return (
     <S.Container>
@@ -375,8 +388,8 @@ export default function RoadmapPage() {
                     </S.DifficultyBadge>
                   )}
                 </S.CourseMeta>
-                {/* 진행률 바는 진행 중 탭에서만 표시 */}
-                {activeTab === 'inprogress' && progress > 0 && (
+                {/* 진행률 바는 진행 중/완료 탭에서 표시 */}
+                {(activeTab === 'inprogress' || activeTab === 'completed') && progress > 0 && (
                   <>
                     <S.ProgressBarOuter>
                       <S.ProgressBarInner $percent={progress} />
@@ -395,10 +408,13 @@ export default function RoadmapPage() {
         <S.EmptyState>
           <S.EmptyIcon>&#x1F4DA;</S.EmptyIcon>
           <S.EmptyText>
-            {activeTab === 'inprogress'
-              ? <>진행 중인 코스가 없어요.<br />코스를 시작해보세요!</>
-              : <>아직 등록된 코스가 없어요.<br />곧 다양한 영화 코스가 추가될 예정이에요!</>
-            }
+            {activeTab === 'inprogress' ? (
+              <>진행 중인 코스가 없어요.<br />코스를 시작해보세요!</>
+            ) : activeTab === 'completed' ? (
+              <>완료된 코스가 없어요.<br />먼저 코스를 완료해 보세요!</>
+            ) : (
+              <>아직 등록된 코스가 없어요.<br />곧 다양한 영화 코스가 추가될 예정이에요!</>
+            )}
           </S.EmptyText>
         </S.EmptyState>
       )}

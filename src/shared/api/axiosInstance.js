@@ -33,7 +33,7 @@
  */
 
 import axios from 'axios';
-import { getToken, setToken, removeToken, clearAll } from '../utils/storage';
+import { getToken, setToken, removeToken, clearAll, setSuspendedReason } from '../utils/storage';
 import { AUTH_ENDPOINTS } from '../constants/api';
 import { SERVICE_URLS } from './serviceUrls';
 /* Zustand 인증 스토어 — refresh 실패 시 인메모리 상태도 함께 초기화 */
@@ -239,6 +239,16 @@ function attachAuthResponseInterceptor(instance) {
     async (error) => {
       const originalRequest = error.config || {};
       const status = error.response?.status;
+      const data = error.response?.data;
+
+      // ── 계정 정지 (A011) — 유효한 토큰이어도 즉시 강제 로그아웃 ──
+      if (status === 403 && data?.code === 'A011') {
+        setSuspendedReason(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
+        clearAll();
+        useAuthStore.setState({ token: null, user: null });
+        window.location.href = '/login';
+        return Promise.reject(new Error(data.message));
+      }
 
       // refresh 요청 자체가 401 이면 재시도하지 않음 (무한 루프 방지)
       const isRefreshRequest = originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH);
@@ -279,7 +289,6 @@ function attachAuthResponseInterceptor(instance) {
       }
 
       // 에러 메시지 추출
-      const data = error.response?.data;
       const message = data?.message || data?.detail || getFallbackMessage(status);
       const apiError = new Error(message);
       apiError.code = data?.code || null;
@@ -382,12 +391,23 @@ backendApi.interceptors.response.use(
 
   async (error) => {
     const originalRequest = error.config;
+    const status = error.response?.status;
+    const data = error.response?.data;
+
+    // ── 계정 정지 (A011) — 유효한 토큰이어도 즉시 강제 로그아웃 ──
+    if (status === 403 && data?.code === 'A011') {
+      setSuspendedReason(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
+      clearAll();
+      useAuthStore.setState({ token: null, user: null });
+      window.location.href = '/login';
+      return Promise.reject(new Error(data.message));
+    }
 
     const isAuthRequest = originalRequest.url?.includes('/auth/');
     const isRefreshRequest = originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH);
 
     if (
-      error.response?.status === 401 &&
+      status === 401 &&
       !originalRequest._retry &&
       !isRefreshRequest &&
       !isAuthRequest
@@ -416,8 +436,6 @@ backendApi.interceptors.response.use(
         /* 인증 정보 전체 초기화 (localStorage + Zustand 인메모리 상태) */
         clearAll();
         useAuthStore.setState({ token: null, user: null });
-        /* 로그인 리다이렉트는 하지 않음 — 에러를 호출측에 전파하여
-           PrivateRoute 또는 개별 컴포넌트가 인증 필요 여부를 판단하도록 위임 */
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -425,8 +443,6 @@ backendApi.interceptors.response.use(
     }
 
     // 에러 메시지 추출
-    const data = error.response?.data;
-    const status = error.response?.status;
     const message = data?.message || data?.detail || getFallbackMessage(status);
     const apiError = new Error(message);
     apiError.code = data?.code || null;
