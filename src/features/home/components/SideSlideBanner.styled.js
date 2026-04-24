@@ -158,35 +158,6 @@ export const Fallback = styled.div`
   line-height: 1.3;
 `;
 
-/**
- * 닫기 버튼 — 우측 상단. 사용자가 이 세션 동안 배너를 숨길 수 있도록 제공.
- * 오버레이 형태로 살짝 띄워 두되 배너 본체 링크 클릭을 방해하지 않도록
- * 작은 영역에만 히트 박스를 둔다.
- */
-export const CloseButton = styled.button`
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border: none;
-  padding: 0;
-  border-radius: ${({ theme }) => theme.radius.full};
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 4;
-  opacity: 0.7;
-  transition: opacity ${({ theme }) => theme.transitions.fast};
-
-  &:hover {
-    opacity: 1;
-    background: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
 /** 슬라이드 인디케이터 컨테이너 — 하단 중앙에 작은 점 여러 개 */
 export const Indicators = styled.div`
   position: absolute;

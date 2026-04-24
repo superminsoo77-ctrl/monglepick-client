@@ -9,7 +9,6 @@
  *   - 4초 간격 자동 회전 (배너가 2개 이상일 때만)
  *   - 마우스 hover 시 자동 회전 일시 정지
  *   - 하단 인디케이터 클릭 시 수동 전환
- *   - 우측상단 × 버튼으로 세션 단위 닫기 (sessionStorage 기반)
  *   - 이미지 로드 실패 / imageUrl 없을 시 primary 그라데이션 + 제목 fallback
  *   - 활성 배너가 0개이면 렌더 자체를 하지 않음 (빈 프레임 방지)
  *
@@ -24,9 +23,6 @@ import * as S from './SideSlideBanner.styled';
 /** 자동 슬라이드 전환 간격 (ms) */
 const SLIDE_INTERVAL_MS = 4000;
 
-/** 닫기 상태 저장 키 (sessionStorage 단위) — 위치별로 분리 */
-const DISMISS_KEY_PREFIX = 'mongle.sideBanner.dismissed.';
-
 export default function SideSlideBanner({ position = 'MAIN' }) {
   /** 활성 배너 목록 — [] 이면 미노출 */
   const [banners, setBanners] = useState([]);
@@ -39,18 +35,6 @@ export default function SideSlideBanner({ position = 'MAIN' }) {
    * useRef 대신 state 로 보관하는 이유는 hover 변화를 useEffect 의존성으로 쓰기 위함.
    */
   const [isHovered, setIsHovered] = useState(false);
-  /**
-   * 사용자가 × 버튼으로 닫은 상태. sessionStorage 와 동기화되어
-   * 탭이 열려있는 동안은 다시 뜨지 않고, 탭을 닫으면 초기화된다.
-   */
-  const [isDismissed, setIsDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem(DISMISS_KEY_PREFIX + position) === '1';
-    } catch {
-      // 사파리 프라이빗 모드 등에서 sessionStorage 접근 불가 — 기본 노출
-      return false;
-    }
-  });
 
   /**
    * 언마운트 이후의 setState 경고를 막기 위한 플래그.
@@ -112,26 +96,8 @@ export default function SideSlideBanner({ position = 'MAIN' }) {
     });
   }, []);
 
-  /**
-   * × 버튼 클릭 — 세션 단위로 배너를 숨긴다.
-   * 링크 <a> 위에 얹혀 있으므로 이벤트 전파를 차단하여 클릭 시 링크 이동을 막는다.
-   */
-  const handleDismiss = useCallback(
-    (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      try {
-        sessionStorage.setItem(DISMISS_KEY_PREFIX + position, '1');
-      } catch {
-        // 스토리지 접근 불가 시에도 현재 세션의 UI 상태로만 숨김 처리
-      }
-      setIsDismissed(true);
-    },
-    [position],
-  );
-
-  /* 배너 0개 or 닫힘 상태면 전체 미노출 (프레임도 렌더하지 않음) */
-  if (isDismissed || banners.length === 0) return null;
+  /* 배너 0개이면 전체 미노출 (프레임도 렌더하지 않음) */
+  if (banners.length === 0) return null;
 
   const current = banners[currentIndex];
   const bannerId = current.id ?? currentIndex;
@@ -171,15 +137,6 @@ export default function SideSlideBanner({ position = 'MAIN' }) {
           <S.Fallback>{current.title || '이벤트 배너'}</S.Fallback>
         )}
       </S.Slide>
-
-      {/* 닫기 버튼 — Slide <a> 위에 오버레이 */}
-      <S.CloseButton
-        type="button"
-        aria-label="배너 닫기"
-        onClick={handleDismiss}
-      >
-        ×
-      </S.CloseButton>
 
       {/* 인디케이터 — 배너 2개 이상일 때만 노출 */}
       {banners.length > 1 && (
