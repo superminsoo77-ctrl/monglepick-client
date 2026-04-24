@@ -571,6 +571,16 @@ export const SUPPORT_ENDPOINTS = {
   MY_TICKETS: `${API_VERSION}/support/tickets`,
   /** 티켓 상세 조회 - GET (ticketId 파라미터 필요) */
   TICKET_DETAIL: (ticketId) => `${API_VERSION}/support/tickets/${ticketId}`,
-  /** AI 챗봇 대화 - POST (body: {message, sessionId?}) */
+  /**
+   * (레거시) Backend 키워드 매칭 기반 챗봇 — POST (body: {message, sessionId?}).
+   * 2026-04-23 이후 LLM 몽글이 SSE 챗봇으로 교체됨. 새 코드는 SUPPORT_CHAT_SSE 사용.
+   * 백엔드 엔드포인트는 당분간 유지(Client 롤백 안전망 + 관리자 E2E 검증용).
+   */
   CHATBOT: `${API_VERSION}/support/chatbot`,
+  /**
+   * 고객센터 AI 챗봇 SSE (Agent 서비스 — EXAONE 1.2B 몽글이 + FAQ RAG).
+   * POST (body: {message, sessionId?}). EventSourceResponse(text/event-stream).
+   * 이벤트: session / status / matched_faq / token / needs_human / done / error.
+   */
+  SUPPORT_CHAT_SSE: `${API_VERSION}/support/chat`,
 };

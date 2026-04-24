@@ -61,17 +61,19 @@ export default function RoadmapPage() {
   const { showAlert } = useModal();
 
   /**
-   * 현재 경로가 /stamp 계열인지 여부.
-   * - true  → 도장깨기 모드: STAMP / STAMP_DETAIL 사용
-   * - false → 로드맵 모드:  ROADMAP / ROADMAP_DETAIL 사용
+   * 현재 경로가 /account/stamp 계열인지 여부 (2026-04-23 PR-4: /account 하위로 이관).
+   * - true  → 도장깨기 모드: ACCOUNT_STAMP / ACCOUNT_STAMP_DETAIL 사용
+   * - false → 로드맵 모드:  ACCOUNT_ROADMAP / ACCOUNT_ROADMAP_DETAIL 사용
+   *
+   * pathname 검사는 "/account/stamp" prefix 로 판정 — /account/stamp/123, /account/stamp 모두 true.
    */
-  const isStampMode = pathname.startsWith(ROUTES.STAMP.replace('/:id', '').replace(':id', ''));
+  const isStampMode = pathname.startsWith(ROUTES.ACCOUNT_STAMP);
 
   /** 목록으로 돌아갈 경로 (진입 모드에 따라 분기) */
-  const listRoute = isStampMode ? ROUTES.STAMP : ROUTES.ROADMAP;
+  const listRoute = isStampMode ? ROUTES.ACCOUNT_STAMP : ROUTES.ACCOUNT_ROADMAP;
 
   /** 상세 페이지 경로 빌더 (진입 모드에 따라 분기) */
-  const detailRoute = isStampMode ? ROUTES.STAMP_DETAIL : ROUTES.ROADMAP_DETAIL;
+  const detailRoute = isStampMode ? ROUTES.ACCOUNT_STAMP_DETAIL : ROUTES.ACCOUNT_ROADMAP_DETAIL;
 
   /* ── 탭 상태 ── */
   const [activeTab, setActiveTab] = useState('all');
@@ -181,7 +183,7 @@ export default function RoadmapPage() {
   const handleCheckboxClick = (movieId, movieTitle, isCompleted, isRejected, rejectionReason, isPending) => {
     if (!detail) return;
     navigate(
-      buildPath(ROUTES.STAMP_REVIEW, { courseId: detail.id, movieId }),
+      buildPath(ROUTES.ACCOUNT_STAMP_REVIEW, { courseId: detail.id, movieId }),
       {
         state: {
           movieTitle,

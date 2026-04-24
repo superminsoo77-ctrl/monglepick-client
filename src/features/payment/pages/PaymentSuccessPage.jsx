@@ -87,7 +87,7 @@ export default function PaymentSuccessPage() {
           <S.Title>결제 승인 실패</S.Title>
           <S.Message>{error}</S.Message>
           <S.Actions>
-            <S.BtnSecondary onClick={() => navigate('/payment')}>
+            <S.BtnSecondary onClick={() => navigate('/account/payment')}>
               결제 페이지로 돌아가기
             </S.BtnSecondary>
             <S.BtnPrimary onClick={() => navigate('/support')}>
@@ -128,7 +128,7 @@ export default function PaymentSuccessPage() {
         )}
 
         <S.Actions>
-          <S.BtnSecondary onClick={() => navigate('/payment')}>
+          <S.BtnSecondary onClick={() => navigate('/account/payment')}>
             결제 내역 보기
           </S.BtnSecondary>
           <S.BtnPrimary onClick={() => navigate('/chat')}>

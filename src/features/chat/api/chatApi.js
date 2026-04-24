@@ -4,7 +4,7 @@
  * 백엔드 POST /api/v1/chat 엔드포인트에 fetch 요청을 보내고,
  * ReadableStream으로 SSE 이벤트를 실시간 파싱하여 콜백으로 전달한다.
  *
- * SSE 이벤트 타입 (8종):
+ * SSE 이벤트 타입 (10종 — 2026-04-23 외부 지도 연동: theater_card / now_showing 추가):
  * - session: 세션 ID 발행 ({session_id})
  * - status: 처리 단계 (phase, message)
  * - movie_card: 추천 영화 데이터 (RankedMovie)
@@ -25,6 +25,8 @@
 import { getToken } from '../../../shared/utils/storage';
 /* 서비스 URL — Agent 직접 호출 */
 import { SERVICE_URLS } from '../../../shared/api/serviceUrls';
+/* Backend axios 인스턴스 — 추천 칩 REST 호출 (JWT 자동 갱신 포함) */
+import { backendApi } from '../../../shared/api/axiosInstance';
 
 /** API 베이스 경로 (Agent 서비스 직접 호출) */
 const API_BASE = `${SERVICE_URLS.AGENT}/api/v1`;
@@ -93,8 +95,8 @@ function delay(ms, signal) {
  * @returns {Promise<void>}
  */
 async function _sendChatMessageOnce(
-  { message, userId = '', sessionId = '', image = null },
-  { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError } = {},
+  { message, userId = '', sessionId = '', image = null, location = null },
+  { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError } = {},
   signal,
 ) {
   // JWT 토큰 조회 — storage 래퍼를 통해 안전하게 접근 (시크릿 모드 등 대응)
@@ -104,15 +106,20 @@ async function _sendChatMessageOnce(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // POST 요청 전송
+  // POST 요청 전송 — credentials:include 로 mongle_guest 쿠키 자동 전송
+  // (비로그인 게스트의 평생 1회 쿼터를 서버가 쿠키 기반으로 식별)
+  // location 은 외부 지도 연동 — Agent 의 LocationPayload 와 동일 구조 (lat/lng/address?).
+  // null 이면 body 에서 생략하지 않고 그대로 보내도 Agent 가 None 으로 받아들이므로 무방.
   const response = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({
       user_id: userId,
       session_id: sessionId,
       message,
       image,
+      location,
     }),
     signal,
   });
@@ -157,7 +164,7 @@ async function _sendChatMessageOnce(
 
       for (const block of blocks) {
         if (!block.trim()) continue;
-        parseSSEBlock(block, { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError });
+        parseSSEBlock(block, { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError });
       }
     }
 
@@ -166,7 +173,7 @@ async function _sendChatMessageOnce(
       if (import.meta.env.DEV) {
         console.log('[SSE] 잔여 버퍼 처리:', buffer.substring(0, 200));
       }
-      parseSSEBlock(buffer, { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError });
+      parseSSEBlock(buffer, { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError });
     }
   } finally {
     // 예외 발생 시에도 reader를 반드시 해제하여 스트림 리소스 누수 방지
@@ -201,17 +208,17 @@ async function _sendChatMessageOnce(
  * @returns {Promise<void>}
  */
 export async function sendChatMessage(
-  { message, userId = '', sessionId = '', image = null },
-  { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError } = {},
+  { message, userId = '', sessionId = '', image = null, location = null },
+  { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError } = {},
   signal,
 ) {
-  const callbacks = { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError };
+  const callbacks = { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError };
 
   // 재시도 루프: attempt는 0부터 시작하며 MAX_RETRY_COUNT까지 시도한다
   for (let attempt = 0; attempt <= MAX_RETRY_COUNT; attempt++) {
     try {
       await _sendChatMessageOnce(
-        { message, userId, sessionId, image },
+        { message, userId, sessionId, image, location },
         callbacks,
         signal,
       );
@@ -334,7 +341,7 @@ function dispatchEvent(eventType, data, callbacks) {
   if (import.meta.env.DEV) {
     console.log('[SSE] dispatchEvent:', eventType, data);
   }
-  const { onSession, onStatus, onMovieCard, onClarification, onToken, onPointUpdate, onDone, onError } = callbacks;
+  const { onSession, onStatus, onMovieCard, onTheaterCard, onNowShowing, onClarification, onToken, onPointUpdate, onDone, onError } = callbacks;
 
   switch (eventType) {
     // 세션 ID 발행 (스트리밍 시작 직후)
@@ -346,6 +353,14 @@ function dispatchEvent(eventType, data, callbacks) {
       break;
     case 'movie_card':
       onMovieCard?.(data);
+      break;
+    // 외부 지도 — 영화관 단건 (theater_search 결과 N회 반복)
+    case 'theater_card':
+      onTheaterCard?.(data);
+      break;
+    // 외부 지도 — KOBIS 박스오피스 Top-N 묶음 (1회)
+    case 'now_showing':
+      onNowShowing?.(data);
       break;
     // 후속 질문 힌트 (선호 부족/검색 품질 미달 시)
     case 'clarification':
@@ -370,5 +385,51 @@ function dispatchEvent(eventType, data, callbacks) {
         onToken?.(data);
       }
       break;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+ * 채팅 환영 화면 추천 칩 API (2026-04-23 추가)
+ * Backend :8080 / Public EP — 인증 불필요
+ * ══════════════════════════════════════════════════════════ */
+
+/**
+ * 활성 추천 칩 목록을 Backend에서 조회한다.
+ *
+ * 성공 시: [{id: Long, text: String}, ...] 배열 반환.
+ * 실패 시: 빈 배열 반환 (silent fallback — 환영 화면 칩은 UX 보조 기능이므로 에러 전파 X).
+ *
+ * @param {number} [limit=4] - 조회할 칩 수 (1~10)
+ * @returns {Promise<Array<{id: number, text: string}>>} 추천 칩 배열
+ */
+export async function fetchChatSuggestions(limit = 4) {
+  try {
+    // axios 인터셉터가 response.data를 1회 언래핑하므로 반환값이 곧 배열
+    const result = await backendApi.get('/api/v1/chat/suggestions', { params: { limit } });
+    return Array.isArray(result) ? result : [];
+  } catch (err) {
+    // 환영 화면 칩은 선택적 UX 기능이므로 에러를 사용자에게 노출하지 않는다
+    console.warn('[chatApi] 추천 칩 조회 실패 (fallback 사용):', err?.message);
+    return [];
+  }
+}
+
+/**
+ * 추천 칩 클릭 이벤트를 Backend에 fire-and-forget 방식으로 전송한다.
+ *
+ * id가 null/undefined이면 즉시 반환 (fallback 칩은 클릭 트래킹 불필요).
+ * 실패 시 silent — 트래킹 실패가 사용자 경험을 방해해서는 안 된다.
+ *
+ * @param {number|null} id - 추천 칩 ID (null이면 호출 생략)
+ * @returns {Promise<void>}
+ */
+export async function trackChatSuggestionClick(id) {
+  // fallback 칩(id=null)은 트래킹 대상에서 제외
+  if (id == null) return;
+  try {
+    await backendApi.post(`/api/v1/chat/suggestions/${id}/click`);
+  } catch (err) {
+    // 클릭 트래킹 실패는 무시 — 사용자 액션에 영향을 주지 않아야 한다
+    console.warn('[chatApi] 추천 칩 클릭 트래킹 실패:', err?.message);
   }
 }

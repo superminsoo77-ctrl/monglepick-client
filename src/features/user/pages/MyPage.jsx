@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../../shared/stores/useAuthStore';
+/* 라우팅 재설계 PR-3 (2026-04-23) — 탭·모달 상태 URL 동기화 공통 훅 */
+import useTabParam from '../../../shared/hooks/useTabParam';
+import useModalRoute from '../../../shared/hooks/useModalRoute';
 import {
   getFavoriteGenres,
   getFavoriteMovies,
@@ -46,6 +49,13 @@ const TABS = [
   { id: 'wishlist', label: '위시리스트' },
   { id: 'preferences', label: '선호 설정' },
 ];
+
+/**
+ * 유효한 탭 id 화이트리스트 — useTabParam 이 URL 쿼리값을 검증할 때 사용.
+ * 외부 입력(?tab=xxx) 은 신뢰할 수 없으므로 반드시 이 Set 에 포함된 값만 허용하고,
+ * 벗어나면 defaultTab('profile') 로 폴백한다.
+ */
+const VALID_TAB_IDS = new Set(TABS.map((t) => t.id));
 
 function parseMovieGenres(genres) {
   if (Array.isArray(genres)) return genres;
@@ -615,12 +625,23 @@ function FavoriteMovieModal({ initialMovies = [], onClose, onSave }) {
 
 /* ── 마이페이지 ── */
 export default function MyPagePage() {
-  const location = useLocation();
   const navigate = useNavigate();
   const { showAlert } = useModal();
   const onboardingMission = location.state?.onboardingMission || null;
 
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
+  /*
+   * 2026-04-23 라우팅 재설계 PR-3:
+   *   - 기존 `useState(location.state?.activeTab || 'profile')` 을 useTabParam 으로 교체.
+   *     location.state 기반은 새로고침/공유 시 탭 상태를 잃었다.
+   *   - URL: /mypage?tab=wishlist → activeTab='wishlist'.
+   *   - 기본 탭(profile) 선택 시 쿼리 생략 → 캐노니컬 URL 유지.
+   *   - 탭 전환은 내부적으로 replace:true → 뒤로가기는 "이전 페이지" 로 이동 (이전 탭 아님).
+   */
+  const [activeTab, setActiveTab] = useTabParam({
+    validIds: VALID_TAB_IDS,
+    defaultTab: 'profile',
+  });
+
   const [profile, setProfile] = useState(null);
   const [wishlist, setWishlist] = useState([]);
   const [favoriteGenreCatalog, setFavoriteGenreCatalog] = useState([]);
@@ -632,7 +653,12 @@ export default function MyPagePage() {
   const [favoriteMovies, setFavoriteMovies] = useState([]);
   const [savedFavoriteMovieIds, setSavedFavoriteMovieIds] = useState([]);
   const [favoriteMovieMaxCount, setFavoriteMovieMaxCount] = useState(MAX_FAVORITE_MOVIES);
-  const [isFavoriteMovieModalOpen, setIsFavoriteMovieModalOpen] = useState(false);
+  /*
+   * 2026-04-23 PR-3: "최애 영화 찾기" 모달의 열림/닫힘을 URL ?modal=favoriteMovies 와 동기화.
+   * 브라우저 뒤로가기 시 페이지 이동이 아니라 모달만 닫히도록 히스토리 스택을 활용한다.
+   */
+  const [isFavoriteMovieModalOpen, openFavoriteMovieModal, closeFavoriteMovieModal] =
+    useModalRoute('favoriteMovies');
   const [isFavoriteOrderSaving, setIsFavoriteOrderSaving] = useState(false);
   const [draggedFavoriteMovieId, setDraggedFavoriteMovieId] = useState(null);
   const [dragOverFavoriteMovieId, setDragOverFavoriteMovieId] = useState(null);
@@ -650,7 +676,11 @@ export default function MyPagePage() {
   const [myPostsPagination, setMyPostsPagination] = useState({ totalPages: 0, totalElements: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  /*
+   * 2026-04-23 PR-3: "프로필 수정" 모달도 URL ?modal=editProfile 와 동기화.
+   * 동시에 두 모달이 열리지는 않으므로 단일 ?modal 키로 충분하다 (useModalRoute 규약).
+   */
+  const [isEditModalOpen, openEditModal, closeEditModal] = useModalRoute('editProfile');
 
   /**
    * 착용 아바타 / 배지 (2026-04-14 신설, C 방향).
@@ -915,7 +945,8 @@ export default function MyPagePage() {
     if (updated?.nickname || updated?.profileImageUrl) {
       updateUser({ ...user, ...updated });
     }
-    setIsEditModalOpen(false);
+    /* 2026-04-23 PR-3: 로컬 state 가 아니라 URL 쿼리(?modal 제거) 로 모달 닫기 */
+    closeEditModal();
   }
 
   const handleFavoriteMoviesSaved = useCallback(async (movieIds) => {
@@ -1015,10 +1046,20 @@ export default function MyPagePage() {
   }, [applyFavoriteMovieResponse, favoriteMovieIds, showAlert]);
 
   const handleFavoriteMovieClick = useCallback((movieId) => {
+    /*
+     * 2026-04-23 PR-3: backTab 필드를 폐기하고 backTo URL 에 직접 ?tab=preferences 포함.
+     *   - 기존: { backTo: '/mypage', backTab: 'preferences' } 를 상세에서 읽어 state.activeTab 로 재전달
+     *   - 신: { backTo: '/mypage?tab=preferences' } 만으로 완결 — MyPage 의 useTabParam 이 쿼리로 탭 복원
+     *   useBackNavigation 공통 훅은 state.backTo 만 해석하므로 우회 로직이 사라져 단순/안전.
+     */
     navigate(buildPath(ROUTES.MOVIE_DETAIL, { id: movieId }), {
       state: {
-        backTo: ROUTES.MYPAGE,
-        backTab: 'preferences',
+        /*
+         * PR-3 라우팅 재설계: backTab 폐기 + URL 쿼리로 탭 복원.
+         * MYPAGE → ACCOUNT_PROFILE 이관 (/account/profile?tab=preferences).
+         * returnTo / onboardingMission 은 별개 플로우라 state 에 그대로 보존한다.
+         */
+        backTo: `${ROUTES.ACCOUNT_PROFILE}?tab=preferences`,
         returnTo: location.state?.returnTo,
         onboardingMission,
       },
@@ -1102,7 +1143,7 @@ export default function MyPagePage() {
               )}
             </S.NameRow>
             <S.Email>{user?.email || ''}</S.Email>
-            <S.EditBtn onClick={() => setIsEditModalOpen(true)}>
+            <S.EditBtn onClick={openEditModal}>
               ✏️ 프로필 수정
             </S.EditBtn>
           </S.UserInfo>
@@ -1413,7 +1454,7 @@ export default function MyPagePage() {
                   <S.FavoriteMoviesHeaderActions>
                     <S.FavoriteMoviesActionButton
                       type="button"
-                      onClick={() => setIsFavoriteMovieModalOpen(true)}
+                      onClick={openFavoriteMovieModal}
                     >
                       영화 찾기
                     </S.FavoriteMoviesActionButton>
@@ -1496,11 +1537,14 @@ export default function MyPagePage() {
         </S.Content>
       </S.Inner>
 
-      {/* 프로필 수정 모달 */}
+      {/*
+        2026-04-23 PR-3: 모달 열림/닫힘은 URL ?modal=editProfile / ?modal=favoriteMovies 에서
+        전적으로 관리된다. 로컬 setIsXxxOpen 호출은 모두 제거 — close 는 URL 쿼리 제거로 통일.
+      */}
       {isEditModalOpen && (
         <EditProfileModal
           profile={profile}
-          onClose={() => setIsEditModalOpen(false)}
+          onClose={closeEditModal}
           onSaved={handleProfileSaved}
         />
       )}
@@ -1511,7 +1555,7 @@ export default function MyPagePage() {
             ...item.movie,
             movieId: item.movieId,
           }))}
-          onClose={() => setIsFavoriteMovieModalOpen(false)}
+          onClose={closeFavoriteMovieModal}
           onSave={handleFavoriteMoviesSaved}
         />
       )}

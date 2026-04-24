@@ -21,6 +21,8 @@ import MovieSelector from '../components/MovieSelector';
 import SharedFeaturesBadge from '../components/SharedFeaturesBadge';
 import MatchResultCard from '../components/MatchResultCard';
 import MonggleCharacter from '../../../shared/components/MonggleCharacter/MonggleCharacter';
+/* 게스트 평생 1회 쿼터 초과 시 로그인 유도 모달 (2026-04-22) */
+import LoginRequiredModal from '../../auth/components/LoginRequiredModal';
 import { formatRating } from '../../../shared/utils/formatters';
 /* 공유 디자인 시스템 */
 import { fadeInUp, scaleIn, floatUpDown, pulseGlow, borderGlow } from '../../../shared/styles/animations';
@@ -683,6 +685,8 @@ export default function MatchPage() {
     completedPhases,
     isLoading,
     error,
+    guestQuotaExceeded,
+    dismissGuestQuotaModal,
     selectMovie1,
     selectMovie2,
     clearMovie1,
@@ -1003,6 +1007,13 @@ export default function MatchPage() {
           </StepWrapper>
         )}
       </ContentLayer>
+
+      {/* ── 게스트 평생 1회 쿼터 소진 → 로그인 유도 모달 (2026-04-22) ── */}
+      <LoginRequiredModal
+        open={Boolean(guestQuotaExceeded)}
+        onClose={dismissGuestQuotaModal}
+        reason={guestQuotaExceeded?.reason}
+      />
     </PageContainer>
   );
 }

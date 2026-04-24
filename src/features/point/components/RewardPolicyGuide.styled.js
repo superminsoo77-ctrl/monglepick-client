@@ -120,7 +120,11 @@ export const Grid = styled.div`
   }
 `;
 
-/* 정책 단건 카드 */
+/* 정책 단건 카드
+ * QA #159 (2026-04-23): 긴 정책명/설명이 카드 경계 밖으로 튀어나오는 현상 방지.
+ * min-width: 0 로 flex/grid 자식이 overflow 하는 CSS 기본 동작을 잠그고,
+ * Card 자체에 overflow: hidden 을 주되 hover translateY 가 잘리지 않도록 margin 여유를 둔다.
+ */
 export const Card = styled.article`
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
@@ -129,6 +133,8 @@ export const Card = styled.article`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.xs};
+  min-width: 0;
+  overflow: hidden;
   transition: transform ${({ theme }) => theme.transitions.fast},
     border-color ${({ theme }) => theme.transitions.fast};
 
@@ -143,6 +149,9 @@ export const CardHeader = styled.div`
   justify-content: space-between;
   align-items: flex-start;
   gap: ${({ theme }) => theme.spacing.sm};
+  /* flex 자식이 넘치지 않도록 */
+  min-width: 0;
+  width: 100%;
 `;
 
 export const CardTitle = styled.h3`
@@ -151,6 +160,12 @@ export const CardTitle = styled.h3`
   color: ${({ theme }) => theme.colors.textPrimary};
   margin: 0;
   line-height: 1.3;
+  /* QA #159: 한국어 긴 정책명이 카드 밖으로 삐져나오지 않도록 강제 줄바꿈.
+   * 하이픈 대안으로 overflow-wrap 사용 — 단어 중간에서 끊기는 것은 anywhere 가 필요할 때만. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
 `;
 
 /* 지급 포인트 배지 — 대형 숫자 강조 */
@@ -159,15 +174,19 @@ export const PointBadge = styled.div`
   font-weight: ${({ theme }) => theme.typography.fontBold};
   color: ${({ theme }) => theme.colors.primary};
   white-space: nowrap;
+  flex: 0 0 auto;
 `;
 
-/* 카드 설명 */
+/* 카드 설명
+ * QA #159: 설명 텍스트도 카드 내부로 강제 줄바꿈. */
 export const CardDesc = styled.p`
   font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textSecondary};
   margin: 0;
   line-height: 1.5;
   min-height: 2.8em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 `;
 
 /* 메타 정보 행 (일일 한도/쿨다운/최소 글자수 배지) */
@@ -188,6 +207,11 @@ export const MetaChip = styled.span`
   border-radius: ${({ theme }) => theme.radius.sm};
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
+  /* QA #159: 긴 쿨다운/한도 문구가 카드 밖으로 밀리지 않도록 */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 /* 카테고리 라벨 칩 (MILESTONE/ATTENDANCE 등) */

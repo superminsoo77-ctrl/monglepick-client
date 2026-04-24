@@ -49,7 +49,11 @@ export function useChat({ userId = '' } = {}) {
    * - localStorage 에는 세션 ID 를 저장하지 않는다 (이중 관리 방지).
    */
   const navigate = useNavigate();
-  // 메시지 목록: [{role: 'user'|'bot'|'movie_cards', content: string, movies?: array, timestamp: number}]
+  // 메시지 목록: [{role: 'user'|'bot'|'movie_cards'|'external_map',
+  //                content?: string, movies?: array, theaters?: array, nowShowing?: array,
+  //                userLocation?: {latitude, longitude, address?}, timestamp: number}]
+  // - external_map: 외부 지도 연동(영화관 + 박스오피스 묶음, 2026-04-23 추가)
+  //                 userLocation 은 그 턴에 보낸 사용자 좌표 — 미니맵 사용자 마커/길찾기에 사용
   const [messages, setMessages] = useState([]);
   // 현재 처리 상태 메시지 (status 이벤트에서 수신)
   const [status, setStatus] = useState('');
@@ -67,6 +71,9 @@ export function useChat({ userId = '' } = {}) {
   // 쿼터/포인트 관련 에러 ({error_code, message, ...상세 필드})
   // error_code: "INSUFFICIENT_POINT" | "INPUT_TOO_LONG" | "QUOTA_EXCEEDED"
   const [quotaError, setQuotaError] = useState(null);
+  // 게스트(비로그인) 평생 1회 쿼터 초과 — 로그인 유도 모달 노출 트리거.
+  // error_code === 'GUEST_QUOTA_EXCEEDED' 수신 시 {reason, message} 저장.
+  const [guestQuotaExceeded, setGuestQuotaExceeded] = useState(null);
 
   // 요청 취소용 AbortController ref
   const abortControllerRef = useRef(null);
@@ -78,14 +85,21 @@ export function useChat({ userId = '' } = {}) {
   const pendingResponseRef = useRef('');
   // 현재 스트리밍 중인 영화 카드를 누적하는 ref
   const pendingMoviesRef = useRef([]);
+  // 현재 스트리밍 중인 영화관 카드(theater_card)를 누적하는 ref — 외부 지도 연동
+  const pendingTheatersRef = useRef([]);
+  // 현재 스트리밍 중인 박스오피스 묶음(now_showing 1회) — 외부 지도 연동
+  const pendingNowShowingRef = useRef(null);
 
   /**
    * 메시지를 전송하고 SSE 스트리밍 응답을 처리한다.
    *
    * @param {string} messageText - 사용자 입력 메시지
    * @param {string|null} imageBase64 - base64 인코딩된 이미지 데이터 (선택)
+   * @param {object|null} location - 사용자 위치 (외부 지도 연동, theater/booking 의도용)
+   *                                 {latitude, longitude, address?} 또는 null.
+   *                                 useGeolocation 훅의 coords 를 그대로 전달하면 됨.
    */
-  const sendMessage = useCallback(async (messageText, imageBase64 = null) => {
+  const sendMessage = useCallback(async (messageText, imageBase64 = null, location = null) => {
     // 빈 메시지 무시 (이미지만 보내는 것은 허용)
     if (!messageText.trim() && !imageBase64) return;
     // 이전 요청이 진행 중이면 무시
@@ -100,6 +114,8 @@ export function useChat({ userId = '' } = {}) {
     setQuotaError(null);
     pendingResponseRef.current = '';
     pendingMoviesRef.current = [];
+    pendingTheatersRef.current = [];
+    pendingNowShowingRef.current = null;
 
     // 사용자 메시지를 목록에 추가 (이미지 포함)
     const userMessage = {
@@ -120,6 +136,7 @@ export function useChat({ userId = '' } = {}) {
           userId,
           sessionId: sessionIdRef.current,
           image: imageBase64,
+          location,
         },
         {
           // session 이벤트: 세션 ID 를 받으면 URL 을 /chat/:sessionId 로 교체하여 SSOT 유지.
@@ -141,6 +158,17 @@ export function useChat({ userId = '' } = {}) {
           // movie_card 이벤트: 추천 영화 누적
           onMovieCard: (movieData) => {
             pendingMoviesRef.current = [...pendingMoviesRef.current, movieData];
+          },
+
+          // theater_card 이벤트: 외부 지도 — 영화관 단건 누적 (theater 의도)
+          onTheaterCard: (theaterData) => {
+            pendingTheatersRef.current = [...pendingTheatersRef.current, theaterData];
+          },
+
+          // now_showing 이벤트: 외부 지도 — KOBIS 박스오피스 Top-N 묶음 (1회)
+          // payload: {movies: [{rank, movie_cd, movie_nm, audi_acc, ...}]}
+          onNowShowing: (data) => {
+            pendingNowShowingRef.current = data?.movies || [];
           },
 
           // clarification 이벤트: 후속 질문 힌트 저장
@@ -221,6 +249,33 @@ export function useChat({ userId = '' } = {}) {
               });
             }
 
+            // 외부 지도 결과(영화관 + 박스오피스)가 있으면 봇 응답 앞에 단일 메시지로 삽입
+            // (영화관과 박스오피스를 같은 메시지로 묶어 한 화면에 보여주는 게 UX 상 더 자연스럽다)
+            // userLocation 도 함께 저장 → TheaterCard 미니맵에 사용자 위치 마커 + 길찾기 버튼 활성화.
+            const hasTheaters = pendingTheatersRef.current.length > 0;
+            const hasNowShowing = pendingNowShowingRef.current && pendingNowShowingRef.current.length > 0;
+            if (hasTheaters || hasNowShowing) {
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastBotIdx = newMessages.findLastIndex((m) => m.role === 'bot');
+                const externalMapMessage = {
+                  role: 'external_map',
+                  theaters: pendingTheatersRef.current,
+                  nowShowing: pendingNowShowingRef.current || [],
+                  // 이번 턴에 함께 보낸 사용자 좌표 — 메시지 단위 보존하여 이후 카드 재렌더링에서도 유지.
+                  // null/undefined 인 경우는 그대로 빠짐 (TheaterCard 가 없는 것으로 처리).
+                  userLocation: location || null,
+                  timestamp: Date.now(),
+                };
+                if (lastBotIdx >= 0) {
+                  newMessages.splice(lastBotIdx, 0, externalMapMessage);
+                } else {
+                  newMessages.push(externalMapMessage);
+                }
+                return newMessages;
+              });
+            }
+
             setStatus('');
             setIsLoading(false);
           },
@@ -229,7 +284,14 @@ export function useChat({ userId = '' } = {}) {
           // error_code가 쿼터/포인트 관련이면 quotaError에 저장하고 일반 에러는 표시하지 않음
           onError: (data) => {
             const quotaErrorCodes = ['INSUFFICIENT_POINT', 'INPUT_TOO_LONG', 'QUOTA_EXCEEDED'];
-            if (data.error_code && quotaErrorCodes.includes(data.error_code)) {
+            if (data.error_code === 'GUEST_QUOTA_EXCEEDED') {
+              // 게스트 평생 1회 무료 체험 소진 — 로그인 유도 모달 트리거
+              // (쿼터 배너 대신 모달을 띄워 이탈을 줄이고 가입 CTA 를 강조)
+              setGuestQuotaExceeded({
+                reason: data.reason ?? null,
+                message: data.message ?? '',
+              });
+            } else if (data.error_code && quotaErrorCodes.includes(data.error_code)) {
               // 쿼터/포인트 에러: 전용 배너로 표시 (일반 에러 메시지 대신)
               setQuotaError(data);
             } else {
@@ -246,33 +308,76 @@ export function useChat({ userId = '' } = {}) {
     } catch (err) {
       // AbortError는 사용자가 취소한 것이므로 에러로 처리하지 않음
       if (err.name === 'AbortError') {
+        // ── 부분 복원 — 취소 직전까지 받은 영화/외부 지도 카드는 보존 ──
+        // 사용자가 취소했더라도 이미 화면에 떠 있을 수 있는 카드는 메시지로 묶어둬야
+        // 다음 턴 / 새로고침 후에도 일관성 유지된다 (Agent session 저장은 안 됐지만
+        // 현재 화면 세션 내에서는 보존). pending refs 가 비어있으면 추가하지 않는다.
+        const partialMovies = pendingMoviesRef.current.length > 0 ? [...pendingMoviesRef.current] : null;
+        const partialTheaters = pendingTheatersRef.current.length > 0 ? [...pendingTheatersRef.current] : null;
+        const partialNowShowing = pendingNowShowingRef.current && pendingNowShowingRef.current.length > 0
+          ? [...pendingNowShowingRef.current]
+          : null;
+        const partialUserLocation = location || null;
+
         // 부분 응답이 있으면 "[취소됨]" 표시를 붙여서 보존
         const partialText = pendingResponseRef.current;
-        if (partialText) {
-          setMessages((prev) => {
-            const newMessages = [...prev];
+
+        setMessages((prev) => {
+          const newMessages = [...prev];
+
+          // 1) 영화 카드 부분 복원 (있으면 봇 응답 앞에 movie_cards 메시지 삽입)
+          if (partialMovies) {
+            newMessages.push({
+              role: 'movie_cards',
+              movies: partialMovies,
+              cancelled: true,
+              timestamp: Date.now(),
+            });
+          }
+
+          // 2) 외부 지도 부분 복원 (영화관 또는 박스오피스 중 하나라도 있으면)
+          if (partialTheaters || partialNowShowing) {
+            newMessages.push({
+              role: 'external_map',
+              theaters: partialTheaters || [],
+              nowShowing: partialNowShowing || [],
+              userLocation: partialUserLocation,
+              cancelled: true,
+              timestamp: Date.now() + 1,  // movie_cards 보다 한 tick 뒤
+            });
+          }
+
+          // 3) 텍스트 응답 보존
+          if (partialText) {
             const lastMsg = newMessages[newMessages.length - 1];
+            // 마지막 메시지가 bot 이면 취소 표시만 덧붙이고, 아니면 신규 봇 메시지 추가.
+            // (token 핸들러가 이미 봇 메시지를 만들어둔 경우 그 인스턴스를 살린다.)
             if (lastMsg && lastMsg.role === 'bot') {
               newMessages[newMessages.length - 1] = {
                 ...lastMsg,
                 content: partialText + '\n\n[응답이 중단되었습니다]',
                 cancelled: true,
               };
+            } else {
+              newMessages.push({
+                role: 'bot',
+                content: partialText + '\n\n[응답이 중단되었습니다]',
+                cancelled: true,
+                timestamp: Date.now() + 2,
+              });
             }
-            return newMessages;
-          });
-        } else {
-          // 부분 응답이 없으면 취소 안내 메시지 추가
-          setMessages((prev) => [
-            ...prev,
-            {
+          } else if (!partialMovies && !partialTheaters && !partialNowShowing) {
+            // 어떤 부분 응답도 없으면 취소 안내 메시지 추가
+            newMessages.push({
               role: 'bot',
               content: '요청이 취소되었습니다.',
               cancelled: true,
               timestamp: Date.now(),
-            },
-          ]);
-        }
+            });
+          }
+          return newMessages;
+        });
+
         setStatus('');
         setIsLoading(false);
         return;
@@ -321,6 +426,13 @@ export function useChat({ userId = '' } = {}) {
   }, []);
 
   /**
+   * 게스트 평생 1회 쿼터 초과 모달을 닫는다.
+   */
+  const dismissGuestQuotaModal = useCallback(() => {
+    setGuestQuotaExceeded(null);
+  }, []);
+
+  /**
    * 기존 세션을 로드하여 이전 대화를 이어서 진행한다.
    * 사이드바에서 세션을 선택했을 때 호출된다.
    *
@@ -344,6 +456,20 @@ export function useChat({ userId = '' } = {}) {
           formattedMessages.push({
             role: 'movie_cards',
             movies: msg.movies,
+            timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
+          });
+        }
+        // 외부 지도 결과(영화관 + 박스오피스 + 사용자 위치)가 있으면 external_map 메시지로 분리.
+        // theaters 또는 nowShowing 둘 중 하나라도 있으면 복원 (Agent 가 같은 어시스턴트 턴에 묶어 저장).
+        const hasArchivedTheaters = Array.isArray(msg.theaters) && msg.theaters.length > 0;
+        const hasArchivedNowShowing = Array.isArray(msg.nowShowing) && msg.nowShowing.length > 0;
+        if (hasArchivedTheaters || hasArchivedNowShowing) {
+          formattedMessages.push({
+            role: 'external_map',
+            theaters: hasArchivedTheaters ? msg.theaters : [],
+            nowShowing: hasArchivedNowShowing ? msg.nowShowing : [],
+            // userLocation 은 옵셔널 — 미니맵 사용자 마커/길찾기에 사용
+            userLocation: msg.userLocation || null,
             timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
           });
         }
@@ -377,10 +503,12 @@ export function useChat({ userId = '' } = {}) {
     clarification,
     pointInfo,
     quotaError,
+    guestQuotaExceeded,
     sendMessage,
     clearMessages,
     cancelRequest,
     dismissQuotaError,
+    dismissGuestQuotaModal,
     loadExistingSession,
     /** 현재 세션 ID (사이드바에서 활성 세션 강조 표시용, state로 관리하여 리렌더링 트리거) */
     currentSessionId,

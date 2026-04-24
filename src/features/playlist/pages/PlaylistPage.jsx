@@ -95,7 +95,7 @@ export default function PlaylistPage() {
       setSharedPostId(null);
     } catch {
       showAlert({ title: '오류', message: '플레이리스트를 불러올 수 없습니다.', type: 'error' });
-      navigate(ROUTES.PLAYLIST, { replace: true });
+      navigate(ROUTES.ACCOUNT_PLAYLIST, { replace: true });
     } finally {
       setIsDetailLoading(false);
     }
@@ -300,7 +300,7 @@ export default function PlaylistPage() {
   if (detailId) {
     return (
       <S.Container>
-        <S.BackLink onClick={() => navigate(ROUTES.PLAYLIST)}>
+        <S.BackLink onClick={() => navigate(ROUTES.ACCOUNT_PLAYLIST)}>
           ← 플레이리스트 목록
         </S.BackLink>
 
@@ -452,7 +452,7 @@ export default function PlaylistPage() {
           {playlists.map((pl) => (
             <S.Card
               key={pl.playlistId}
-              onClick={() => navigate(buildPath(ROUTES.PLAYLIST_DETAIL, { id: pl.playlistId }))}
+              onClick={() => navigate(buildPath(ROUTES.ACCOUNT_PLAYLIST_DETAIL, { id: pl.playlistId }))}
             >
               {/* 제목 + 케밥 메뉴 */}
               <S.CardHeaderRow>

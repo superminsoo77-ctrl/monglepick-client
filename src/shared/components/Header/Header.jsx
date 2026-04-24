@@ -17,7 +17,17 @@ import { ROUTES, NAV_ITEMS, USER_MENU_ITEMS } from '../../constants/routes';
 import ThemeToggle from './ThemeToggle';
 import * as S from './Header.styled';
 
-export default function Header() {
+/**
+ * @param {Object} props
+ * @param {'default' | 'compact'} [props.variant='default']
+ *   - 'default': 기본 헤더 — 상단 NAV 드롭다운 + 모바일 햄버거 + 유저 드롭다운 전체 노출
+ *   - 'compact': 슬림 헤더 — 상단 NAV 와 모바일 햄버거를 숨긴다. 로고/테마 토글/유저
+ *     드롭다운만 남겨 ChatWindow 같은 "전체 화면 집중" UX 에서도 계정 접근은 유지.
+ *     NAV 숨김으로 모바일 햄버거도 함께 의미를 잃으므로 같이 감춘다.
+ */
+export default function Header({ variant = 'default' }) {
+  // compact 모드 플래그 — 아래 렌더 트리에서 Nav/MobileToggle 조건 부여
+  const isCompact = variant === 'compact';
   // 현재 경로 — 활성 메뉴 하이라이트에 사용
   const location = useLocation();
   // 인증 상태 및 액션
@@ -233,6 +243,13 @@ export default function Header() {
           모바일(햄버거)에서는 같은 마크업이 column flex 흐름에 편입되어
           접이식 섹션처럼 동작한다(스타일에서 분기 처리).
         */}
+        {/*
+          compact 모드에서는 상단 NAV 트리 자체를 렌더하지 않는다.
+          모바일 햄버거의 AuthSection(모바일 유저메뉴) 도 같이 빠지지만,
+          compact 는 로고+테마+데스크톱 유저 드롭다운만으로 계정 접근을 보장한다
+          (ChatWindow 내부 사이드바에 세션 히스토리가 별도로 존재).
+        */}
+        {!isCompact && (
         <S.Nav ref={navRef} $isOpen={isMobileMenuOpen}>
           {NAV_ITEMS.filter(isNavItemVisible).map((item) => {
             /* ── 드롭다운(자식 있음) ── */
@@ -303,9 +320,14 @@ export default function Header() {
             );
           })}
 
-          {/* ── 테마 토글 (모바일 메뉴 내부 전용 — 데스크톱에서는 숨김) ── */}
+          {/*
+            ── 테마 토글 (모바일 메뉴 내부 전용) ──
+            모바일 햄버거 메뉴 내부에서는 드롭다운이 없는 맥락이므로 스위치 variant 를
+            그대로 한 row 로 노출한다. 햄버거 메뉴 섹션 구분 border-top 과 자연스럽게 결합.
+            데스크톱에서는 MobileOnly 로 숨김 — 유저 드롭다운 맨 아래 스위치가 담당.
+          */}
           <S.MobileOnly>
-            <ThemeToggle />
+            <ThemeToggle variant="switch" />
           </S.MobileOnly>
 
           {/*
@@ -347,11 +369,15 @@ export default function Header() {
             )}
           </S.AuthSection>
         </S.Nav>
+        )}
 
-        {/* ── 테마 토글 (데스크톱 전용 — 모바일에서는 햄버거 메뉴 내부 MobileOnly 에서 렌더됨) ── */}
-        <S.DesktopOnly>
-          <ThemeToggle />
-        </S.DesktopOnly>
+        {/*
+          ── 데스크톱 테마 토글 제거 (2026-04-23) ──
+          헤더 상단 바에서 홀로 떠 있던 ThemeToggle 을 제거.
+          - 로그인 상태: UserDropdown 맨 아래 스위치 row 로 이동 (환경 설정 그룹).
+          - 비로그인 상태: AuthSection 내부 로그인 버튼 왼쪽에 compact variant 로 노출.
+          - 모바일: 햄버거 메뉴 내부 MobileOnly 스위치 row 로 노출 (위 Nav 블록 참고).
+        */}
 
         {/*
           인증 영역 (데스크톱).
@@ -383,7 +409,6 @@ export default function Header() {
                 <S.UserDropdown role="menu">
                   {USER_MENU_ITEMS.map((item, idx) =>
                     item.divider ? (
-                      /* 그룹 구분선 — path가 없으므로 idx를 키로 사용 */
                       <S.DropdownDivider key={`divider-${idx}`} aria-hidden="true" />
                     ) : (
                       <S.DropdownItem
@@ -397,7 +422,14 @@ export default function Header() {
                       </S.DropdownItem>
                     ),
                   )}
-                  {/* 마지막 그룹 — 로그아웃 (path 없는 액션이라 별도 컴포넌트) */}
+                  {/*
+                    ── 다크 모드 스위치 (환경 설정 그룹) ──
+                    메뉴 이동 항목들과 로그아웃 사이의 "환경 설정" 슬롯.
+                    내부에서 stopPropagation + role="switch" 로 처리되므로
+                    여기서는 단순히 배치만 한다.
+                  */}
+                  <S.DropdownDivider aria-hidden="true" />
+                  <ThemeToggle variant="switch" />
                   <S.DropdownDivider aria-hidden="true" />
                   <S.DropdownLogoutBtn
                     type="button"
@@ -411,6 +443,11 @@ export default function Header() {
             </S.UserMenuWrapper>
           ) : (
             <>
+              {/*
+                비로그인 상태 — UserDropdown 이 없으므로 테마 토글을 여기에 직접 노출.
+                compact variant = 작은 원형 아이콘 버튼으로 로그인/회원가입 버튼과 균형.
+              */}
+              <ThemeToggle variant="compact" />
               <S.AuthBtn to={ROUTES.LOGIN}>
                 로그인
               </S.AuthBtn>
@@ -421,16 +458,21 @@ export default function Header() {
           )}
         </S.AuthSection>
 
-        {/* ── 모바일 햄버거 메뉴 버튼 ── */}
-        <S.MobileToggle
-          $isOpen={isMobileMenuOpen}
-          onClick={toggleMobileMenu}
-          aria-label="메뉴 열기/닫기"
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </S.MobileToggle>
+        {/*
+          ── 모바일 햄버거 메뉴 버튼 ──
+          compact 모드에서는 숨긴다 — 열릴 Nav 자체가 없으므로 토글 버튼은 의미 없음.
+        */}
+        {!isCompact && (
+          <S.MobileToggle
+            $isOpen={isMobileMenuOpen}
+            onClick={toggleMobileMenu}
+            aria-label="메뉴 열기/닫기"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </S.MobileToggle>
+        )}
       </S.Inner>
     </S.HeaderWrapper>
   );

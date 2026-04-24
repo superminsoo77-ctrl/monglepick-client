@@ -114,7 +114,7 @@ export default function AchievementPage() {
                 key={ach.achievementTypeId ?? ach.id}
                 $achieved={ach.achieved}
                 onClick={() => navigate(
-                  buildPath(ROUTES.ACHIEVEMENT_DETAIL, { id: ach.achievementTypeId ?? ach.id }),
+                  buildPath(ROUTES.ACCOUNT_ACHIEVEMENT_DETAIL, { id: ach.achievementTypeId ?? ach.id }),
                   { state: { achievement: ach } }
                 )}
               >

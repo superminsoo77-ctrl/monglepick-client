@@ -31,7 +31,7 @@
  * - error: 에러 메시지
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 /* Match SSE API — 같은 feature 내의 matchApi에서 가져옴 */
 import { sendMatchRequest } from '../api/matchApi';
 /* Match 전용 Zustand 스토어 — 라우트 이동 시 상태 영속 */
@@ -74,6 +74,16 @@ export function useMatch({ userId = '' } = {}) {
 
   /** 요청 취소용 AbortController — cancelRequest 에서 abort() 호출 */
   const abortControllerRef = useRef(null);
+
+  /**
+   * 게스트(비로그인) 평생 1회 쿼터 초과 모달 노출 state (2026-04-22).
+   * error_code === 'GUEST_QUOTA_EXCEEDED' 수신 시 {reason} 저장.
+   * sessionStorage persist 대상 아님 — 모달 닫으면 사라져야 함.
+   */
+  const [guestQuotaExceeded, setGuestQuotaExceeded] = useState(null);
+  const dismissGuestQuotaModal = useCallback(() => {
+    setGuestQuotaExceeded(null);
+  }, []);
   /**
    * 현재 진행 중인 phase 코드를 추적하는 ref.
    * status 이벤트 수신 시 이전 phase 를 completedPhases 에 추가하기 위해 사용.
@@ -225,7 +235,15 @@ export function useMatch({ userId = '' } = {}) {
           },
 
           onError: (data) => {
-            setError(data.message || '영화 분석 중 오류가 발생했습니다.');
+            // 게스트 평생 1회 쿼터 초과 — 로그인 유도 모달 트리거 (2026-04-22)
+            if (data.error_code === 'GUEST_QUOTA_EXCEEDED') {
+              setGuestQuotaExceeded({
+                reason: data.reason ?? null,
+                message: data.message ?? '',
+              });
+            } else {
+              setError(data.message || '영화 분석 중 오류가 발생했습니다.');
+            }
             setMatchResults([]);
             setSharedFeatures(null);
             setCurrentStatus('');
@@ -302,6 +320,9 @@ export function useMatch({ userId = '' } = {}) {
     completedPhases,
     isLoading,
     error,
+    // 게스트 평생 1회 쿼터 초과 모달 상태 (2026-04-22)
+    guestQuotaExceeded,
+    dismissGuestQuotaModal,
     // 액션 함수
     selectMovie1,
     selectMovie2,

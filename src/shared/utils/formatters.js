@@ -6,6 +6,35 @@
  */
 
 /**
+ * 서버 응답 문자열을 Date 로 안전하게 파싱한다.
+ *
+ * QA #177 (2026-04-23): Backend 엔티티가 `LocalDateTime` (타임존 없는 naive 타입) 이라서
+ * Jackson 기본 직렬화가 `2026-04-23T14:30:00` 형태로 내려준다. 서버 JVM 의 user.timezone 이
+ * UTC 인 상태(Docker 기본값)에서는 이 naive 문자열이 실제로 UTC 기준 시각을 나타내고,
+ * 브라우저가 KST 로 로컬 파싱하면 `KST 14:30` 으로 해석되어 실제 서버 시각(KST 23:30) 과
+ * 9시간 차이가 발생한다 → "방금 쓴 리뷰가 9시간 전"으로 표시되는 증상.
+ *
+ * 운영 JVM TZ 를 Asia/Seoul 로 고정하는 인프라 수정이 근본 해결이지만, 혼재 기간 중에도
+ * 사용자에게 올바른 상대시간을 보여주도록 다음 휴리스틱을 적용한다:
+ *   - 입력 문자열에 timezone suffix(`Z`/`+HH:MM`/`-HH:MM`) 가 있으면 그대로 사용
+ *   - 없으면 UTC 로 가정해 `Z` 를 붙여 파싱
+ * 서버가 추후 KST naive 로 내려주는 경로로 바뀌면 이 휴리스틱이 오히려 9시간 과거로 해석되므로,
+ * 서버 수정 시 이 함수도 함께 롤백해야 한다.
+ */
+export function parseServerDate(input) {
+  if (input == null) return null;
+  if (input instanceof Date) return input;
+  if (typeof input !== 'string') return new Date(input);
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // ISO-8601 날짜시간 형태이고 timezone suffix 가 없으면 UTC 부착
+  const hasTimePart = trimmed.includes('T');
+  const hasTzSuffix = /[Zz]|[+-]\d{2}:?\d{2}$/.test(trimmed);
+  const normalized = hasTimePart && !hasTzSuffix ? `${trimmed}Z` : trimmed;
+  return new Date(normalized);
+}
+
+/**
  * 날짜 문자열을 한국어 형식으로 포맷팅한다.
  *
  * @param {string|Date} dateInput - 날짜 문자열 또는 Date 객체 (예: '2024-03-15')
@@ -21,7 +50,8 @@ export function formatDate(dateInput, { includeTime = false } = {}) {
   if (!dateInput) return '-';
 
   try {
-    const date = new Date(dateInput);
+    const date = parseServerDate(dateInput);
+    if (!date) return '-';
     // 유효하지 않은 날짜 확인
     if (isNaN(date.getTime())) return '-';
 
@@ -57,11 +87,14 @@ export function formatRelativeTime(dateInput) {
   if (!dateInput) return '-';
 
   try {
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '-';
+    // QA #177: parseServerDate 로 timezone suffix 없는 서버 문자열 방어 (상단 주석 참조).
+    const date = parseServerDate(dateInput);
+    if (!date || isNaN(date.getTime())) return '-';
 
     const now = new Date();
     const diffMs = now - date;
+    // 미래 시각(시계 어긋남/서버 TZ 추가 수정 후 과보정 등) — 0 이하로 내려가면 "방금 전"
+    if (diffMs < 0) return '방금 전';
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);

@@ -82,51 +82,91 @@ export default function RecommendationPage() {
   };
 
   /**
-   * 찜 토글 핸들러.
+   * 찜 토글 핸들러 — 낙관적 업데이트(optimistic update).
+   *
+   * QA #173 (2026-04-23): 기존엔 `await toggleWishlist()` 완료 후에야 state 를 뒤집어서
+   * 네트워크 왕복(수백 ms) 동안 버튼이 아무 반응 없는 것처럼 보였다. UI 를 먼저 뒤집어
+   * 사용자 피드백을 즉시 주고, 서버 응답으로 최종 값을 보정한다. 실패 시 롤백 + 알럿.
+   *
+   * QA 후속 (2026-04-23): 매칭 키 버그 수정 — Backend `RecommendationHistoryResponse` 는
+   * `recommendationLogId` 로 내려오므로 `rec.id === recommendationId` 비교는 항상 false 였다.
+   * → optimistic update / 서버 응답 보정 모두 no-op → "찜/봤어요 버튼 눌러도 반영 안됨"
+   *   (평가 등록 후 별점 복원도 동일 원인으로 실패). `recommendationLogId` 로 교체.
+   *
+   * Backend RecommendationHistoryController 는 payload 언랩 후 `{wishlisted: boolean}` 을 내려주므로
+   * 성공 응답의 `result.wishlisted` 값을 그대로 사용하면 된다.
    */
   const handleToggleWishlist = async (recommendationId) => {
+    const targetRec = recommendations.find((rec) => rec.recommendationLogId === recommendationId);
+    const prevValue = targetRec?.wishlisted ?? false;
+    /* 1) 낙관적으로 먼저 뒤집기 */
+    setRecommendations((prev) =>
+      prev.map((rec) =>
+        rec.recommendationLogId === recommendationId ? { ...rec, wishlisted: !prevValue } : rec,
+      ),
+    );
     try {
       const result = await toggleWishlist(recommendationId);
-      /* 목록에서 해당 항목 업데이트 */
+      /* 2) 서버 응답으로 최종 값 보정 (동시 클릭 등 race 방지) */
+      if (result?.wishlisted != null) {
+        setRecommendations((prev) =>
+          prev.map((rec) =>
+            rec.recommendationLogId === recommendationId ? { ...rec, wishlisted: result.wishlisted } : rec,
+          ),
+        );
+      }
+    } catch {
+      /* 3) 실패 시 원상 복구 + 안내 */
       setRecommendations((prev) =>
         prev.map((rec) =>
-          rec.id === recommendationId
-            ? { ...rec, wishlisted: result?.wishlisted ?? !rec.wishlisted }
-            : rec,
+          rec.recommendationLogId === recommendationId ? { ...rec, wishlisted: prevValue } : rec,
         ),
       );
-    } catch {
       showAlert({ title: '오류', message: '찜 처리에 실패했습니다.', type: 'error' });
     }
   };
 
   /**
-   * 봤어요 토글 핸들러.
+   * 봤어요 토글 핸들러 — 낙관적 업데이트(QA #173).
+   * 매칭 키: `recommendationLogId` (rec.id 는 Backend 응답 스키마에 없음).
    */
   const handleToggleWatched = async (recommendationId) => {
+    const targetRec = recommendations.find((rec) => rec.recommendationLogId === recommendationId);
+    const prevValue = targetRec?.watched ?? false;
+    setRecommendations((prev) =>
+      prev.map((rec) =>
+        rec.recommendationLogId === recommendationId ? { ...rec, watched: !prevValue } : rec,
+      ),
+    );
     try {
       const result = await toggleWatched(recommendationId);
+      if (result?.watched != null) {
+        setRecommendations((prev) =>
+          prev.map((rec) =>
+            rec.recommendationLogId === recommendationId ? { ...rec, watched: result.watched } : rec,
+          ),
+        );
+      }
+    } catch {
       setRecommendations((prev) =>
         prev.map((rec) =>
-          rec.id === recommendationId
-            ? { ...rec, watched: result?.watched ?? !rec.watched }
-            : rec,
+          rec.recommendationLogId === recommendationId ? { ...rec, watched: prevValue } : rec,
         ),
       );
-    } catch {
       showAlert({ title: '오류', message: '봤어요 처리에 실패했습니다.', type: 'error' });
     }
   };
 
   /**
    * 피드백 제출 핸들러.
+   * 매칭 키: `recommendationLogId`.
    */
   const handleSubmitFeedback = async (recommendationId, feedback) => {
     try {
       await submitFeedback(recommendationId, feedback);
       setRecommendations((prev) =>
         prev.map((rec) =>
-          rec.id === recommendationId
+          rec.recommendationLogId === recommendationId
             ? { ...rec, feedbackRating: feedback.rating, feedbackComment: feedback.comment }
             : rec,
         ),

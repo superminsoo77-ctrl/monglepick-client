@@ -19,17 +19,28 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 /* 인증 Context 훅 — app/providers에서 가져옴 (userId 전달용) */
 import useAuthStore from '../../../shared/stores/useAuthStore';
+/* 라우트 상수 — 유저 프로필 버튼 이동 경로용 */
+import { ROUTES } from '../../../shared/constants/routes';
 /* 채팅 상태 관리 훅 — 같은 feature 내의 hooks에서 가져옴 */
 import { useChat } from '../hooks/useChat';
 /* 채팅 이력 관리 훅 — 사이드바 세션 목록 */
 import { useSessionHistory } from '../hooks/useSessionHistory';
+/* 외부 지도 연동 — navigator.geolocation 권한/좌표 (Phase 6, 2026-04-23) */
+import { useGeolocation } from '../hooks/useGeolocation';
+/* 채팅 환영 화면 추천 칩 — DB 동적 풀 + 클릭 트래킹 (2026-04-23) */
+import useChatSuggestions from '../hooks/useChatSuggestions';
 import MovieCard from './MovieCard';
+/* 외부 지도 카드/패널 — theater_card / now_showing SSE 이벤트 렌더 */
+import TheaterCard from './TheaterCard';
+import NowShowingPanel from './NowShowingPanel';
 /* 후속 질문 + AI 생성 제안 카드 (Claude Code 스타일, 2026-04-15 신설) */
 import ClarificationOptions from './ClarificationOptions';
 /* 몽글이 캐릭터 애니메이션 컴포넌트 */
 import MonggleCharacter from '../../../shared/components/MonggleCharacter/MonggleCharacter';
 /* 채팅 이력 사이드바 */
 import SessionSidebar from './SessionSidebar';
+/* 게스트 평생 1회 쿼터 소진 시 노출되는 로그인 유도 모달 (2026-04-22 신규) */
+import LoginRequiredModal from '../../auth/components/LoginRequiredModal';
 import * as S from './ChatWindow.styled';
 
 /** 이미지 최대 크기 (10MB) */
@@ -38,6 +49,17 @@ const IMAGE_MAX_SIZE_MB = 10;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 /** 기본 최대 입력 글자수 (NORMAL 등급 '알갱이' 기본값 200자, 서버 쿼터 정보 수신 전 사용) */
 const DEFAULT_MAX_INPUT_LENGTH = 200;
+
+/**
+ * 메시지에 영화관/예매 의도 키워드가 포함됐는지 휴리스틱 감지.
+ * theater/booking 의도일 가능성이 높을 때만 좌표 권한을 요청해 사용자 마찰을 줄인다.
+ * 추천(recommend) 의도까지 매번 위치를 묻지 않도록 보수적으로 매칭.
+ */
+const THEATER_INTENT_RE = /(영화관|상영관|극장|cgv|롯데시네마|메가박스|예매)/i;
+function detectsTheaterIntent(text) {
+  if (!text) return false;
+  return THEATER_INTENT_RE.test(text);
+}
 
 export default function ChatWindow() {
   /* 뒤로가기 네비게이션 + URL 세션 ID */
@@ -59,13 +81,28 @@ export default function ChatWindow() {
     clarification,
     pointInfo,
     quotaError,
+    guestQuotaExceeded,
     sendMessage,
     clearMessages,
     cancelRequest,
     dismissQuotaError,
+    dismissGuestQuotaModal,
     loadExistingSession,
     currentSessionId,
   } = useChat({ userId: user?.id || '' });
+
+  // 외부 지도 연동 — 위치 권한/좌표 (theater/booking 의도용, 2026-04-23)
+  // 좌표는 sendMessage 호출 단위에서만 사용되고 영구 저장하지 않는다.
+  const geo = useGeolocation();
+
+  // 채팅 환영 화면 추천 칩 — DB 동적 풀 + 클릭 트래킹 (2026-04-23)
+  // 칩 클릭 시 sendMessage 로 바로 전송. isLoading 중에는 전송 억제.
+  const { suggestions: welcomeSuggestions, handleSelect: handleSuggestionSelect } =
+    useChatSuggestions({
+      onSelect: (text) => {
+        if (!isLoading) sendMessage(text);
+      },
+    });
 
   // 채팅 이력 훅 — 사이드바 세션 목록 관리
   const {
@@ -205,14 +242,30 @@ export default function ChatWindow() {
    * 메시지 전송 핸들러.
    * Enter 키 또는 전송 버튼 클릭 시 호출.
    * 첨부 이미지가 있으면 base64로 함께 전송.
+   *
+   * 외부 지도 연동 (2026-04-23):
+   * - 메시지에 영화관/예매 키워드가 보이고 좌표가 아직 없으면 navigator.geolocation 권한을 요청.
+   * - 사용자가 거부/타임아웃하더라도 메시지는 그대로 전송 (Agent 가 메시지에서 지명 추출 fallback).
+   * - 좌표는 sendMessage 호출 단위에서만 body 에 첨부되고 영구 저장 X.
    */
-  const handleSend = () => {
+  const handleSend = async () => {
     const hasText = inputText.trim();
     const hasImage = attachedImage !== null;
     if ((!hasText && !hasImage) || isLoading) return;
 
-    // 이미지 포함 전송
-    sendMessage(inputText.trim(), attachedImage?.base64 || null);
+    const text = inputText.trim();
+
+    // theater/booking 의도가 의심되고 좌표를 아직 못 받았으면 권한 요청.
+    // 권한 거부/실패는 무시 — Agent 의 지명 추출 fallback 이 받아준다.
+    let location = geo.coords;
+    if (!location && detectsTheaterIntent(text)) {
+      const requested = await geo.request();
+      if (requested) {
+        location = requested;
+      }
+    }
+
+    sendMessage(text, attachedImage?.base64 || null, location || null);
     setInputText('');
     setAttachedImage(null);
     // 전송 후 입력 필드에 포커스 유지
@@ -391,64 +444,34 @@ export default function ChatWindow() {
         onRetry={() => loadSessions(true)}
       />
 
-      {/* ── 헤더 ── */}
-      <S.ChatHeader>
-        <S.ChatHeaderLeft>
-          {/* 이전 대화 목록 버튼 (인증된 사용자만 표시) */}
-          {isAuthenticated && (
-            <S.BackButton onClick={handleOpenSidebar} title="이전 대화 목록">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </S.BackButton>
-          )}
-          {/* 뒤로가기 버튼 — 이전 페이지로 이동 */}
-          <S.BackButton onClick={() => navigate(-1)} title="뒤로가기">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </S.BackButton>
-          {/*
-            헤더 몽글이: idle 상태 고정.
-            isLoading일 때 헤더 캐릭터까지 바뀌면 시선이 분산되므로
-            헤더는 항상 idle(둥실둥실)을 유지한다.
-          */}
-          <MonggleCharacter animation="idle" size="sm" />
-          <div>
-            <S.HeaderTitle>몽글픽</S.HeaderTitle>
-            <S.HeaderSubtitle>AI 영화 추천</S.HeaderSubtitle>
-          </div>
-        </S.ChatHeaderLeft>
-        <S.HeaderClearBtn
-          onClick={async () => {
-            /* 대화 내역이 있을 때만 확인 요청 — 빈 상태에서는 바로 리셋 */
-            if (messages.length > 0) {
-              const confirmed = await showConfirm({
-                title: '새 대화 시작',
-                message: '현재 대화를 종료하고 새 대화를 시작할까요?',
-                type: 'confirm',
-                confirmLabel: '시작',
-                cancelLabel: '취소',
-              });
-              if (!confirmed) return;
-            }
-            /* useChat 내부 상태 초기화 (messages, session, status, point 등) */
-            clearMessages();
-            /* ChatWindow 로컬 상태 초기화 */
-            setInputText('');
-            setAttachedImage(null);
-            /* URL 리셋 */
-            navigate('/chat', { replace: true });
-            /* 입력 필드에 포커스 */
-            inputRef.current?.focus();
-          }}
-          title="새 대화 시작"
+      {/* ── Floating 액션 (2026-04-23 도구바 최종 제거) ──
+          기존 <S.ChatHeader> 풀 너비 도구바가 상단 MainLayout Header 와 이중 바를 만들어 UX 저해.
+          → ChatHeader 전체 제거. 필요한 두 기능만 메시지 영역의 좌/우 상단 모서리에
+          floating 으로 띄운다. 프로필 버튼은 상단 MainLayout Header 좌측에서 이미 제공. */}
+
+      {/* 좌상단: 이전 대화 목록 토글 (인증 유저만) */}
+      {isAuthenticated && (
+        <S.ChatFloatingHamburger
+          type="button"
+          onClick={handleOpenSidebar}
+          title="이전 대화 목록"
+          aria-label="이전 대화 목록 열기"
         >
-          + 새 대화
-        </S.HeaderClearBtn>
-      </S.ChatHeader>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </S.ChatFloatingHamburger>
+      )}
+
+      {/*
+        2026-04-23: 우상단 "+ 새 대화" 버튼 제거.
+        대안 진입점:
+          - 좌상단 햄버거로 열리는 이전 대화 사이드바 내부의 "새 대화" 진입
+          - URL `/chat` 직접 이동 또는 상단 로고 → /home → 다시 채팅 진입
+        showConfirm/clearMessages 등의 유틸 핸들러는 사이드바 측에서 그대로 재사용.
+      */}
 
       {/* ── 포인트/쿼터 정보 바 (추천 완료 후 point_update 수신 시 표시) ──
            2026-04-15 확장: source(GRADE_FREE/SUB_BONUS/PURCHASED/BLOCKED)별로
@@ -522,7 +545,7 @@ export default function ChatWindow() {
                   <S.QuotaErrorDesc>
                     현재 잔액: {quotaError.balance?.toLocaleString() ?? 0}P / 필요: {quotaError.cost?.toLocaleString() ?? 0}P
                   </S.QuotaErrorDesc>
-                  <S.QuotaErrorLink href="/point">
+                  <S.QuotaErrorLink href="/account/point">
                     포인트 충전하기 &rarr;
                   </S.QuotaErrorLink>
                 </>
@@ -554,7 +577,7 @@ export default function ChatWindow() {
                   <>월간: {quotaError.monthly_used ?? 0}/{quotaError.monthly_limit}회</>
                 )}
               </S.QuotaErrorDesc>
-              <S.QuotaErrorLink href="/point">
+              <S.QuotaErrorLink href="/account/point">
                 등급 업그레이드 알아보기 &rarr;
               </S.QuotaErrorLink>
             </S.QuotaErrorContent>
@@ -578,20 +601,13 @@ export default function ChatWindow() {
               무엇이든 말씀해 주세요!
             </S.WelcomeDesc>
             <S.WelcomeSuggestions>
-              {/* 추천 질문 버튼 */}
-              {[
-                '오늘 기분이 우울한데 영화 추천해줘',
-                '인터스텔라 같은 영화 보고 싶어',
-                '가족이랑 볼 애니메이션 추천해줘',
-                '요즘 인기 있는 한국 영화 뭐 있어?',
-              ].map((suggestion) => (
+              {/* 추천 질문 버튼 — DB 동적 풀 (fallback 4개로 즉시 렌더, fetch 후 자연 교체) */}
+              {welcomeSuggestions.map((s) => (
                 <S.WelcomeSuggestionBtn
-                  key={suggestion}
-                  onClick={() => {
-                    if (!isLoading) sendMessage(suggestion);
-                  }}
+                  key={s.id ?? s.text}
+                  onClick={() => handleSuggestionSelect(s)}
                 >
-                  {suggestion}
+                  {s.text}
                 </S.WelcomeSuggestionBtn>
               ))}
             </S.WelcomeSuggestions>
@@ -665,8 +681,55 @@ export default function ChatWindow() {
                       movie={movie}
                       /* 리뷰 작성 시 reviewSource 로 기록되는 현재 세션 ID. 신규 세션이면 빈 문자열 → 'chat' fallback */
                       sessionId={currentSessionId}
+                      /* "근처 영화관" 클릭 시 입력창에 자동 채움 + 포커스. NowShowingPanel 과 동일 패턴 — 자동 전송 X. */
+                      onFindNearbyTheater={(text) => {
+                        setInputText(text);
+                        inputRef.current?.focus();
+                      }}
+                      /* SSE 도중 취소된 부분 데이터는 dimmed 시각화 (활성 결과와 혼동 방지) */
+                      cancelled={msg.cancelled === true}
                     />
                   ))}
+                </S.ChatMovieCards>
+              </S.ChatMsg>
+            );
+          }
+
+          // 외부 지도 결과 (영화관 + 박스오피스, 2026-04-23 외부 지도 연동)
+          if (msg.role === 'external_map') {
+            const hasTheaters = msg.theaters && msg.theaters.length > 0;
+            const hasNowShowing = msg.nowShowing && msg.nowShowing.length > 0;
+            return (
+              <S.ChatMsg key={`map-${msg.timestamp}`}>
+                <S.MonggleAvatarWrapper>
+                  <MonggleCharacter
+                    animation={isLoading ? 'thinking' : 'celebrating'}
+                    size="sm"
+                  />
+                </S.MonggleAvatarWrapper>
+                {/* ChatMovieCards 와 동일한 가로 스크롤 컨테이너 재사용 — 카드 세로 정렬 + 모바일 가로 스와이프 */}
+                <S.ChatMovieCards>
+                  {hasTheaters && msg.theaters.map((t, tIdx) => (
+                    <TheaterCard
+                      key={t.theater_id || `t-${tIdx}`}
+                      theater={t}
+                      userLocation={msg.userLocation}
+                      /* SSE 도중 취소된 부분 데이터는 dimmed 시각화 (MovieCard 와 동일 패턴) */
+                      cancelled={msg.cancelled === true}
+                      /* 영화관이 1개뿐이면 미니맵 자동 펼침 — 사용자가 추가 클릭 없이 위치 즉시 확인 */
+                      defaultOpen={msg.theaters.length === 1}
+                    />
+                  ))}
+                  {hasNowShowing && (
+                    <NowShowingPanel
+                      movies={msg.nowShowing}
+                      onPickMovie={(text) => {
+                        // 박스오피스 영화명 클릭 → 입력창에 자동 채움 + 포커스 (사용자가 보낼지 결정).
+                        setInputText(text);
+                        inputRef.current?.focus();
+                      }}
+                    />
+                  )}
                 </S.ChatMovieCards>
               </S.ChatMsg>
             );
@@ -820,6 +883,13 @@ export default function ChatWindow() {
           </S.DragOverlayContent>
         </S.DragOverlay>
       )}
+
+      {/* ── 게스트 평생 1회 쿼터 소진 → 로그인 유도 모달 (2026-04-22 신규) ── */}
+      <LoginRequiredModal
+        open={Boolean(guestQuotaExceeded)}
+        onClose={dismissGuestQuotaModal}
+        reason={guestQuotaExceeded?.reason}
+      />
     </S.ChatWindowWrapper>
   );
 }

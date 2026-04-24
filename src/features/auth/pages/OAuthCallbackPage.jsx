@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* OAuth 로그인 API — 같은 feature 내의 authApi에서 가져옴 */
@@ -19,14 +19,17 @@ import { oauthLogin } from '../api/authApi';
 import { getOAuthRedirectUri } from '../../../shared/constants/oauth';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
+/* 2026-04-23 PR-5: 구 OAuth 콜백 경로에서도 복귀 경로 복원 */
+import useReturnTo from '../../../shared/hooks/useReturnTo';
 /* styled-components — OAuthCallbackPage 전용 스타일 */
 import * as S from './OAuthCallbackPage.styled';
 
 export default function OAuthCallbackPage() {
   const { provider } = useParams();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
+  /* PR-5: rememberReturnTo 가 저장한 복귀 경로 또는 ROUTES.HOME 으로 */
+  const goAfterLogin = useReturnTo(ROUTES.HOME);
 
   /* 에러 메시지 상태 */
   const [error, setError] = useState('');
@@ -90,8 +93,8 @@ export default function OAuthCallbackPage() {
           user: response.user,
         });
 
-        // 홈으로 리다이렉트
-        navigate(ROUTES.HOME, { replace: true });
+        /* 2026-04-23 PR-5: 복귀 경로 있으면 거기로, 없으면 홈 (replace 내장) */
+        goAfterLogin();
       } catch (err) {
         setError(err.message || '소셜 로그인에 실패했습니다.');
         setIsProcessing(false);

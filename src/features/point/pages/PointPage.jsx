@@ -26,6 +26,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 /* 커스텀 모달 훅 — window.confirm/alert 대체 */
 import { useModal } from '../../../shared/components/Modal';
+/* 2026-04-23 라우팅 재설계 PR-3 — 탭 상태 URL 동기화 공통 훅 */
+import useTabParam from '../../../shared/hooks/useTabParam';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 포인트 API — 같은 feature 내의 pointApi에서 가져옴 */
@@ -80,9 +82,8 @@ const HISTORY_PAGE_SIZE = 10;
 /**
  * 탭 정의 — 라벨/식별자를 단일 진실 원본으로 관리한다.
  *
- * <p>탭 id 는 쿼리 문자열로 노출하지 않고 내부 state 로만 관리하므로
- * 향후 다른 페이지에서 "포인트 페이지의 이력 탭으로 이동" 같은 딥링크가 필요해지면
- * `?tab={id}` 파싱을 추가하면 된다.</p>
+ * 2026-04-23 PR-3: 탭 상태를 URL 쿼리 `?tab={id}` 와 동기화하도록 전환 (useTabParam).
+ * 다른 페이지에서 `/point?tab=history` 같은 딥링크로 특정 탭에 바로 진입 가능.
  */
 const TABS = [
   { id: 'overview', label: '현황' },
@@ -90,6 +91,12 @@ const TABS = [
   { id: 'inventory', label: '내 아이템' },
   { id: 'history', label: '이력' },
 ];
+
+/**
+ * 유효한 탭 id 화이트리스트 — URL 쿼리 값 검증용.
+ * 벗어난 값이 들어오면 defaultTab('overview') 으로 폴백.
+ */
+const VALID_TAB_IDS = new Set(TABS.map((t) => t.id));
 
 export default function PointPage() {
   /* 커스텀 모달 — window.confirm/alert 대체 */
@@ -156,9 +163,17 @@ export default function PointPage() {
   /* 에러 메시지 */
   const [error, setError] = useState(null);
 
-  /* ── 탭 상태 (2026-04-14 신설) ──
-   * 기본은 '현황' 탭. BalanceCard 는 탭과 무관하게 상단에 항상 표시된다. */
-  const [activeTab, setActiveTab] = useState('overview');
+  /* ── 탭 상태 (2026-04-14 신설 / 2026-04-23 PR-3 URL 동기화로 전환) ──
+   * 기본은 '현황' 탭. BalanceCard 는 탭과 무관하게 상단에 항상 표시된다.
+   * useTabParam 이 ?tab= 쿼리 ↔ activeTab state 를 양방향 동기화하므로
+   *   - 새로고침 시 탭 보존
+   *   - 공유 링크로 특정 탭 바로 진입
+   *   - 기본 탭(overview) 선택 시 쿼리 생략
+   * 이 자동으로 보장된다. 기존 useState('overview') 와 API 호환 (tuple 동일). */
+  const [activeTab, setActiveTab] = useTabParam({
+    validIds: VALID_TAB_IDS,
+    defaultTab: 'overview',
+  });
 
   /* setTimeout cleanup 용 ref (메모리 누수 방지) */
   const attendanceTimerRef = useRef(null);
@@ -640,7 +655,7 @@ export default function PointPage() {
    * 충전하기 버튼 클릭 — 결제 페이지로 이동.
    */
   const handleNavigatePayment = () => {
-    navigate(ROUTES.PAYMENT);
+    navigate(ROUTES.ACCOUNT_PAYMENT);
   };
 
   /* ── 렌더링 ── */

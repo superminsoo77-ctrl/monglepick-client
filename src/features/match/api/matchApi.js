@@ -106,9 +106,11 @@ async function _sendMatchRequestOnce(
 
   // Agent(:8000)으로 POST 요청 전송
   // Vite 프록시 설정에서 /api/* → :8000(AI Agent)으로 전달됨
+  // credentials:include — 비로그인 게스트의 mongle_guest 쿠키를 동봉해 평생 1회 쿼터를 식별 (2026-04-22)
   const response = await fetch(`${SERVICE_URLS.AGENT}${MATCH_ENDPOINTS.STREAM}`, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({
       // Agent API 명세: snake_case 필드
       movie_id_1: movieId1,

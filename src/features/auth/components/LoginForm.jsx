@@ -12,12 +12,18 @@
  */
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import { login as loginAPI, checkEmailExists, resetPassword } from '../api/authApi';
 import { validateEmail, validatePassword, validatePasswordConfirm } from '../../../shared/utils/validators';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getOAuth2AuthorizationUrl } from '../../../shared/constants/oauth';
+/*
+ * 2026-04-23 PR-5 — 로그인 복귀 경로 훅.
+ * useReturnTo(): 로컬 로그인 성공 시 state.returnTo 로 복귀 (PrivateRoute 가 주입).
+ * rememberReturnTo(): OAuth 리다이렉트처럼 state 가 날아가는 경우 sessionStorage 경유.
+ */
+import useReturnTo, { rememberReturnTo } from '../../../shared/hooks/useReturnTo';
 import * as S from './LoginForm.styled';
 
 export default function LoginForm() {
@@ -43,7 +49,13 @@ export default function LoginForm() {
   const [fpSuccess,         setFpSuccess]         = useState(false);
 
   const login    = useAuthStore((s) => s.login);
-  const navigate = useNavigate();
+  const location = useLocation();
+  /*
+   * 로그인 성공 후 복귀 네비게이터.
+   *   - state.returnTo (PrivateRoute 가 주입) → sessionStorage (OAuth 경로) → '/home' 순 폴백
+   *   - PR-5 이전에는 navigate(ROUTES.HOME) 하드코딩으로 항상 홈으로 떨어졌다.
+   */
+  const goAfterLogin = useReturnTo(ROUTES.HOME);
 
   /* ── 로그인 폼 유효성 검사 ── */
   const validateLoginForm = () => {
@@ -70,7 +82,8 @@ export default function LoginForm() {
         refreshToken: response.refreshToken,
         user:         response.user,
       });
-      navigate(ROUTES.HOME);
+      /* PR-5: state.returnTo 있으면 원래 페이지로, 없으면 ROUTES.HOME 으로 */
+      goAfterLogin();
     } catch (err) {
       if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
@@ -98,7 +111,8 @@ export default function LoginForm() {
         refreshToken: response.refreshToken,
         user:         response.user,
       });
-      navigate(ROUTES.HOME);
+      /* PR-5: state.returnTo 있으면 원래 페이지로, 없으면 ROUTES.HOME 으로 */
+      goAfterLogin();
     } catch (err) {
       if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
@@ -346,11 +360,20 @@ export default function LoginForm() {
 
       <S.Divider><span>또는</span></S.Divider>
 
+      {/*
+        2026-04-23 PR-5: OAuth 로그인 전에 state.returnTo 를 sessionStorage 에 stash.
+        외부 리다이렉트(Google/카카오/네이버) 를 거치면 location.state 가 소실되므로,
+        sessionStorage 를 브리지로 사용해 OAuthCookiePage 가 복귀 경로를 해석할 수 있도록 한다.
+        rememberReturnTo 내부에서 sanitizeReturnTo 로 안전 검증.
+      */}
       <S.SocialList>
         <S.SocialButton
           type="button"
           $provider="google"
-          onClick={() => { window.location.href = getOAuth2AuthorizationUrl('google'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = getOAuth2AuthorizationUrl('google');
+          }}
           disabled={isSubmitting}
         >
           Google로 로그인
@@ -358,7 +381,10 @@ export default function LoginForm() {
         <S.SocialButton
           type="button"
           $provider="kakao"
-          onClick={() => { window.location.href = getOAuth2AuthorizationUrl('kakao'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = getOAuth2AuthorizationUrl('kakao');
+          }}
           disabled={isSubmitting}
         >
           카카오로 로그인
@@ -366,7 +392,10 @@ export default function LoginForm() {
         <S.SocialButton
           type="button"
           $provider="naver"
-          onClick={() => { window.location.href = getOAuth2AuthorizationUrl('naver'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = getOAuth2AuthorizationUrl('naver');
+          }}
           disabled={isSubmitting}
         >
           네이버로 로그인
@@ -375,7 +404,16 @@ export default function LoginForm() {
 
       <S.Footer>
         계정이 없으신가요?{' '}
-        <S.TextLink as={Link} to={ROUTES.SIGNUP}>회원가입</S.TextLink>
+        {/*
+          PR-5: state.returnTo 를 회원가입 페이지로 전달 — SignUpForm 이 OAuth 클릭 시
+          이 값을 sessionStorage 에 넘기고, OAuth 복귀 후 원래 페이지로 이동할 수 있도록.
+          returnTo 가 없어도 state 는 { returnTo: undefined } 가 되어 안전.
+        */}
+        <S.TextLink
+          as={Link}
+          to={ROUTES.SIGNUP}
+          state={location.state?.returnTo ? { returnTo: location.state.returnTo } : undefined}
+        >회원가입</S.TextLink>
       </S.Footer>
     </S.Form>
   );

@@ -7,7 +7,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+/* 2026-04-23 PR-3: 뒤로가기 3단 폴백 공통 훅 — handleGoBack 로직을 대체 */
+import useBackNavigation from '../../../shared/hooks/useBackNavigation';
 /* Phase 2: 사용자 행동 이벤트 추적 */
 import { trackEvent } from '../../../shared/utils/eventTracker';
 /* 커스텀 모달 훅 — window.alert 대체 */
@@ -53,37 +55,20 @@ export default function MovieDetailPage() {
 
   // URL 파라미터에서 영화 ID 추출
   const { id } = useParams();
-  const location = useLocation();
-  /**
-   * 뒤로가기 네비게이션.
-   *
-   * 2026-04-14 추가: 둘이 영화 고르기(Match)에서 추천 영화 카드를 눌러
-   * 이 페이지로 진입한 뒤 브라우저 뒤로가기를 누르지 않더라도
-   * 화면 상단 버튼으로 이전 화면으로 직접 돌아갈 수 있도록 함.
-   *
-   * navigate(-1) 은 history 스택이 비어있는 경우(직접 URL 진입) 아무
-   * 동작도 하지 않으므로, 그 경우 폴백으로 홈(/) 으로 이동한다.
-   */
-  const navigate = useNavigate();
-  const handleGoBack = () => {
-    if (location.state?.backTo) {
-      navigate(location.state.backTo, {
-        state: {
-          ...(location.state?.backTab ? { activeTab: location.state.backTab } : {}),
-          ...(location.state?.returnTo ? { returnTo: location.state.returnTo } : {}),
-          ...(location.state?.onboardingMission ? { onboardingMission: location.state.onboardingMission } : {}),
-        },
-      });
-      return;
-    }
 
-    // 이전 히스토리가 있으면 뒤로, 없으면 홈으로 폴백
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
-  };
+  /*
+   * 뒤로가기 네비게이션 — 2026-04-23 PR-3 공통 훅화.
+   *
+   * 기존 handleGoBack 함수(3단 폴백: location.state.backTo → navigate(-1) → '/')를
+   * useBackNavigation 훅으로 대체. 훅 내부 로직은 정확히 동일 의미를 갖지만,
+   *   - backTab 필드(state.activeTab 로 재포장) 는 폐기됐다 (호출부가 backTo URL 에
+   *     ?tab= 쿼리를 직접 넣도록 변경 — MyPage.jsx 참조).
+   *   - fallback 은 기존 '/' 에서 '/home' 으로 격상 (랜딩보다 홈이 더 유용한 폴백).
+   *
+   * navigate(-1) 은 직접 URL 진입으로 history 스택이 비어있을 때 아무 동작 없이
+   * 끝나는 특성이 있어 훅 내부에서 window.history.length 를 먼저 확인한다.
+   */
+  const handleGoBack = useBackNavigation('/home');
   // 영화 상세 정보 상태
   const [movie, setMovie] = useState(null);
   // 리뷰 목록 상태

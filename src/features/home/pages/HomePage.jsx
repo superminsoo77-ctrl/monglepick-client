@@ -58,6 +58,12 @@ const SUGGESTION_CARDS = [
 ];
 
 export default function HomePage() {
+  /**
+   * 2026-04-23 신규: 홈 상단 검색 입력 상태.
+   * 상단 NAV 에서 "검색" 탭을 제거하는 대신 홈 본문 상단에 검색창을 노출한다.
+   * 제출 시 `/search?q=...` 로 이동해 SearchPage 가 결과를 렌더.
+   */
+  const [searchQuery, setSearchQuery] = useState('');
   /** 인기 영화 목록 (backend /movies/popular) */
   const [popularMovies, setPopularMovies] = useState([]);
   /** 인기 영화 로딩 상태 */
@@ -220,8 +226,40 @@ export default function HomePage() {
     navigate(ROUTES.CHAT, { state: { initialQuery: query } });
   };
 
+  /**
+   * 2026-04-23: 홈 상단 검색 제출 핸들러.
+   * 공백만 입력된 경우 이동하지 않는다 (SearchPage 가 빈 쿼리로 로드되지 않도록).
+   */
+  const handleHomeSearchSubmit = (e) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    navigate(`${ROUTES.SEARCH}?q=${encodeURIComponent(q)}`);
+  };
+
   return (
     <S.Wrapper>
+      {/*
+        ── 홈 상단 검색창 (2026-04-23 신규, 2026-04-23 위치 수정) ──
+        상단 NAV 에서 "검색" 탭을 제거하는 대신 본문 최상단(헤더 바로 아래)에 전용
+        검색 input 을 노출한다. Hero 섹션보다 먼저 렌더해 페이지 진입 즉시 검색 가능.
+        엔터 또는 "검색" 버튼 클릭 시 /search?q=... 로 이동 — SearchPage 의 useSearchParams 로 수신.
+      */}
+      <S.HomeSearch>
+        <S.HomeSearchForm onSubmit={handleHomeSearchSubmit} role="search">
+          <S.HomeSearchInput
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="보고 싶은 영화·감독·배우를 검색해보세요"
+            aria-label="영화 검색"
+          />
+          <S.HomeSearchBtn type="submit">
+            검색
+          </S.HomeSearchBtn>
+        </S.HomeSearchForm>
+      </S.HomeSearch>
+
       {/* ── 히어로 섹션 ── */}
       <S.Hero>
         <S.HeroContent>
@@ -271,26 +309,40 @@ export default function HomePage() {
       */}
       <SideSlideBanner position="MAIN" />
 
-      {/* ── 공지사항 배너 섹션 — displayType === 'BANNER' 만 카드 노출 ──
-         2026-04-15 개편:
-         - 이전: displayType 구분 없이 전부 배너 카드로 렌더 → POPUP/MODAL 로 저장해도
-           배너처럼 보이던 버그.
-         - 이후: bannerNotices 로 필터링된 BANNER 만 여기 표시.
-           POPUP/MODAL 은 announcementQueue 로 넘어가 NoticeAnnouncementModal 로 노출.
-         - 클릭 동작: linkUrl 있으면 외부 새창, 없으면 커뮤니티 공지 탭 딥링크
-           (?tab=notices&noticeId=) 로 navigate — 상세는 NoticeFeed 한 곳에서만 관리. */}
+      {/* ── 추천 질문 카드 섹션 ── */}
+      <S.Suggestions>
+        <S.SuggestionsInner>
+          <S.SuggestionsTitle>이런 것도 물어볼 수 있어요</S.SuggestionsTitle>
+          <S.SuggestionsGrid>
+            {SUGGESTION_CARDS.map((card, index) => (
+              <S.SuggestionsCard
+                key={card.title}
+                /* $index: 1-based, stagger 딜레이 계산에 사용 */
+                $index={index + 1}
+                onClick={() => handleSuggestionClick(card.query)}
+              >
+                <S.CardIcon>{card.icon}</S.CardIcon>
+                <S.CardTitle>{card.title}</S.CardTitle>
+                <S.CardDesc>{card.description}</S.CardDesc>
+              </S.SuggestionsCard>
+            ))}
+          </S.SuggestionsGrid>
+        </S.SuggestionsInner>
+      </S.Suggestions>
+
+      {/* ── 공지사항 배너 섹션 (2026-04-23: Suggestions 밑, 인기영화 위로 이동) ──
+         displayType === 'BANNER' 만 카드 노출. POPUP/MODAL 은 announcementQueue 로
+         넘어가 NoticeAnnouncementModal 로 노출된다.
+         클릭: linkUrl 있으면 외부 새창, 없으면 커뮤니티 공지 탭 딥링크로 navigate. */}
       {bannerNotices.length > 0 && (
         <S.NoticeBanner>
           {bannerNotices.map((notice) => {
-            // href 는 오른쪽 클릭 "링크 복사"/"새 탭에서 열기" 지원을 위해 항상 설정.
-            // linkUrl 이 있으면 외부 URL, 없으면 커뮤니티 딥링크 경로.
             const communityDeeplink = `${ROUTES.COMMUNITY}?tab=notices&noticeId=${notice.noticeId}`;
             const hasExternalLink = Boolean(notice.linkUrl);
             const href = hasExternalLink ? notice.linkUrl : communityDeeplink;
 
             const handleClick = (e) => {
-              if (hasExternalLink) return; // 외부 링크: 기본 동작(새 창) 유지
-              // 키보드 보조키(⌘/Ctrl/Shift/Middle) 는 브라우저 기본 동작(새 탭/새 창) 존중
+              if (hasExternalLink) return;
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
               e.preventDefault();
               navigate(communityDeeplink);
@@ -316,27 +368,6 @@ export default function HomePage() {
           })}
         </S.NoticeBanner>
       )}
-
-      {/* ── 추천 질문 카드 섹션 ── */}
-      <S.Suggestions>
-        <S.SuggestionsInner>
-          <S.SuggestionsTitle>이런 것도 물어볼 수 있어요</S.SuggestionsTitle>
-          <S.SuggestionsGrid>
-            {SUGGESTION_CARDS.map((card, index) => (
-              <S.SuggestionsCard
-                key={card.title}
-                /* $index: 1-based, stagger 딜레이 계산에 사용 */
-                $index={index + 1}
-                onClick={() => handleSuggestionClick(card.query)}
-              >
-                <S.CardIcon>{card.icon}</S.CardIcon>
-                <S.CardTitle>{card.title}</S.CardTitle>
-                <S.CardDesc>{card.description}</S.CardDesc>
-              </S.SuggestionsCard>
-            ))}
-          </S.SuggestionsGrid>
-        </S.SuggestionsInner>
-      </S.Suggestions>
 
       {/* ── 인기 영화 섹션 ── */}
       <S.Movies>

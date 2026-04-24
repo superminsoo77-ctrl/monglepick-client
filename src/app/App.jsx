@@ -1,139 +1,138 @@
 /**
  * 몽글픽 메인 애플리케이션 컴포넌트.
  *
- * BrowserRouter 기반 라우팅으로 전체 페이지를 관리한다.
- * Zustand useAuthStore로 인증 상태를 전역에서 공유하며,
- * MainLayout이 필요한 페이지는 Header/Footer를 포함하는 레이아웃으로 감싼다.
+ * React Router v7 의 중첩 라우트 + `<Outlet />` 패턴으로 레이아웃을 공유한다.
+ * Zustand useAuthStore 로 인증 상태를 전역에서 공유하며,
+ * PrivateRoute 는 Layer 3 최상위에 한 번만 적용해 하위 계정 라우트 전체를 가드한다.
  *
- * 라우트 구성:
- *   - /                         : 랜딩 페이지 (서비스 소개 + 팀 소개)
- *   - /login                    : 로그인 페이지 (레이아웃 없음)
- *   - /signup                   : 회원가입 페이지 (레이아웃 없음)
- *   - /auth/callback/:provider  : OAuth 콜백 페이지 (소셜 로그인 처리)
- *   - /chat                     : AI 채팅 추천 (전체 화면, 레이아웃 없음)
- *   - /home                     : 홈 페이지 (인기/최신 영화 목록)
- *   - /search                   : 검색 결과 페이지
- *   - /movie/:id                : 영화 상세 페이지
- *   - /movies/:id               : 영화 상세 페이지 레거시 alias
- *   - /match                     : 둘이 영화 고르기 (두 영화 교집합 추천, 비로그인 가능)
- *   - /community                : 커뮤니티 (게시판 + 리뷰)
- *   - /mypage                   : 마이페이지 (프로필/시청이력/위시리스트)
- *   - /point                    : 포인트 관리 (잔액/출석/아이템/이력)
- *   - /payment                  : 결제/구독 관리
- *   - /support                  : 고객센터 (FAQ/도움말/문의하기/문의내역)
+ * 라우트 계층 (2026-04-23 PR-4 재편 — Account Hub 통합):
+ *   Layer 0 — 레이아웃 없음 (랜딩/인증/OAuth)
+ *   Layer 1 — <MainLayout />                      Header(default) + Footer
+ *   Layer 2 — <MainLayout variant="compact" />   슬림 Header, Footer 없음 (채팅)
+ *   Layer 3 — Layer 1 아래 /account/* 중첩       PrivateRoute → AccountLayout → Outlet
+ *   Layer 4 — 레거시 경로 리다이렉트              외부 링크·북마크 하위호환
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-/* Zustand 인증 스토어 — shared/stores에서 가져옴 */
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+/* Zustand 인증 스토어 */
 import useAuthStore from '../shared/stores/useAuthStore';
-/* 메인 레이아웃 — shared/components에서 가져옴 (Header + Content + Footer) */
+/* 게스트 쿠키 발급 — 비로그인 평생 1회 무료 체험 식별자 (2026-04-22) */
+import { initGuestToken } from '../shared/api/guestApi';
+/* 메인 레이아웃 — Outlet 기반, variant 로 default/compact 분기 (PR-2) */
 import MainLayout from '../shared/components/Layout/MainLayout';
-/* 전역 플로팅 챗봇 위젯 — 우측 하단 고정 FAB/패널 (AI 채팅/고객센터/인증 페이지는 자동 숨김) */
+/* 계정 허브 레이아웃 — Outlet + 사이드바 (PR-1 에서 스켈레톤 배치, PR-4 에서 활성화) */
+import AccountLayout from '../shared/components/Layout/AccountLayout';
+/* 동적 파라미터 유지 리다이렉트 — PR-4 레거시 경로 대응 (PR-1 에서 선제 배치) */
+import RedirectWithParams from '../shared/components/RedirectWithParams';
+/* 전역 플로팅 챗봇 위젯 */
 import SupportChatbotWidget from '../shared/components/SupportChatbotWidget/SupportChatbotWidget';
 
-/* ── 레이아웃 없는 페이지 (인증/랜딩/채팅) ── */
-/* 랜딩 페이지 — features/landing에서 가져옴 */
+/* ── Layer 0 페이지 ── */
 import LandingPage from '../features/landing/pages/LandingPage';
-/* 로그인 페이지 — features/auth에서 가져옴 */
 import LoginPage from '../features/auth/pages/LoginPage';
-/* 회원가입 페이지 — features/auth에서 가져옴 */
 import SignUpPage from '../features/auth/pages/SignUpPage';
-/* OAuth 콜백 페이지 — features/auth에서 가져옴 (구 방식: 인가 코드 처리, fallback) */
 import OAuthCallbackPage from '../features/auth/pages/OAuthCallbackPage';
-/* OAuth 쿠키 교환 페이지 — features/auth에서 가져옴 (Spring Security OAuth2 Client: 쿠키→JWT 교환) */
 import OAuthCookiePage from '../features/auth/pages/OAuthCookiePage';
-/* 채팅 윈도우 컴포넌트 — features/chat에서 가져옴 */
+
+/* ── Layer 2 페이지 ── */
 import ChatWindow from '../features/chat/components/ChatWindow';
 /* 회원가입 직후 시작 미션 온보딩 페이지 */
 import OnboardingPage from '../features/onboarding/pages/OnboardingPage';
 
-/* ── MainLayout 포함 페이지 (Header/Footer 있음) ── */
-/* 홈 페이지 — features/home에서 가져옴 */
+/* ── Layer 1 공용 페이지 ── */
 import HomePage from '../features/home/pages/HomePage';
-/* 검색 결과 페이지 — features/search에서 가져옴 */
 import SearchPage from '../features/search/pages/SearchPage';
-/* 영화 상세 페이지 — features/movie에서 가져옴 */
 import MovieDetailPage from '../features/movie/pages/MovieDetailPage';
-/* 커뮤니티 페이지 — features/community에서 가져옴 */
 import CommunityPage from '../features/community/pages/CommunityPage';
-/* 커뮤니티 게시글 상세 페이지 — 댓글 섹션 포함 */
 import PostDetailPage from '../features/community/pages/PostDetailPage';
-/* 마이페이지 — features/user에서 가져옴 */
-import MyPage from '../features/user/pages/MyPage';
-/* 포인트 관리 페이지 — features/point에서 가져옴 */
-import PointPage from '../features/point/pages/PointPage';
-/* 결제/구독 페이지 — features/payment에서 가져옴 */
-import PaymentPage from '../features/payment/pages/PaymentPage';
-/* 결제 성공 콜백 페이지 — Toss Payments v2 successUrl 리다이렉트 대상 */
-import PaymentSuccessPage from '../features/payment/pages/PaymentSuccessPage';
-/* 결제 실패 콜백 페이지 — Toss Payments v2 failUrl 리다이렉트 대상 */
-import PaymentFailPage from '../features/payment/pages/PaymentFailPage';
-/* 고객센터 페이지 — features/support에서 가져옴 */
-import SupportPage from '../features/support/pages/SupportPage';
-/* 둘이 영화 고르기 페이지 — features/match에서 가져옴 (비로그인 가능) */
-import MatchPage from '../features/match/pages/MatchPage';
-/* 추천 내역 페이지 — features/recommendation에서 가져옴 */
-import RecommendationPage from '../features/recommendation/pages/RecommendationPage';
-/* 플레이리스트 페이지 — features/playlist에서 가져옴 */
-import PlaylistPage from '../features/playlist/pages/PlaylistPage';
 import SharedPlaylistDetailPage from '../features/community/pages/SharedPlaylistDetailPage';
-/* 업적 페이지 — features/achievement에서 가져옴 */
-import AchievementPage from '../features/achievement/pages/AchievementPage';
-/* 업적 상세 페이지 */
-import AchievementDetailPage from '../features/achievement/pages/AchievementDetailPage';
-/*
- * 영화 퀴즈 페이지 — v2 개편(2026-04-08)으로 CommunityPage 의 "오늘의 퀴즈" 탭으로 이관됨.
- * /quiz 진입은 /community?tab=quiz 로 redirect 처리하므로 App.jsx 에서는 import 불필요.
- * QuizPage 컴포넌트 자체는 features/quiz/pages/QuizPage.jsx 에 그대로 존재하며,
- * CommunityPage 가 직접 import 하여 탭 본문으로 사용한다.
- */
-/* 영화 월드컵 페이지 — features/worldcup에서 가져옴 */
-import WorldcupPage from '../features/worldcup/pages/WorldcupPage';
-/* 영화 로드맵 페이지 — features/roadmap에서 가져옴 */
-import RoadmapPage from '../features/roadmap/pages/RoadmapPage';
-/* 도장깨기 리뷰 작성 페이지 */
-import StampReviewPage from '../features/roadmap/pages/StampReviewPage';
-/* 404 에러 페이지 — features/error에서 가져옴 */
-import NotFoundPage from '../features/error/pages/NotFoundPage';
+import MatchPage from '../features/match/pages/MatchPage';
+import SupportPage from '../features/support/pages/SupportPage';
+import PaymentFailPage from '../features/payment/pages/PaymentFailPage';
 
-/* 로딩 스피너 — shared/components에서 가져옴 (PrivateRoute 로딩 중 표시용) */
+/* ── 법적 정책 페이지 (2026-04-23 Footer 후속) ── */
+import TermsPage from '../features/legal/pages/TermsPage';
+import PrivacyPage from '../features/legal/pages/PrivacyPage';
+import OperationPolicyPage from '../features/legal/pages/OperationPolicyPage';
+import RefundPolicyPage from '../features/legal/pages/RefundPolicyPage';
+
+/* ── Layer 3 계정 페이지 ── */
+import MyPage from '../features/user/pages/MyPage';
+import PointPage from '../features/point/pages/PointPage';
+import PaymentPage from '../features/payment/pages/PaymentPage';
+import PaymentSuccessPage from '../features/payment/pages/PaymentSuccessPage';
+import RecommendationPage from '../features/recommendation/pages/RecommendationPage';
+import PlaylistPage from '../features/playlist/pages/PlaylistPage';
+import AchievementPage from '../features/achievement/pages/AchievementPage';
+import AchievementDetailPage from '../features/achievement/pages/AchievementDetailPage';
+import WorldcupPage from '../features/worldcup/pages/WorldcupPage';
+import RoadmapPage from '../features/roadmap/pages/RoadmapPage';
+import StampReviewPage from '../features/roadmap/pages/StampReviewPage';
+
+import NotFoundPage from '../features/error/pages/NotFoundPage';
 import Loading from '../shared/components/Loading/Loading';
-/* App.css 삭제됨 — #root/.app 레이아웃은 GlobalStyle.js에서 관리 */
 
 /**
  * 인증이 필요한 라우트를 보호하는 래퍼 컴포넌트.
- * 인증되지 않은 사용자는 로그인 페이지로 리다이렉트한다.
+ *
+ * 비인증 사용자는 /login 으로 replace 리다이렉트되며, 이때 현재 경로를
+ * `state.returnTo` 에 실어 로그인 성공 후 원래 가려던 페이지로 돌아갈 수 있게 한다.
+ *
+ * 2026-04-23 PR-5 확장:
+ *   기존엔 단순히 `<Navigate to="/login" replace />` 만 하여 로그인 후 항상 홈으로
+ *   떨어졌다. 예컨대 `/account/point` 에 접근하던 사용자가 로그인 세션이 만료된 경우,
+ *   로그인 후 홈으로 튕기면 "포인트 충전하려다 이탈" 같은 UX 손실이 발생했다.
+ *   이제 LoginPage/OAuthCookiePage 등은 `useReturnTo()` 훅으로 이 state 를 소비해
+ *   정확히 원래 페이지로 복귀한다.
  */
 function PrivateRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const isLoading = useAuthStore((s) => s.isLoading);
+  const location = useLocation();
 
   /* 초기 로딩 중에는 Loading 컴포넌트를 표시 (localStorage 복원 대기) */
   if (isLoading) return <Loading message="인증 확인 중..." />;
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    /*
+     * state.returnTo 에는 pathname + search 만 담는다 (hash 는 브라우저가 자체 보존).
+     * 예: '/account/point?tab=history' 처럼 쿼리 문자열까지 기억해야
+     * 복귀 시 탭 상태가 유지된다.
+     *
+     * useReturnTo 의 sanitizeReturnTo 가 `/` 시작 내부 path 만 허용하므로,
+     * 악의적 returnTo 주입은 자동 차단된다 (open redirect 방어).
+     */
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ returnTo: location.pathname + location.search }}
+      />
+    );
   }
 
   return children;
 }
 
 function App() {
+  /*
+   * 앱 최초 마운트 시 게스트 쿠키(mongle_guest) 발급/재확인.
+   * 서버가 멱등 처리하므로 로그인/비로그인 상관없이 1회 호출한다.
+   */
+  useEffect(() => {
+    initGuestToken();
+  }, []);
+
   return (
     <BrowserRouter>
-      {/* Zustand 스토어는 Provider 래핑 불필요 — 어디서든 useAuthStore() 호출 가능 */}
       <Routes>
-        {/* ── 레이아웃 없는 페이지 ── */}
-
-        {/* 랜딩 페이지 — 서비스/팀 소개 */}
+        {/* ══════════════════════════════════════════════════════════════
+            Layer 0 — 레이아웃 없음
+            ══════════════════════════════════════════════════════════════ */}
         <Route path="/" element={<LandingPage />} />
-
-        {/* 로그인 페이지 — 레이아웃 없이 단독 표시 */}
         <Route path="/login" element={<LoginPage />} />
-
-        {/* 회원가입 페이지 — 레이아웃 없이 단독 표시 */}
         <Route path="/signup" element={<SignUpPage />} />
-
         {/* 회원가입 직후 시작 미션 온보딩 페이지 */}
         <Route
           path="/onboarding"
@@ -148,334 +147,128 @@ function App() {
 
         {/* OAuth 콜백 페이지 — 구 방식: 인가 코드 직접 처리 (fallback) */}
         <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
-
-        {/* OAuth 쿠키 교환 페이지 — Spring Security OAuth2 Client 방식 (쿠키→JWT 교환) */}
         <Route path="/cookie" element={<OAuthCookiePage />} />
 
-        {/* AI 채팅 추천 — 전체 화면 채팅 UI (레이아웃 없음) */}
-        <Route path="/chat" element={<div className="app"><ChatWindow /></div>} />
-        {/* AI 채팅 추천 — 이전 세션 이어하기 (URL에 sessionId 포함) */}
-        <Route path="/chat/:sessionId" element={<div className="app"><ChatWindow /></div>} />
+        {/* ══════════════════════════════════════════════════════════════
+            Layer 1 — 공용 영역 (MainLayout default)
 
-        {/* ── MainLayout(Header/Footer) 포함 페이지 ── */}
+            Layer 3(/account/*) 은 이 Layer 의 자식으로 중첩되어 MainLayout
+            을 상속받는다 (Header + Footer 공용). AccountLayout 은 /account
+            진입 시에만 추가 사이드바를 덧그리는 2중 Outlet 구조.
+            ══════════════════════════════════════════════════════════════ */}
+        <Route element={<MainLayout />}>
+          {/* 비로그인 허용 */}
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/movie/:id" element={<MovieDetailPage />} />
+          {/* /movies/:id — 기존 북마크 호환 레거시 alias */}
+          <Route path="/movies/:id" element={<MovieDetailPage />} />
+          <Route path="/match" element={<MatchPage />} />
+          <Route path="/community" element={<CommunityPage />} />
+          <Route path="/community/:id" element={<PostDetailPage />} />
+          <Route path="/community/playlist/:playlistId" element={<SharedPlaylistDetailPage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/payment/fail" element={<PaymentFailPage />} />
 
-        {/* 홈 페이지 — 인기/최신 영화 목록 */}
-        <Route
-          path="/home"
-          element={
-            <MainLayout>
-              <HomePage />
-            </MainLayout>
-          }
-        />
+          {/*
+            ── 법적 정책 페이지 4종 (2026-04-23 Footer 후속) ──
+            비로그인 접근 허용. LegalPageLayout 공용 컴포넌트를 사용해
+            현재는 placeholder "준비 중" 상태로 노출된다. 실제 약관 문구 확정 시
+            각 페이지 컴포넌트의 sections prop 만 채우면 본문이 자동 렌더된다.
+          */}
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/operation-policy" element={<OperationPolicyPage />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
 
-        {/* 검색 결과 페이지 */}
-        <Route
-          path="/search"
-          element={
-            <MainLayout>
-              <SearchPage />
-            </MainLayout>
-          }
-        />
+          {/* ════════════════════════════════════════════════════════════
+              Layer 3 — 계정 허브 /account/*
 
-        {/* 영화 상세 페이지 — URL 파라미터에서 영화 ID 추출 */}
-        <Route
-          path="/movie/:id"
-          element={
-            <MainLayout>
-              <MovieDetailPage />
-            </MainLayout>
-          }
-        />
+              PrivateRoute 로 한 번만 가드, 하위 전 라우트가 자동 보호됨.
+              AccountLayout 이 좌측 사이드바 + <Outlet /> 로 하위 페이지 렌더.
+              index route 는 /account 직접 진입 시 /account/profile 로 redirect.
+              ════════════════════════════════════════════════════════════ */}
+          <Route
+            path="/account"
+            element={
+              <PrivateRoute>
+                <AccountLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route index element={<Navigate to="profile" replace />} />
+            <Route path="profile"                       element={<MyPage />} />
+            <Route path="point"                         element={<PointPage />} />
+            <Route path="payment"                       element={<PaymentPage />} />
+            <Route path="payment/success"               element={<PaymentSuccessPage />} />
+            <Route path="recommendations"               element={<RecommendationPage />} />
+            <Route path="playlist"                      element={<PlaylistPage />} />
+            <Route path="playlist/:id"                  element={<PlaylistPage />} />
+            <Route path="achievement"                   element={<AchievementPage />} />
+            <Route path="achievement/:id"               element={<AchievementDetailPage />} />
+            <Route path="stamp"                         element={<RoadmapPage />} />
+            <Route path="stamp/:id"                     element={<RoadmapPage />} />
+            <Route path="stamp/:courseId/review/:movieId" element={<StampReviewPage />} />
+            <Route path="worldcup"                      element={<WorldcupPage />} />
+            <Route path="roadmap"                       element={<RoadmapPage />} />
+            <Route path="roadmap/:id"                   element={<RoadmapPage />} />
+          </Route>
 
-        {/* 영화 상세 페이지 레거시 alias — 기존 /movies/:id 링크/북마크 호환 */}
-        <Route
-          path="/movies/:id"
-          element={
-            <MainLayout>
-              <MovieDetailPage />
-            </MainLayout>
-          }
-        />
+          {/* ════════════════════════════════════════════════════════════
+              Layer 4 — 레거시 경로 하위호환 리다이렉트
 
-        {/* 둘이 영화 고르기 — 두 영화 교집합 추천 (비로그인 가능) */}
-        <Route
-          path="/match"
-          element={
-            <MainLayout>
-              <MatchPage />
-            </MainLayout>
-          }
-        />
+              외부 링크/북마크/Toss successUrl 구 설정이 가리키는 경로를
+              /account/* 로 보낸다. RedirectWithParams 는 동적 :id 와 함께
+              쿼리 문자열도 자동 보존 (예: ?paymentKey=...).
+              ════════════════════════════════════════════════════════════ */}
+          <Route path="/mypage"          element={<Navigate to="/account/profile" replace />} />
+          <Route path="/point"           element={<Navigate to="/account/point" replace />} />
+          <Route path="/payment"         element={<Navigate to="/account/payment" replace />} />
+          <Route path="/payment/success" element={<RedirectWithParams to="/account/payment/success" />} />
+          <Route path="/recommendations" element={<Navigate to="/account/recommendations" replace />} />
+          <Route path="/playlist"        element={<Navigate to="/account/playlist" replace />} />
+          <Route path="/playlist/:id"    element={<RedirectWithParams to="/account/playlist/:id" />} />
+          <Route path="/achievement"     element={<Navigate to="/account/achievement" replace />} />
+          <Route path="/achievement/:id" element={<RedirectWithParams to="/account/achievement/:id" />} />
+          <Route path="/stamp"           element={<Navigate to="/account/stamp" replace />} />
+          <Route path="/stamp/:id"       element={<RedirectWithParams to="/account/stamp/:id" />} />
+          <Route
+            path="/stamp/:courseId/review/:movieId"
+            element={<RedirectWithParams to="/account/stamp/:courseId/review/:movieId" />}
+          />
+          <Route path="/worldcup"        element={<Navigate to="/account/worldcup" replace />} />
+          <Route path="/roadmap"         element={<Navigate to="/account/roadmap" replace />} />
+          <Route path="/roadmap/:id"     element={<RedirectWithParams to="/account/roadmap/:id" />} />
+        </Route>
 
-        {/* 커뮤니티 — 게시판 + 리뷰 */}
-        <Route
-          path="/community"
-          element={
-            <MainLayout>
-              <CommunityPage />
-            </MainLayout>
-          }
-        />
+        {/* ══════════════════════════════════════════════════════════════
+            Layer 2 — 채팅 (MainLayout default + hideFooter)
 
-        {/*
-          커뮤니티 게시글 상세 (비로그인 허용).
-          PostList에서 {@code /community/:id} Link로 진입하며,
-          댓글 섹션이 CommentSection 내부에서 독립적으로 렌더링된다.
-        */}
-        <Route
-          path="/community/:id"
-          element={
-            <MainLayout>
-              <PostDetailPage />
-            </MainLayout>
-          }
-        />
+            2026-04-23 PR-2 의 슬림 헤더(compact) 로 편입 → 자체 헤더 중복 이슈
+            → Layer 0 독립 복귀 (채팅 중 전역 네비 불가) → 최종 재편 (본 버전):
+            풀 헤더를 그대로 얹고 Footer 만 숨긴다. ChatWindow 자체 헤더는
+            로고/타이틀을 제거한 "슬림 도구바" 로 축소 — 햄버거(사이드바) + 뒤로가기 + 새 대화.
+            결과: 상단 64px 전역 네비 + 44px 채팅 도구바 = 108px, 역할 명확 분리.
+            ══════════════════════════════════════════════════════════════ */}
+        <Route element={<MainLayout hideFooter />}>
+          <Route path="/chat" element={<ChatWindow />} />
+          <Route path="/chat/:sessionId" element={<ChatWindow />} />
+        </Route>
 
-        {/* 마이페이지 — 프로필/시청이력/위시리스트 (인증 필수) */}
-        <Route
-          path="/mypage"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <MyPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
+        {/* ══════════════════════════════════════════════════════════════
+            기타 리다이렉트 & 404
+            ══════════════════════════════════════════════════════════════ */}
+        {/* /quiz — CommunityPage "오늘의 퀴즈" 탭으로 이관 (2026-04-08) */}
+        <Route path="/quiz" element={<Navigate to="/community?tab=quiz" replace />} />
 
-        {/* 포인트 관리 — 잔액/출석/아이템/이력 (인증 필수) */}
-        <Route
-          path="/point"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <PointPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 결제/구독 관리 (인증 필수) */}
-        <Route
-          path="/payment"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <PaymentPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/*
-          결제 성공 콜백 (인증 필수).
-          Toss Payments v2 successUrl로 지정되며,
-          쿼리파라미터(paymentKey/orderId/amount)를 추출해
-          Backend POST /api/v1/payment/confirm 호출로 승인을 완료한다.
-          승인 API가 JWT를 요구하므로 PrivateRoute로 보호한다.
-        */}
-        <Route
-          path="/payment/success"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <PaymentSuccessPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/*
-          결제 실패 콜백 (레이아웃 O, 인증 없음).
-          Toss Payments v2 failUrl로 지정되며,
-          쿼리파라미터(code/message/orderId)로 사용자 친화 메시지를 표시만 한다.
-          서버 호출이 없으므로 로그인 없이도 표시 가능하도록 PrivateRoute를 제외한다.
-        */}
-        <Route
-          path="/payment/fail"
-          element={
-            <MainLayout>
-              <PaymentFailPage />
-            </MainLayout>
-          }
-        />
-
-        {/* 고객센터 — FAQ/도움말/AI챗봇/문의하기/문의내역 */}
-        <Route
-          path="/support"
-          element={
-            <MainLayout>
-              <SupportPage />
-            </MainLayout>
-          }
-        />
-
-        {/* 추천 내역 — AI 추천 이력 조회, 찜/봤어요/피드백 (인증 필수) */}
-        <Route
-          path="/recommendations"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <RecommendationPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 플레이리스트 목록 (인증 필수) */}
-        <Route
-          path="/playlist"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <PlaylistPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 플레이리스트 상세 (인증 필수) */}
-        <Route
-          path="/playlist/:id"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <PlaylistPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 커뮤니티 공유 플레이리스트 상세 (읽기 전용, 비로그인 허용) */}
-        <Route
-          path="/community/playlist/:playlistId"
-          element={
-            <MainLayout>
-              <SharedPlaylistDetailPage />
-            </MainLayout>
-          }
-        />
-
-        {/* 업적 (인증 필수) */}
-        <Route
-          path="/achievement"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <AchievementPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 업적 상세 (인증 필수) */}
-        <Route
-          path="/achievement/:id"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <AchievementDetailPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 도장깨기 목록 (인증 필수) */}
-        <Route
-          path="/stamp"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <RoadmapPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 도장깨기 코스 상세 (인증 필수) */}
-        <Route
-          path="/stamp/:id"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <RoadmapPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 도장깨기 리뷰 작성 (인증 필수) */}
-        <Route
-          path="/stamp/:courseId/review/:movieId"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <StampReviewPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/*
-          영화 퀴즈 페이지 — v2 개편 (2026-04-08).
-
-          기존 독립 페이지(`/quiz`)에서 CommunityPage 의 "오늘의 퀴즈" 탭으로 이관됨.
-          외부 링크/즐겨찾기/북마크 호환을 위해 `/quiz` 경로는 그대로 두되,
-          접근 시 `/community?tab=quiz` 로 영구 리다이렉트(replace) 한다.
-
-          replace=true 이유: 뒤로가기 시 `/quiz` 로 다시 돌아가지 않도록 히스토리 스택을 교체.
-        */}
-        <Route
-          path="/quiz"
-          element={<Navigate to="/community?tab=quiz" replace />}
-        />
-
-        {/* 영화 이상형 월드컵 (인증 필수) */}
-        <Route
-          path="/worldcup"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <WorldcupPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 영화 로드맵 목록 (인증 필수) */}
-        <Route
-          path="/roadmap"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <RoadmapPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 영화 로드맵 코스 상세 (인증 필수) */}
-        <Route
-          path="/roadmap/:id"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <RoadmapPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
-        {/* 404 — 매칭되지 않는 모든 경로를 Not Found 페이지로 처리 */}
+        {/* 매칭되지 않는 모든 경로 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
       {/*
-        전역 플로팅 챗봇 위젯 — BrowserRouter 내부에 위치하여 useLocation 동작을 보장한다.
-        Routes 바깥에 두어야 모든 라우트에서 동일한 위젯 인스턴스가 유지되며(대화 상태 보존),
-        AI 채팅(/chat), 고객센터(/support), 인증 관련 페이지에서는 내부에서 자동 숨김 처리된다.
+        전역 플로팅 챗봇 위젯 — BrowserRouter 내부에 위치해 useLocation 동작을 보장.
+        Routes 바깥이라 모든 라우트에서 동일 인스턴스(대화 상태 보존).
+        AI 채팅(/chat), 고객센터(/support), 인증 페이지에서는 내부에서 자동 숨김.
       */}
       <SupportChatbotWidget />
     </BrowserRouter>

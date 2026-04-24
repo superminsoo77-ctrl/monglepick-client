@@ -66,7 +66,7 @@ export default function PaymentFailPage() {
 
         {/* 액션 버튼 */}
         <S.Actions>
-          <S.BtnPrimary onClick={() => navigate('/payment')}>
+          <S.BtnPrimary onClick={() => navigate('/account/payment')}>
             다시 시도하기
           </S.BtnPrimary>
           <S.BtnSecondary onClick={() => navigate('/support')}>

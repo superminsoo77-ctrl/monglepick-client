@@ -25,13 +25,21 @@ export const Card = styled.div`
   border-radius: ${({ theme }) => theme.radius.lg};
   overflow: hidden;
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s, filter 0.2s;
   position: relative;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: ${({ theme }) => theme.shadows.md};
   }
+
+  /* 취소된 카드 — opacity 60% + 채도 낮춰 "보존되었지만 부분 데이터" 시각화.
+     호버 시에도 부각하지 않아 사용자가 활성 결과와 혼동하지 않도록 한다. */
+  ${({ $cancelled }) => $cancelled && `
+    opacity: 0.6;
+    filter: grayscale(0.3);
+    &:hover { transform: none; box-shadow: none; }
+  `}
 `;
 
 /* ── 순위 배지 ── */
@@ -46,6 +54,49 @@ export const RankBadge = styled.span`
   padding: 2px 8px;
   border-radius: 10px;
   z-index: 1;
+`;
+
+/* ── 외부 웹 정보 배지 (2026-04-23 후속 과제) ──
+ * id 접두사 'external_' 인 영화에 노출. DB 에 없는 신작이라 DuckDuckGo 로 찾아온
+ * 경우임을 사용자에게 명시적으로 표시한다. RankBadge 옆에 배치 (top:8px, left:48px).
+ * 색상: 보조 액센트 (주황 계열) — 일반 추천과 시각적 구분.
+ */
+export const ExternalBadge = styled.span`
+  position: absolute;
+  top: 8px;
+  left: 48px;
+  background: #ff8c42;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 1;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+`;
+
+/* ── 외부 출처 링크 (2026-04-23 후속 과제) ──
+ * overview 에 부착된 `[외부 출처] URL` 을 파싱해 별도 링크로 렌더링.
+ * Overview 본문 아래 작은 글씨로 표시.
+ */
+export const ExternalSourceLink = styled.a`
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.primary};
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &::before {
+    content: '🌐';
+    margin-right: 3px;
+  }
 `;
 
 /* ── 포스터 이미지 래퍼 ── */
@@ -70,7 +121,10 @@ export const InfoArea = styled.div`
   gap: 6px;
 `;
 
-/* ── 한국어 제목 ── */
+/* ── 한국어 제목 ──
+ * QA #156 (2026-04-23): 트레일러 버튼이 있는 영화 카드에서 긴 제목/공백 없는 문자열이
+ * 박스를 뚫고 나가는 현상 방지. word-break 를 명시해 한국어 줄바꿈을 표준화한다.
+ */
 export const Title = styled.h3`
   font-size: 14px;
   font-weight: 700;
@@ -82,6 +136,8 @@ export const Title = styled.h3`
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 `;
 
 /* ── 영어 제목 ── */
@@ -177,17 +233,34 @@ export const OttList = styled.div`
   flex-wrap: wrap;
 `;
 
-/* ── OTT 개별 배지 ── */
-export const OttBadge = styled.span`
+/* ── OTT 개별 배지 ──
+ * QA #170 (2026-04-23): span → a 로 변경해 클릭 시 해당 OTT 의 영화 검색 결과로 이동.
+ * href 가 없으면(매핑 없는 OTT) 기존과 동일하게 정적 뱃지처럼 보이도록 pointer 커서·밑줄 제거.
+ */
+export const OttBadge = styled.a`
+  display: inline-block;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
   background-color: ${({ theme }) => theme.colors.successBg};
   color: ${({ theme }) => theme.colors.success};
+  text-decoration: none;
+  cursor: ${({ href }) => (href ? 'pointer' : 'default')};
+  transition: filter 0.15s ease;
+
+  &:hover {
+    ${({ href }) => href && 'filter: brightness(1.1); text-decoration: underline;'}
+  }
 `;
 
-/* ── 트레일러 링크/버튼 공통 ── */
+/* ── 트레일러 링크/버튼 공통 ──
+ * QA #156 (2026-04-23): 트레일러 버튼 주변 레이아웃이 세로로 누적되어 카드가 길어지는
+ * 현상 보정. align-self: flex-start 로 너비가 콘텐츠 크기에 맞춰지도록 하고,
+ * margin-top 으로 앞 요소(OttList/Overview)와 시각적 간격을 일관화한다.
+ */
 export const TrailerLink = styled.button`
+  align-self: flex-start;
+  margin-top: 4px;
   font-size: 12px;
   color: ${({ theme }) => theme.colors.primary};
   text-decoration: none;
@@ -199,6 +272,7 @@ export const TrailerLink = styled.button`
   cursor: pointer;
   font-family: inherit;
   text-align: left;
+  white-space: nowrap;
 
   &:hover {
     color: ${({ theme }) => theme.colors.primaryHover};
@@ -206,13 +280,16 @@ export const TrailerLink = styled.button`
   }
 `;
 
-/* ── 트레일러 외부 링크 (a 태그) ── */
+/* ── 트레일러 외부 링크 (a 태그) ── QA #156 */
 export const TrailerAnchor = styled.a`
+  align-self: flex-start;
+  margin-top: 4px;
   font-size: 12px;
   color: ${({ theme }) => theme.colors.primary};
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s;
+  white-space: nowrap;
 
   &:hover {
     color: ${({ theme }) => theme.colors.primaryHover};

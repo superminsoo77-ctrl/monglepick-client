@@ -87,7 +87,7 @@ export default function StampReviewPage() {
 
   /** 뒤로가기 — 코스 상세 페이지 */
   const handleBack = () => {
-    navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+    navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
   };
 
   /**
@@ -116,7 +116,7 @@ export default function StampReviewPage() {
           message: `'${movieTitle}' 영화 도장을 찍었어요!`,
           type: 'success',
         });
-        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+        navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
 
       } else if (reviewStatus === 'NEEDS_REVIEW') {
         showAlert({
@@ -124,7 +124,7 @@ export default function StampReviewPage() {
           message: '리뷰가 제출되었어요. AI 판단이 애매하여 관리자가 확인 중이에요. 잠시 후 반영됩니다.',
           type: 'info',
         });
-        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+        navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
 
       } else if (reviewStatus === 'AUTO_REJECTED') {
         const rationale =
@@ -146,7 +146,7 @@ export default function StampReviewPage() {
             : '리뷰가 제출되었어요. AI 검토가 일시적으로 불가능해 잠시 후 관리자가 확인할 예정이에요.',
           type: 'info',
         });
-        navigate(buildPath(ROUTES.STAMP_DETAIL, { id: courseId }));
+        navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
       }
     } catch (err) {
       showAlert({

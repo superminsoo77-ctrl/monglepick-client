@@ -145,8 +145,18 @@ export const Nav = styled.nav`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.xs};
+  /*
+   * 2026-04-23 중앙 배치:
+   * Nav 와 AuthSection($desktop) 양쪽에 margin-left: auto 를 주면 flex 가 두 요소 앞의
+   * 남는 공간을 균등 분배한다. 결과적으로 [로고 ... NAV ... 유저드롭다운] 구도가 되어
+   * NAV 가 헤더 중앙에 위치한다 (유저 드롭다운은 우측 끝 유지).
+   * (2026-04-23 후속: 헤더 상단 바의 ThemeToggle 단독 노출 폐지 — UserDropdown 내부 스위치로 흡수)
+   */
+  margin-left: auto;
 
   ${media.tablet} {
+    /* 모바일에서는 풀 오버레이이므로 data auto margin 무효화 */
+    margin-left: 0;
     display: ${({ $isOpen }) => ($isOpen ? 'flex' : 'none')};
     position: fixed;
     top: ${({ theme }) => theme.layout.headerHeight};
@@ -416,6 +426,20 @@ export const AuthSection = styled.div`
   ${({ $desktop }) =>
     $desktop &&
     css`
+      /*
+       * 2026-04-23 우측 끝 고정:
+       * Inner(space-between) + 4 자식(Logo/Nav/AuthSection/MobileToggle) 구도에서
+       * 자식들이 균등 분산되어 AuthSection 이 중간처럼 보이는 현상 방지.
+       * margin-left: auto 로 본인의 왼쪽 여백을 모두 흡수 → AuthSection 이 항상 최우측에 붙는다.
+       * (데스크톱에서 MobileToggle 은 display:none 이므로 AuthSection 이 실질적 최우측 자식이 됨)
+       *
+       * 2026-04-23 후속: 헤더 상단 바의 ThemeToggle 단독 노출을 폐지.
+       *   - 로그인 상태:  UserDropdown 맨 아래 스위치 row 로 흡수.
+       *   - 비로그인 상태: AuthSection 내부(로그인 버튼 왼쪽)에 compact variant 로 삽입.
+       *   헤더 바 자식은 Logo/Nav/AuthSection/MobileToggle 4개로 정리됨.
+       */
+      margin-left: auto;
+
       ${media.tablet} {
         display: none;
       }
@@ -635,21 +659,6 @@ export const MobileOnly = styled.div`
 
   ${media.tablet} {
     display: block;
-  }
-`;
-
-/**
- * 데스크톱에서만 표시 (모바일에서 숨김).
- *
- * 헤더의 데스크톱용 ThemeToggle 처럼, 모바일에서는 햄버거 메뉴 안의
- * MobileOnly 영역에서 다시 렌더되므로 데스크톱 인스턴스를 숨겨야 한다.
- * 누락되어 모바일에서 테마 토글 버튼이 헤더 + 메뉴 안 두 번 노출되던 버그 수정.
- */
-export const DesktopOnly = styled.div`
-  display: contents;
-
-  ${media.tablet} {
-    display: none;
   }
 `;
 

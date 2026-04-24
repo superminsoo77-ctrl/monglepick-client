@@ -27,6 +27,8 @@ import PostWatchFeedback from '../../../features/movie/components/PostWatchFeedb
 import {
   Card,
   RankBadge,
+  ExternalBadge,
+  ExternalSourceLink,
   PosterWrapper,
   InfoArea,
   Title,
@@ -66,6 +68,72 @@ function getPosterUrl(posterPath, size = 'w342') {
     return `https://placehold.co/342x513/1a1a2e/666?text=No+Poster`;
   }
   return `https://image.tmdb.org/t/p/${size}${posterPath}`;
+}
+
+/**
+ * OTT 플랫폼명 → 해당 OTT 의 영화 검색 URL 매핑.
+ *
+ * QA #170 (2026-04-23): OttBadge 클릭 시 사용자가 실제로 해당 플랫폼에서 영화를 찾아볼 수 있도록
+ * 제목 기반 검색 딥링크를 제공한다. 각 OTT 가 "제목" 쿼리를 URL 파라미터로 받는 검색 페이지를
+ * 가지므로 encodeURIComponent 처리만 해서 바로 여는 방식.
+ *
+ * 매핑 키는 Agent/DB 에 저장된 OTT 이름(한글/영문 변형)을 lowercase trim 한 것.
+ * 매핑에 없는 플랫폼은 href 없이 정적 뱃지로 렌더된다 (기존 동작 호환).
+ */
+const OTT_SEARCH_URL_BY_NAME = {
+  netflix: (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}`,
+  '넷플릭스': (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}`,
+  watcha: (q) => `https://watcha.com/search?query=${encodeURIComponent(q)}`,
+  '왓챠': (q) => `https://watcha.com/search?query=${encodeURIComponent(q)}`,
+  tving: (q) => `https://www.tving.com/search?keyword=${encodeURIComponent(q)}`,
+  '티빙': (q) => `https://www.tving.com/search?keyword=${encodeURIComponent(q)}`,
+  'disney+': (q) => `https://www.disneyplus.com/search?q=${encodeURIComponent(q)}`,
+  'disney plus': (q) => `https://www.disneyplus.com/search?q=${encodeURIComponent(q)}`,
+  '디즈니+': (q) => `https://www.disneyplus.com/search?q=${encodeURIComponent(q)}`,
+  '디즈니플러스': (q) => `https://www.disneyplus.com/search?q=${encodeURIComponent(q)}`,
+  wavve: (q) => `https://www.wavve.com/search/search.html?searchWord=${encodeURIComponent(q)}`,
+  '웨이브': (q) => `https://www.wavve.com/search/search.html?searchWord=${encodeURIComponent(q)}`,
+  coupangplay: (q) => `https://www.coupangplay.com/search?keyword=${encodeURIComponent(q)}`,
+  '쿠팡플레이': (q) => `https://www.coupangplay.com/search?keyword=${encodeURIComponent(q)}`,
+  'apple tv+': (q) => `https://tv.apple.com/kr/search?term=${encodeURIComponent(q)}`,
+  'apple tv': (q) => `https://tv.apple.com/kr/search?term=${encodeURIComponent(q)}`,
+  '애플tv+': (q) => `https://tv.apple.com/kr/search?term=${encodeURIComponent(q)}`,
+  '애플티비': (q) => `https://tv.apple.com/kr/search?term=${encodeURIComponent(q)}`,
+  primevideo: (q) => `https://www.primevideo.com/search?phrase=${encodeURIComponent(q)}`,
+  '프라임비디오': (q) => `https://www.primevideo.com/search?phrase=${encodeURIComponent(q)}`,
+};
+
+function getOttSearchUrl(platformName, movieTitle) {
+  if (!platformName || !movieTitle) return null;
+  const key = platformName.trim().toLowerCase();
+  const builder = OTT_SEARCH_URL_BY_NAME[key];
+  return builder ? builder(movieTitle) : null;
+}
+
+/**
+ * overview 끝에 부착된 `[외부 출처] URL` 마커를 분리한다 (2026-04-23 후속 과제).
+ *
+ * Agent `external_search_node` 가 DuckDuckGo 결과의 source_url 을 overview 본문 뒤에
+ * 한 줄로 붙여 보낸다:
+ *   "본문 텍스트...\n[외부 출처] https://namu.wiki/w/XXX"
+ *
+ * Client 는 이 마커를 파싱해 본문과 출처 URL 을 분리 렌더링한다.
+ * 출처 URL 이 없으면 overview 전체를 본문으로 반환.
+ *
+ * @param {string|null|undefined} overview
+ * @returns {{ body: string, sourceUrl: string|null }}
+ */
+function parseExternalSource(overview) {
+  if (!overview) return { body: '', sourceUrl: null };
+  const marker = '[외부 출처]';
+  const idx = overview.lastIndexOf(marker);
+  if (idx === -1) return { body: overview, sourceUrl: null };
+
+  const body = overview.slice(0, idx).trim();
+  const afterMarker = overview.slice(idx + marker.length).trim();
+  // URL 이 공백·줄바꿈 으로 끝날 수 있음
+  const sourceUrl = afterMarker.split(/\s+/)[0] || null;
+  return { body, sourceUrl };
 }
 
 /**
@@ -129,9 +197,14 @@ function getYouTubeEmbedUrl(url) {
  * @param {string} [props.movie.trailer_url] - 트레일러 URL
  * @param {string} [props.movie.explanation] - 추천 이유
  * @param {string} [props.sessionId] - 현재 채팅 세션 ID (리뷰 작성 시 reviewSource 로 기록)
+ * @param {(text:string)=>void} [props.onFindNearbyTheater] - "근처 영화관" 버튼 클릭 시 호출.
+ *   ChatWindow 가 setInputText 를 wrap 해서 전달하면 입력창에 "○○○ 근처 영화관 알려줘" 자동 채움.
+ *   자동 전송하지 않고 사용자가 검토 후 직접 보내도록 한다 (사용자 의도 존중, NowShowingPanel 과 동일 패턴).
+ * @param {boolean} [props.cancelled] - SSE 도중 취소된 부분 데이터. true 면 dimmed 시각화.
  */
-export default function MovieCard({ movie, sessionId }) {
+export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cancelled = false }) {
   const {
+    id,
     rank,
     title,
     title_en,
@@ -148,6 +221,13 @@ export default function MovieCard({ movie, sessionId }) {
     trailer_url,
     explanation,
   } = movie;
+
+  /* 2026-04-23 후속: Agent external_search_node 가 생성한 영화 식별.
+   * id 가 'external_' 접두사면 DB 에 없는 신작 (DuckDuckGo 경유 정보). */
+  const isExternal = typeof id === 'string' && id.startsWith('external_');
+
+  /* overview 에서 [외부 출처] URL 부분을 분리 — 본문과 링크를 별도로 렌더링 */
+  const { body: overviewBody, sourceUrl: externalSourceUrl } = parseExternalSource(overview);
 
   /* 트레일러 모달 표시 상태 */
   const [showTrailer, setShowTrailer] = useState(false);
@@ -309,9 +389,13 @@ export default function MovieCard({ movie, sessionId }) {
     <Card
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      $cancelled={cancelled}
     >
       {/* 순위 배지 */}
       {rank && <RankBadge>#{rank}</RankBadge>}
+
+      {/* 외부 웹 정보 배지 — DuckDuckGo 경유로 찾아온 DB 밖 신작임을 표시 */}
+      {isExternal && <ExternalBadge title="DB 에 없는 최신 영화 — 외부 웹에서 찾은 정보">🌐 웹 정보</ExternalBadge>}
 
       {/* 포스터 이미지 */}
       <PosterWrapper>
@@ -361,11 +445,23 @@ export default function MovieCard({ movie, sessionId }) {
           </Tags>
         )}
 
-        {/* 줄거리 (최대 100자) */}
-        {overview && (
+        {/* 줄거리 (최대 100자). 외부 출처 URL 은 아래 별도 링크로 분리 렌더링. */}
+        {overviewBody && (
           <Overview>
-            {overview.length > 100 ? overview.slice(0, 100) + '...' : overview}
+            {overviewBody.length > 100 ? overviewBody.slice(0, 100) + '...' : overviewBody}
           </Overview>
+        )}
+
+        {/* 외부 출처 링크 — external_search_node 결과일 때만 표시 */}
+        {externalSourceUrl && (
+          <ExternalSourceLink
+            href={externalSourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="원문 정보 보기"
+          >
+            출처 보기
+          </ExternalSourceLink>
         )}
 
         {/* 추천 이유 */}
@@ -373,12 +469,25 @@ export default function MovieCard({ movie, sessionId }) {
           <Explanation>{explanation}</Explanation>
         )}
 
-        {/* OTT 플랫폼 */}
+        {/* OTT 플랫폼 — QA #170: 클릭 시 해당 OTT 의 영화 검색 페이지로 이동 (매핑 없으면 정적 뱃지).
+            추적: 어떤 OTT 로 이동했는지 기록해 추천 결과 클릭 전환율을 분석. */}
         {ott_platforms.length > 0 && (
           <OttList>
-            {ott_platforms.map((p) => (
-              <OttBadge key={p}>{p}</OttBadge>
-            ))}
+            {ott_platforms.map((p) => {
+              const url = getOttSearchUrl(p, title);
+              return (
+                <OttBadge
+                  key={p}
+                  href={url || undefined}
+                  target={url ? '_blank' : undefined}
+                  rel={url ? 'noopener noreferrer' : undefined}
+                  title={url ? `${p} 에서 "${title}" 검색` : p}
+                  onClick={url ? () => trackEvent('ott_click', movie.id, { rank, platform: p, source: 'chat' }) : undefined}
+                >
+                  {p}
+                </OttBadge>
+              );
+            })}
           </OttList>
         )}
 
@@ -415,9 +524,21 @@ export default function MovieCard({ movie, sessionId }) {
             >
               {reviewed ? '✓ 리뷰 작성됨' : '✎ 리뷰 작성'}
             </ReviewButton>
+            {/* "근처 영화관" — onFindNearbyTheater 콜백이 전달됐고 리뷰 미작성 상태에서만 노출.
+                ReviewButton 우측에 보조 액션으로 배치. NotInterestedButton 과 함께 라인업되어
+                기존 레이아웃(2버튼 → 3버튼)을 깨지 않도록 NotInterestedButton 다음 순서. */}
             {!reviewed && (
               <NotInterestedButton type="button" onClick={handleNotInterested}>
                 ✕ 관심 없음
+              </NotInterestedButton>
+            )}
+            {!reviewed && typeof onFindNearbyTheater === 'function' && (
+              <NotInterestedButton
+                type="button"
+                onClick={() => onFindNearbyTheater(`${title} 근처에서 볼 수 있는 영화관 알려줘`)}
+                aria-label={`${title} 근처 영화관 찾기`}
+              >
+                🏢 영화관
               </NotInterestedButton>
             )}
           </ActionRow>

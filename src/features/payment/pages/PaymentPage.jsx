@@ -110,8 +110,13 @@ const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY;
 /**
  * 결제 성공/실패 리다이렉트 URL의 기본 경로.
  * 현재 origin 기준으로 절대 경로를 생성한다.
+ *
+ * 2026-04-23 PR-4: successUrl 은 /account/payment/success (PrivateRoute 보호) 로,
+ * failUrl 은 /payment/fail (공용 레이어, 비로그인 도달 가능) 로 분기 유지.
+ * 구 버전 Toss 설정이 가리키는 `/payment/success` 는 App.jsx Layer 4 리다이렉트가
+ * 쿼리 문자열 보존 후 /account/payment/success 로 보내므로 하위호환 유지.
  */
-const SUCCESS_URL = `${window.location.origin}/payment/success`;
+const SUCCESS_URL = `${window.location.origin}/account/payment/success`;
 const FAIL_URL = `${window.location.origin}/payment/fail`;
 
 export default function PaymentPage() {

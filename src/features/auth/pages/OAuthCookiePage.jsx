@@ -22,14 +22,27 @@ import { exchangeToken } from '../api/authApi';
 import { ROUTES } from '../../../shared/constants/routes';
 /* 리워드 토스트 훅 — OAuth 신규 가입 보너스 알림 표시 */
 import { useRewardToast } from '../../../shared/components/RewardToast/RewardToastProvider';
+/*
+ * 2026-04-23 PR-5: OAuth 복귀 경로 훅.
+ * LoginForm 에서 rememberReturnTo 로 sessionStorage 에 저장한 값을 소비해
+ * 원래 가려던 페이지로 돌려보낸다. 없으면 ROUTES.HOME 폴백.
+ */
+import useReturnTo from '../../../shared/hooks/useReturnTo';
 /* OAuthCallbackPage와 동일한 styled-components 재사용 */
 import * as S from './OAuthCallbackPage.styled';
 
 export default function OAuthCookiePage() {
-  const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
   /* 신규 OAuth 가입 보너스 토스트 — SocialSuccessHandler 가 URL 에 ?signupBonus=N 쿼리파람을 붙여 전달 */
   const { showReward } = useRewardToast();
+  /* PR-5: rememberReturnTo 가 저장한 복귀 경로 또는 ROUTES.HOME 으로 이동 */
+  const goAfterLogin = useReturnTo(ROUTES.HOME);
+  /*
+   * 신규 OAuth 가입자는 복귀 경로보다 온보딩 미션 페이지가 우선이므로,
+   * useReturnTo 를 거치지 않고 직접 navigate(ROUTES.ONBOARDING) 로 보낸다.
+   * 이 분기만을 위한 useNavigate 복원.
+   */
+  const navigate = useNavigate();
 
   /* 에러 메시지 상태 */
   const [error, setError] = useState('');
@@ -73,8 +86,16 @@ export default function OAuthCookiePage() {
           showReward(bonus, '회원가입 보너스');
         }
 
-        // 신규 OAuth 가입이면 시작 미션, 기존 사용자는 홈으로 이동
-        navigate(bonus > 0 ? ROUTES.ONBOARDING : ROUTES.HOME, { replace: true });
+        /*
+         * 신규 OAuth 가입자(signupBonus > 0) 는 온보딩 미션으로 우선 이동.
+         * 기존 사용자는 PR-5 복귀 로직(useReturnTo) 에 따라 returnTo 가 있으면 거기로,
+         * 없으면 홈으로 이동. useReturnTo 는 replace:true 라 뒤로가기 시 /cookie 복귀 없음.
+         */
+        if (bonus > 0) {
+          navigate(ROUTES.ONBOARDING, { replace: true });
+        } else {
+          goAfterLogin();
+        }
       } catch (err) {
         setError(err.message || '소셜 로그인 토큰 교환에 실패했습니다.');
         setIsProcessing(false);

@@ -14,6 +14,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
+/* 2026-04-23 라우팅 재설계 PR-3 — 섹션 탭 URL 동기화 */
+import useTabParam from '../../../shared/hooks/useTabParam';
 /* 고객센터 API — 같은 feature 내의 supportApi에서 가져옴 */
 import {
   getFaqs,
@@ -47,6 +49,12 @@ const SECTION_TABS = [
   { key: 'ticket', label: '문의하기' },
   { key: 'history', label: '내 문의 내역' },
 ];
+
+/**
+ * 유효한 섹션 key 화이트리스트 — URL ?tab= 쿼리 검증용.
+ * 벗어나면 defaultTab('chatbot') 으로 폴백.
+ */
+const VALID_SECTION_KEYS = new Set(SECTION_TABS.map((t) => t.key));
 
 /** FAQ/도움말 카테고리 필터 탭 (라벨 → API 값 매핑) */
 const CATEGORY_FILTERS = [
@@ -132,7 +140,17 @@ export default function SupportPage() {
   const authLoading = useAuthStore((s) => s.isLoading);
 
   /* ── 섹션/탭 상태 ── */
-  const [activeSection, setActiveSection] = useState('chatbot');
+  /*
+   * 2026-04-23 PR-3: 섹션 탭을 URL ?tab= 쿼리와 동기화.
+   *   - /support?tab=faq 같은 딥링크 지원 (기존 홈 배너/챗봇 링크에서 이미 `?tab=` 형식)
+   *   - 새로고침 시 섹션 보존
+   *   - 기본 섹션(chatbot) 은 쿼리 생략 — 캐노니컬 URL `/support` 유지
+   * useTabParam 반환 튜플은 [string, (id)=>void] 라 기존 useState API 와 호환.
+   */
+  const [activeSection, setActiveSection] = useTabParam({
+    validIds: VALID_SECTION_KEYS,
+    defaultTab: 'chatbot',
+  });
 
   /* ── FAQ 상태 ── */
   const [faqs, setFaqs] = useState([]);

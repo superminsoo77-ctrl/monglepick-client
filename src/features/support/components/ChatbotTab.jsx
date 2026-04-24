@@ -9,18 +9,17 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { sendChatbotMessage } from '../api/supportApi';
+/* 2026-04-23: LLM 몽글이(Agent SSE) 로 전환. 레거시 sendChatbotMessage 는 rollback 폴백. */
+import { sendSupportChatSse } from '../api/supportApi';
+/* 2026-04-23: 추천 질문 칩 동적 조회 (chat_suggestions.surface='faq_chatbot') */
+import useChatbotSuggestions from '../hooks/useChatbotSuggestions';
 import * as S from './ChatbotTab.styled';
 
-/** 추천 질문 목록 */
-const SUGGESTIONS = [
-  '포인트는 어떻게 충전하나요?',
-  'AI 추천은 어떻게 사용하나요?',
-  '비밀번호를 변경하고 싶어요',
-  '환불은 어떻게 하나요?',
-];
+/* 추천 질문 목록은 더 이상 하드코딩하지 않는다 — Backend 에서 surface=faq_chatbot 으로 조회 */
 
 export default function ChatbotTab({ onSwitchToTicket }) {
+  /* 추천 질문 풀 — Backend 에서 surface=faq_chatbot 으로 조회 (기본 4개) */
+  const suggestions = useChatbotSuggestions(4);
   /* 메시지 목록: [{role: 'user'|'bot', content, matchedFaqs?, needsHumanAgent?}] */
   const [messages, setMessages] = useState([]);
   /* 입력 텍스트 */
@@ -39,45 +38,82 @@ export default function ChatbotTab({ onSwitchToTicket }) {
   }, [messages, isLoading]);
 
   /**
-   * 메시지 전송 핸들러.
+   * 메시지 전송 핸들러 (SSE 기반).
+   *
+   * 진행 흐름은 {@link SupportChatbotWidget} 과 동일한 규약을 사용한다.
+   *   - 봇 자리표시자 pending 메시지 삽입
+   *   - session/matched_faq/token/needs_human/error 이벤트로 해당 메시지 patch
+   *   - done 시 pending 해제
+   * 빈 본문 자리표시자 버블은 렌더 쪽에서 숨긴다(타이핑 인디케이터가 대체).
    */
   const handleSend = useCallback(async (text) => {
     const message = (text || input).trim();
     if (!message || isLoading) return;
 
-    /* 사용자 메시지 추가 */
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+    /* 사용자 + 봇 자리표시자를 동시 삽입 */
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: message },
+      { role: 'bot', content: '', matchedFaqs: [], needsHumanAgent: false, pending: true },
+    ]);
     setInput('');
     setIsLoading(true);
 
+    const updateLastBot = (patch) => {
+      setMessages((prev) => {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === 'bot' && next[i].pending) {
+            next[i] = { ...next[i], ...patch };
+            break;
+          }
+        }
+        return next;
+      });
+    };
+
+    /* Agent v3 matched_faq 페이로드 {faq_id, category, question} → UI {id, question} 매핑 */
+    const mapMatchedFaqs = (items) =>
+      (items || []).map((m) => ({
+        id: m.faq_id,
+        category: m.category,
+        question: m.question,
+      }));
+
     try {
-      const data = await sendChatbotMessage({ message, sessionId });
-
-      /* 세션 ID 저장 */
-      if (data.sessionId) {
-        setSessionId(data.sessionId);
-      }
-
-      /* 봇 응답 추가 */
-      setMessages((prev) => [
-        ...prev,
+      await sendSupportChatSse(
+        { message, sessionId: sessionId || '' },
         {
-          role: 'bot',
-          content: data.answer || '죄송합니다. 잠시 후 다시 시도해 주세요.',
-          matchedFaqs: data.matchedFaqs || [],
-          needsHumanAgent: data.needsHumanAgent || false,
+          onSession: (data) => {
+            if (data?.session_id) setSessionId(data.session_id);
+          },
+          onMatchedFaq: (data) => {
+            updateLastBot({ matchedFaqs: mapMatchedFaqs(data?.items) });
+          },
+          onToken: (data) => {
+            if (data?.delta) updateLastBot({ content: data.delta });
+          },
+          onNeedsHuman: (data) => {
+            updateLastBot({ needsHumanAgent: Boolean(data?.value) });
+          },
+          onError: (data) => {
+            updateLastBot({
+              content: data?.message || '잠시 문제가 있었어요. 잠시 후 다시 시도해 주세요.',
+              needsHumanAgent: true,
+            });
+          },
+          onDone: () => {
+            updateLastBot({ pending: false });
+          },
         },
-      ]);
+      );
     } catch {
-      /* API 실패 시 폴백 응답 */
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'bot',
-          content: '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.\n문제가 지속되면 "문의하기" 탭에서 직접 문의해 주세요.',
-          needsHumanAgent: true,
-        },
-      ]);
+      /* 네트워크/서버 오류 폴백 — pending 봇 메시지에 에러 본문 주입 */
+      updateLastBot({
+        content: '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.\n문제가 지속되면 "문의하기" 탭에서 직접 문의해 주세요.',
+        needsHumanAgent: true,
+        pending: false,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +159,7 @@ export default function ChatbotTab({ onSwitchToTicket }) {
               궁금한 점을 편하게 물어보세요!
             </S.WelcomeText>
             <S.SuggestionChips>
-              {SUGGESTIONS.map((q) => (
+              {suggestions.map((q) => (
                 <S.SuggestionChip key={q} onClick={() => handleSend(q)}>
                   {q}
                 </S.SuggestionChip>
@@ -135,11 +171,15 @@ export default function ChatbotTab({ onSwitchToTicket }) {
         {/* 메시지 목록 */}
         {messages.map((msg, idx) => (
           <div key={idx}>
-            <S.MsgRow $isUser={msg.role === 'user'}>
-              <S.MsgBubble $isUser={msg.role === 'user'}>
-                {msg.content}
-              </S.MsgBubble>
-            </S.MsgRow>
+            {/* SSE 자리표시자(토큰 수신 전) 의 빈 봇 버블은 렌더하지 않는다 —
+                바로 아래 타이핑 인디케이터가 시각적 자리 표시를 대체한다. */}
+            {!(msg.role === 'bot' && msg.pending && !msg.content) && (
+              <S.MsgRow $isUser={msg.role === 'user'}>
+                <S.MsgBubble $isUser={msg.role === 'user'}>
+                  {msg.content}
+                </S.MsgBubble>
+              </S.MsgRow>
+            )}
 
             {/* 매칭 FAQ 카드 (봇 응답에 포함된 경우) */}
             {msg.role === 'bot' && msg.matchedFaqs && msg.matchedFaqs.length > 0 && (
@@ -155,8 +195,8 @@ export default function ChatbotTab({ onSwitchToTicket }) {
               </S.FaqMatches>
             )}
 
-            {/* 상담원 이관 배너 */}
-            {msg.role === 'bot' && msg.needsHumanAgent && (
+            {/* 상담원 이관 배너 — 자리표시자 단계에서는 숨김 */}
+            {msg.role === 'bot' && msg.needsHumanAgent && msg.content && (
               <S.HumanAgentBanner>
                 <S.HumanAgentText>
                   추가 도움이 필요하시면 상담원에게 문의해 주세요.

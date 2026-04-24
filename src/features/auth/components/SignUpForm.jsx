@@ -12,7 +12,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import TermsModal from './TermsModal';
 /* 인증 Context 훅 — app/providers에서 가져옴 */
 import useAuthStore from '../../../shared/stores/useAuthStore';
@@ -29,6 +29,14 @@ import {
 import { ROUTES } from '../../../shared/constants/routes';
 /* OAuth URL 생성 유틸 — shared/constants에서 가져옴 */
 import { buildOAuthUrl } from '../../../shared/constants/oauth';
+/*
+ * 2026-04-23 PR-5 — 로그인/가입 복귀 경로 훅.
+ *   - useReturnTo(): 가입 성공 후 원래 페이지(state.returnTo 또는 sessionStorage) 로 복귀
+ *   - rememberReturnTo(): OAuth 리다이렉트 전에 state.returnTo 를 sessionStorage 로 stash
+ *   LoginPage → "회원가입" 링크로 이동한 경우, LoginForm 이 state 를 함께 넘겨주므로
+ *   SignUpForm 도 동일한 returnTo 를 이어받아 OAuth 경로에서 유실되지 않게 한다.
+ */
+import useReturnTo, { rememberReturnTo } from '../../../shared/hooks/useReturnTo';
 /* 리워드 토스트 훅 — 가입 보너스 지급 알림 표시 */
 import { useRewardToast } from '../../../shared/components/RewardToast/RewardToastProvider';
 import * as S from './SignUpForm.styled';
@@ -94,7 +102,13 @@ export default function SignUpForm({ onSignupSuccess }) {
   }
 
   const login    = useAuthStore((s) => s.login);
-  const navigate = useNavigate();
+  const location = useLocation();
+  /*
+   * PR-5: 가입 성공 후 복귀 — state.returnTo 있으면 거기로, 없으면 ONBOARDING.
+   * PrivateRoute → /login → (Link) → /signup 경로로 도달한 경우 state 가 전달되어
+   * 원래 가려던 페이지로 복귀. 신규 가입자(returnTo 없음)는 온보딩 미션 페이지로 진입.
+   */
+  const goAfterSignup = useReturnTo(ROUTES.ONBOARDING);
   /* 가입 보너스 토스트 — 백엔드 응답의 signupBonusPoints 를 화면 상단에 표시 */
   const { showReward } = useRewardToast();
 
@@ -181,8 +195,12 @@ export default function SignUpForm({ onSignupSuccess }) {
         showReward(response.signupBonusPoints, '회원가입 보너스');
       }
 
-      /* 시작 미션 온보딩 페이지로 리다이렉트 */
-      navigate(ROUTES.ONBOARDING, { replace: true });
+      /*
+       * PR-5 + 온보딩: returnTo 있으면 원래 경로로(복귀 우선),
+       * 없으면 ROUTES.ONBOARDING 으로 (신규 가입자 미션).
+       * useReturnTo(ROUTES.ONBOARDING) 한 번 호출로 두 케이스 통합 처리.
+       */
+      goAfterSignup();
     } catch (err) {
       /* 에러 코드별 사용자 친화적 메시지 분기 */
       if (err.code === 'A001') {
@@ -358,12 +376,19 @@ export default function SignUpForm({ onSignupSuccess }) {
       {/* 소셜 로그인 구분선 */}
       <S.Divider><span>또는</span></S.Divider>
 
-      {/* 소셜 로그인 버튼 */}
+      {/*
+        소셜 로그인 버튼.
+        PR-5: OAuth 외부 리다이렉트 직전에 state.returnTo 를 sessionStorage 로 stash.
+        LoginForm 과 동일 패턴 — useReturnTo 가 callback 페이지에서 꺼내 쓴다.
+      */}
       <S.SocialList>
         <S.SocialButton
           type="button"
           $provider="google"
-          onClick={() => { window.location.href = buildOAuthUrl('google'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = buildOAuthUrl('google');
+          }}
           disabled={isSubmitting}
         >
           Google로 시작하기
@@ -371,7 +396,10 @@ export default function SignUpForm({ onSignupSuccess }) {
         <S.SocialButton
           type="button"
           $provider="kakao"
-          onClick={() => { window.location.href = buildOAuthUrl('kakao'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = buildOAuthUrl('kakao');
+          }}
           disabled={isSubmitting}
         >
           카카오로 시작하기
@@ -379,7 +407,10 @@ export default function SignUpForm({ onSignupSuccess }) {
         <S.SocialButton
           type="button"
           $provider="naver"
-          onClick={() => { window.location.href = buildOAuthUrl('naver'); }}
+          onClick={() => {
+            rememberReturnTo(location.state?.returnTo);
+            window.location.href = buildOAuthUrl('naver');
+          }}
           disabled={isSubmitting}
         >
           네이버로 시작하기
@@ -389,7 +420,12 @@ export default function SignUpForm({ onSignupSuccess }) {
       {/* 로그인 페이지 링크 — as={Link}로 react-router-dom 라우팅 유지 */}
       <S.Footer>
         이미 계정이 있으신가요?{' '}
-        <S.TextLink as={Link} to={ROUTES.LOGIN}>로그인</S.TextLink>
+        {/* PR-5: 가입 페이지 → 로그인 페이지 이동 시에도 state.returnTo 유지 */}
+        <S.TextLink
+          as={Link}
+          to={ROUTES.LOGIN}
+          state={location.state?.returnTo ? { returnTo: location.state.returnTo } : undefined}
+        >로그인</S.TextLink>
       </S.Footer>
     </S.Form>
     </>

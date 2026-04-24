@@ -210,6 +210,75 @@ export const HeroOrb2 = styled.div`
   animation: ${floatUpDown} 10s ease-in-out infinite 2s;
 `;
 
+/* ── 홈 상단 검색창 (2026-04-23 신규) ──
+   헤더 바로 아래 최상단에 검색 input 을 노출해 페이지 진입 즉시 검색 가능하도록 함.
+   카드 형태로 배치하여 주요 입력 요소로 부각. */
+
+/** 검색 섹션 래퍼 — 헤더 바로 아래(Hero 위) */
+export const HomeSearch = styled.section`
+  max-width: ${({ theme }) => theme.layout.contentMaxWidth};
+  margin: 0 auto;
+  padding: ${({ theme }) => theme.spacing.lg};
+`;
+
+/** 검색 form — input + 버튼 수평 정렬, 테두리 + 그림자로 카드 느낌 */
+export const HomeSearchForm = styled.form`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.md}`};
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:focus-within {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+`;
+
+/** 검색 input — flex:1 로 남은 공간 차지, 기본 border 없음 (form 이 컨테이너 역할) */
+export const HomeSearchInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textMd};
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.xs}`};
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+`;
+
+/** 검색 제출 버튼 — primary 색 pill 형태 */
+export const HomeSearchBtn = styled.button`
+  flex-shrink: 0;
+  padding: ${({ theme }) => `${theme.spacing.sm} ${theme.spacing.lg}`};
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.md};
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: opacity ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+`;
+
 /* ── 공지사항 배너 섹션 ── */
 
 /** 공지 배너 래퍼 — 히어로 바로 아래 배치 */

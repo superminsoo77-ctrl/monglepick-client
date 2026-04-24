@@ -76,7 +76,13 @@ const dotBounce = keyframes`
 export const ChatWindowWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /*
+   * 2026-04-23 헤더 재설계:
+   * /chat 은 MainLayout(hideFooter) 아래에 편입되므로 상단 Header(64px) 를 제외한
+   * 나머지 뷰포트를 채워야 한다. Footer 는 hideFooter 로 미렌더.
+   * (styled-components 템플릿 리터럴 내부라 백틱 사용 금지 — 템플릿 종료로 해석됨)
+   */
+  height: calc(100vh - ${({ theme }) => theme.layout.headerHeight});
   width: 100%;
   background-color: ${({ theme }) => theme.colors.bgMain};
   color: ${({ theme }) => theme.colors.textPrimary};
@@ -137,17 +143,93 @@ export const DragOverlayText = styled.span`
  * ============================================================ */
 
 /**
- * 상단 헤더.
- * 아바타 + 제목(좌) / 새 대화 버튼(우) 레이아웃.
+ * (Deprecated 2026-04-23) 채팅 전용 도구바.
+ *
+ * 상단 MainLayout Header 와 이중 바를 만들어 UX 저해 → ChatHeader 자체를 렌더하지 않는다.
+ * 필요한 두 기능(이전 대화 토글 / 새 대화) 은 아래 `ChatFloatingHamburger` /
+ * `ChatFloatingNewBtn` 로 메시지 영역 좌/우 상단에 floating 배치.
+ * styled 컴포넌트는 레거시 호환(시드 데이터/테스트 등 잠재 참조) 을 위해 export 는 유지하되
+ * ChatWindow.jsx 에서는 더 이상 사용하지 않는다.
  */
 export const ChatHeader = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 6px 12px;
+  min-height: 44px;
   background-color: ${({ theme }) => theme.colors.bgCard};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDefault};
   flex-shrink: 0;
+`;
+
+/**
+ * 채팅 좌상단 Floating 햄버거 버튼 — 이전 대화 사이드바 토글.
+ *
+ * ChatWindowWrapper(position: relative) 기준 absolute. MainLayout Header 아래
+ * 12px 여백에서 뜬다. 메시지 영역과 겹치지만 z-index 로 상단 유지.
+ */
+export const ChatFloatingHamburger = styled.button`
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.primaryLight};
+    color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+/**
+ * 채팅 우상단 Floating "새 대화" 버튼.
+ *
+ * 햄버거와 대칭으로 우측에 배치. 라벨이 있으므로 pill 형태.
+ * 기존 `HeaderClearBtn` 과 시각적으로 동일 계열이지만 floating 이므로 shadow 강화.
+ */
+export const ChatFloatingNewBtn = styled.button`
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.primaryLight};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
 `;
 
 /** 헤더 좌측 영역 (뒤로가기 + 아바타 + 텍스트) */
@@ -155,6 +237,61 @@ export const ChatHeaderLeft = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
+`;
+
+/**
+ * 좌측 상단 유저 프로필 버튼 (2026-04-23 도구바 개편 신설).
+ *
+ * 아바타(원형 이니셜) + 닉네임. 클릭 시 /account/profile 로 이동.
+ * 도구바의 햄버거(이전 대화) 와 시각적으로 구분되도록 배경·테두리를 명확히 부여.
+ */
+export const ChatProfileBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: 999px;
+  background: ${({ theme }) => theme.colors.bgMain};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  cursor: pointer;
+  max-width: 180px;
+  flex-shrink: 1;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.primaryLight};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+`;
+
+/** 프로필 버튼 내부 아바타 (32×32 원형, 닉네임 이니셜) */
+export const ChatProfileAvatar = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+`;
+
+/** 프로필 버튼 내부 닉네임 — 모바일에서 긴 닉네임이 레이아웃을 깨지 않도록 말줄임 */
+export const ChatProfileName = styled.span`
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 `;
 
 /**
@@ -246,7 +383,11 @@ export const HeaderClearBtn = styled.button`
 export const ChatMessages = styled.main`
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  /*
+   * 상단 패딩 64px: ChatFloatingHamburger / ChatFloatingNewBtn (top:12 + h:40) 이
+   * 위로 뜨므로 콘텐츠 첫 줄이 버튼과 겹치지 않도록 여유 확보.
+   */
+  padding: 64px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -267,15 +408,22 @@ export const ChatMessages = styled.main`
 
 /* ── 초기 안내 메시지 ── */
 
-/** 메시지가 없을 때 중앙에 표시되는 환영 영역 */
+/**
+ * 메시지가 없을 때 표시되는 환영 영역.
+ *
+ * 2026-04-23 개편: 기존 justify-content: center 로는 MainLayout Header(64) + 도구바(44)
+ * + 입력창(~100) 공제 후 남은 영역의 세로 중앙에 배치돼, 낮은 뷰포트에서 추천 칩이 viewport
+ * 아래로 밀려 사용자가 "안 보인다" 고 피드백. 상단 정렬로 바꿔 칩이 항상 화면 상단 1/3 근처에
+ * 위치하도록 한다.
+ */
 export const ChatWelcome = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex: 1;
   text-align: center;
-  padding: 40px 20px;
+  padding: 24px 20px 40px;
   gap: 12px;
 `;
 

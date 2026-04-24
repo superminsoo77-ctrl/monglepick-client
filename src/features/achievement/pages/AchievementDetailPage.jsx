@@ -11,9 +11,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { getAchievements } from '../api/achievementApi';
 import { ROUTES } from '../../../shared/constants/routes';
+/* 2026-04-23 라우팅 재설계 PR-3 — 하드코딩 navigate(ROUTES.ACHIEVEMENT) 3곳을 공통 훅으로 대체 */
+import useBackNavigation from '../../../shared/hooks/useBackNavigation';
 import * as S from './AchievementDetailPage.styled';
 
 /** 카테고리 한글 라벨 */
@@ -47,9 +49,16 @@ function formatDate(isoStr) {
 }
 
 export default function AchievementDetailPage() {
-  const navigate = useNavigate();
   const { id } = useParams();
   const { state } = useLocation();
+
+  /*
+   * 2026-04-23 PR-3: 뒤로가기 훅화.
+   *   - 호출부에서 state.backTo 를 넘겼으면 그쪽으로 (예: `/achievement?tab=done&page=2`)
+   *   - 아니면 브라우저 히스토리 → 폴백 ROUTES.ACHIEVEMENT
+   * 기존엔 navigate(ROUTES.ACHIEVEMENT) 를 3곳에 하드코딩해 탭/페이지/필터 상태를 잃었음.
+   */
+  const goBack = useBackNavigation(ROUTES.ACCOUNT_ACHIEVEMENT);
 
   const [achievement, setAchievement] = useState(state?.achievement ?? null);
   const [isLoading, setIsLoading] = useState(!state?.achievement);
@@ -85,7 +94,7 @@ export default function AchievementDetailPage() {
   if (isLoading) {
     return (
       <S.Container>
-        <S.BackLink onClick={() => navigate(ROUTES.ACHIEVEMENT)}>
+        <S.BackLink onClick={goBack}>
           ← 업적 목록
         </S.BackLink>
         <S.Skeleton $h={120} />
@@ -99,7 +108,7 @@ export default function AchievementDetailPage() {
   if (!achievement) {
     return (
       <S.Container>
-        <S.BackLink onClick={() => navigate(ROUTES.ACHIEVEMENT)}>
+        <S.BackLink onClick={goBack}>
           ← 업적 목록
         </S.BackLink>
         <S.BodyText style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: 40 }}>
@@ -117,7 +126,7 @@ export default function AchievementDetailPage() {
 
   return (
     <S.Container>
-      <S.BackLink onClick={() => navigate(ROUTES.ACHIEVEMENT)}>
+      <S.BackLink onClick={goBack}>
         ← 업적 목록
       </S.BackLink>
 

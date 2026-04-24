@@ -145,10 +145,12 @@ const GlobalStyle = createGlobalStyle`
   }
 
   /* ── 스크롤바 스타일 (Webkit) ── */
+  /* QA #160 (2026-04-23): 6px 은 너무 얇아 사용자가 잡기 어렵다는 피드백이 있어 10px 로 확대.
+   * Firefox 는 scrollbar-width 속성으로 thin/auto 전환 (Webkit 브라우저는 위 스타일 적용). */
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
@@ -158,10 +160,20 @@ const GlobalStyle = createGlobalStyle`
   ::-webkit-scrollbar-thumb {
     background: ${({ theme }) => theme.colors.borderDefault};
     border-radius: ${({ theme }) => theme.radius.full};
+    /* 얇아 보이지 않도록 thumb 에 투명 border 로 시각적 여백 부여 */
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: ${({ theme }) => theme.colors.textMuted};
+    background-clip: padding-box;
+  }
+
+  /* Firefox 용 — thin 보다 auto 가 더 잡기 쉬움 */
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: ${({ theme }) => theme.colors.borderDefault} ${({ theme }) => theme.colors.bgMain};
   }
 
   /* 선택 영역 스타일 */

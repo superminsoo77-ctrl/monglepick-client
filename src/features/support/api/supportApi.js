@@ -8,6 +8,10 @@
 
 /* 공용 axios 인스턴스 + 인증 필수 가드 */
 import api, { requireAuth } from '../../../shared/api/axiosInstance';
+/* Agent 서비스 URL — 고객센터 챗봇 SSE 가 Agent :8000 을 직접 때림 */
+import { SERVICE_URLS } from '../../../shared/api/serviceUrls';
+/* localStorage JWT 래퍼 — SSE fetch 의 Authorization 헤더 주입용 */
+import { getToken } from '../../../shared/utils/storage';
 /* API 상수 — shared/constants에서 가져옴 */
 import { SUPPORT_ENDPOINTS } from '../../../shared/constants/api';
 
@@ -98,9 +102,11 @@ export async function getTicketDetail(ticketId) {
 // ── AI 챗봇 ──
 
 /**
- * AI 고객센터 챗봇에 메시지를 전송한다.
- * FAQ 매칭 + LLM 자동응답을 수행하며,
- * 해결되지 않으면 상담원 이관을 안내한다.
+ * (레거시) Backend 키워드 매칭 기반 챗봇에 메시지를 전송한다.
+ *
+ * 2026-04-23 이후로는 {@link sendSupportChatSse} (Agent SSE) 를 기본으로 사용한다.
+ * 본 함수는 Client SSE 연결이 불가능한 환경(예: 관리자 E2E 회귀 테스트)을
+ * 위한 레거시 폴백 창구로 남겨둔다. 백엔드 라우트는 당분간 유지.
  *
  * @param {Object} params
  * @param {string} params.message - 사용자 메시지
@@ -109,4 +115,163 @@ export async function getTicketDetail(ticketId) {
  */
 export async function sendChatbotMessage({ message, sessionId }) {
   return api.post(SUPPORT_ENDPOINTS.CHATBOT, { message, sessionId });
+}
+
+/**
+ * 고객센터 AI 챗봇 SSE — Agent(:8000) 의 EXAONE 1.2B 몽글이 + FAQ RAG 엔드포인트 호출.
+ *
+ * POST /api/v1/support/chat 에 fetch 요청을 보내고 ReadableStream 으로 SSE 이벤트를
+ * 실시간 파싱해 콜백으로 전달한다. chat SSE 와 달리 자동 재연결은 포함하지 않는다
+ * (고객센터 챗봇은 요청당 수명이 짧아 재시도 가치가 낮고, 네트워크 실패는 즉시
+ *  onError 로 끌어올려 '상담원 연결' 배너를 띄우는 편이 UX 상 자연스럽다).
+ *
+ * 이벤트 (7종):
+ *  - session     : {session_id}
+ *  - status      : {phase, message, keepalive?}
+ *  - matched_faq : {items: [{faq_id, category, question, score}]}
+ *  - token       : {delta} — 최종 응답 텍스트 (현재 MVP 는 1회 전송)
+ *  - needs_human : {value: boolean}
+ *  - done        : {}
+ *  - error       : {message}
+ *
+ * @param {Object} params
+ * @param {string} params.message - 사용자 입력 (1~1500자)
+ * @param {string} [params.sessionId=''] - 세션 ID (빈 문자열이면 Agent 가 발급)
+ * @param {Object} [callbacks={}] - SSE 이벤트 콜백 모음
+ * @param {(data: {session_id: string}) => void} [callbacks.onSession]
+ * @param {(data: {phase: string, message: string, keepalive?: boolean}) => void} [callbacks.onStatus]
+ * @param {(data: {items: Array<{faq_id: number, category: string, question: string, score: number}>}) => void} [callbacks.onMatchedFaq]
+ * @param {(data: {delta: string}) => void} [callbacks.onToken]
+ * @param {(data: {value: boolean}) => void} [callbacks.onNeedsHuman]
+ * @param {() => void} [callbacks.onDone]
+ * @param {(data: {message: string}) => void} [callbacks.onError]
+ * @param {AbortSignal} [signal] - 요청 취소용 AbortSignal (UI 언마운트/재질문 시 호출)
+ * @returns {Promise<void>}
+ */
+export async function sendSupportChatSse(
+  { message, sessionId = '' },
+  {
+    onSession,
+    onStatus,
+    onMatchedFaq,
+    onToken,
+    onNeedsHuman,
+    onDone,
+    onError,
+  } = {},
+  signal,
+) {
+  /* JWT 가 있으면 헤더에 실어 유저 식별 — 없으면 게스트로 처리된다 */
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json', Accept: 'text/event-stream' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const url = `${SERVICE_URLS.AGENT}${SUPPORT_ENDPOINTS.SUPPORT_CHAT_SSE}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    /* 게스트 쿼터는 챗봇에 적용되지 않지만 chat SSE 와 일관되게 쿠키 전송을 허용 */
+    credentials: 'include',
+    body: JSON.stringify({ message, session_id: sessionId }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    // ReadableStream 으로 SSE 프레임 수신
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // CRLF → LF 정규화 (sse_starlette 는 \r\n 사용)
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+      // \n\n 단위 블록 분리 후 마지막(불완전)만 버퍼에 잔존
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        _parseSupportSseBlock(block, { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError });
+      }
+    }
+
+    // 스트림 종료 후 잔여 버퍼 (네트워크 flush 경계상 드물게 발생)
+    if (buffer.trim()) {
+      _parseSupportSseBlock(buffer, { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError });
+    }
+  } finally {
+    // 예외가 나도 reader 를 반드시 해제해 스트림 리소스 누수 방지
+    reader.cancel().catch(() => {});
+  }
+}
+
+/**
+ * 단일 SSE 블록을 파싱하여 대응 콜백을 호출한다.
+ *
+ * chatApi 의 parseSSEBlock 과 구조는 동일하되 고객센터 전용 7종만 디스패치한다.
+ *
+ * @param {string} block - "event: xxx\ndata: {...}" 형태 블록
+ * @param {Object} callbacks - 콜백 모음
+ * @private
+ */
+function _parseSupportSseBlock(block, callbacks) {
+  const lines = block.split('\n');
+  let eventType = null;
+  let dataStr = '';
+  for (const line of lines) {
+    if (line.startsWith('event:')) eventType = line.slice(6).trim();
+    else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+  }
+  if (!dataStr) return;
+
+  let data;
+  try {
+    data = JSON.parse(dataStr);
+  } catch {
+    /* keep-alive 주석/비-JSON 블록은 무시 */
+    return;
+  }
+
+  /* sse_starlette 래핑 — data 안에 다시 "event:.../data:..." 가 올 수 있어 재귀 파싱 */
+  if (typeof data === 'string' && data.includes('event:')) {
+    _parseSupportSseBlock(data, callbacks);
+    return;
+  }
+
+  const { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError } = callbacks;
+  switch (eventType) {
+    case 'session':
+      onSession?.(data);
+      break;
+    case 'status':
+      onStatus?.(data);
+      break;
+    case 'matched_faq':
+      onMatchedFaq?.(data);
+      break;
+    case 'token':
+      onToken?.(data);
+      break;
+    case 'needs_human':
+      onNeedsHuman?.(data);
+      break;
+    case 'done':
+      onDone?.();
+      break;
+    case 'error':
+      onError?.(data);
+      break;
+    default:
+      /* 알 수 없는 이벤트는 조용히 무시 (forward-compat) */
+      break;
+  }
 }

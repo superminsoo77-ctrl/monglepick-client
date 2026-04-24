@@ -103,12 +103,17 @@ export const Wrapper = styled.div`
  *
  * $variant 'current' 이면 "구독 중" 표시용으로 primary gradient 를 사용한다.
  * 기본값(undefined) 이면 BEST 뱃지 — gradient-accent 배경.
+ *
+ * QA #155 (2026-04-23): Wrapper 가 `overflow: hidden` 을 사용해 hover shine(::after)
+ * 이 카드 밖으로 번지지 않도록 제한하고 있어, 기존의 `top: -10px` 로 카드 상단을 벗어난
+ * 배지가 일부 짤렸다. 카드 안쪽 상단 (top: 8px + z-index) 로 이동시켜 보더/shine 에
+ * 영향을 주지 않고 항상 전체가 보이도록 고정한다.
  */
 export const Badge = styled.div`
   position: absolute;
-  top: -10px;
-  right: ${({ theme }) => theme.spacing.md};
-  padding: 2px ${({ theme }) => theme.spacing.md};
+  top: 8px;
+  right: ${({ theme }) => theme.spacing.sm};
+  padding: 3px ${({ theme }) => theme.spacing.md};
   background: ${({ $variant, theme }) =>
     $variant === 'current' ? theme.gradients.primary : theme.gradients.accent};
   color: white;
@@ -120,7 +125,12 @@ export const Badge = styled.div`
     $variant === 'current'
       ? '0 0 12px rgba(99, 102, 241, 0.35)'
       : '0 0 12px rgba(239, 71, 111, 0.3)'};
-  z-index: 1;
+  /* Wrapper::after(shine) 위로 항상 떠 있도록 z-index 상승 */
+  z-index: 2;
+  /* 내용이 좁아지더라도 배지 높이 유지 + 글자 세로 정렬 */
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
 `;
 
 /**
