@@ -55,9 +55,14 @@ export default function QuizPage({ embedded = false }) {
       /* 백엔드 응답은 QuizResponse[] 이지만 ApiResponse 래퍼가 벗겨진 data 직접 반환도 가능 */
       setQuizzes(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
-      console.error('[QuizPage] 오늘의 퀴즈 로드 실패:', err);
-      setLoadError(err.message || '퀴즈 목록을 불러올 수 없습니다.');
-      setQuizzes([]);
+      // 백엔드가 퀴즈 없을 때 400을 반환하는 경우 → 빈 상태로 처리
+      if (err?.response?.status === 400) {
+        setQuizzes([]);
+      } else {
+        console.error('[QuizPage] 오늘의 퀴즈 로드 실패:', err);
+        setLoadError(err.message || '퀴즈 목록을 불러올 수 없습니다.');
+        setQuizzes([]);
+      }
     } finally {
       setIsLoading(false);
     }
