@@ -132,6 +132,17 @@ export async function getProfile() {
  */
 export async function updateProfile(profileData) {
   requireAuth();
+  // If caller provided a FormData (file upload), send as multipart/form-data.
+  // Otherwise send JSON body as before.
+  if (typeof FormData !== 'undefined' && profileData instanceof FormData) {
+    // Do NOT set Content-Type manually — the browser must generate the boundary.
+    // Setting Content-Type: undefined removes the instance-level 'application/json'
+    // default so the browser can attach the correct multipart/form-data; boundary=...
+    return api.patch(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData, {
+      headers: { 'Content-Type': undefined },
+    });
+  }
+
   return api.patch(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData);
 }
 

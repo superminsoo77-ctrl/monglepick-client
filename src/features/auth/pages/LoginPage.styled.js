@@ -78,3 +78,21 @@ export const Orb3 = styled(OrbBase)`
   filter: blur(120px);
   animation: ${floatUpDown} 12s ease-in-out infinite 4s;
 `;
+
+/** 계정 정지 강제 로그아웃 시 로그인 페이지 상단에 노출되는 경고 배너 */
+export const SuspendedBanner = styled.div`
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  background: rgba(239, 71, 111, 0.15);
+  border: 1px solid rgba(239, 71, 111, 0.4);
+  border-radius: ${({ theme }) => theme.radius.lg};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  line-height: 1.5;
+  text-align: center;
+`;

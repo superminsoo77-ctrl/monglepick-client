@@ -50,6 +50,12 @@ const fabPulse = keyframes`
  * 위젯 루트 — 우측 하단 고정 컨테이너.
  * 다른 fixed 요소(Modal, Toast)와의 겹침을 피하기 위해 z-index를 적절히 조정.
  * 모달(9999)보다 낮고 일반 콘텐츠보다는 높게 설정.
+ *
+ * 2026-04-24 배치 조정:
+ *   - 기존 right/bottom 24px 은 화면 모서리에 너무 바싹 붙어 사용자가
+ *     "구석에 처박힌" 느낌을 받는다는 피드백.
+ *   - right/bottom 48/80px 로 안쪽으로 이동해 FAB 가 콘텐츠 영역에 더
+ *     자연스럽게 떠 있도록 조정. 모바일은 좁은 화면을 고려해 24/48 로 완만하게.
  */
 export const Root = styled.div`
   position: fixed;
@@ -57,9 +63,15 @@ export const Root = styled.div`
    * iOS 노치/홈 인디케이터 영역 회피.
    * env(safe-area-inset-*) 는 viewport-fit=cover (index.html) 가 있어야 동작.
    * iPhone X+ 에서 home indicator 영역(약 34px)에 FAB 가 가려지던 문제를 해결.
+   *
+   * 위쪽(=bottom ↑) 과 왼쪽(=right ↑) 으로 더 끌어당기기 위해 두 축 모두
+   * 기존 24px 에서 증가시킨다. safe-area-inset 가산은 유지.
+   *
+   * 2026-04-24 재조정: 우측 여백을 48 → 80px 로 더 키워 FAB 를 왼쪽으로
+   * 추가 이동. bottom 은 80px 유지 (이미 이전 턴에 위로 올렸음).
    */
-  right: calc(24px + env(safe-area-inset-right, 0px));
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: calc(80px + env(safe-area-inset-right, 0px));
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   z-index: 900;
   display: flex;
   flex-direction: column;
@@ -67,8 +79,9 @@ export const Root = styled.div`
   gap: 12px;
 
   @media (max-width: 480px) {
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    /* 모바일은 좁은 화면을 고려해 완만하게만 안쪽으로 이동 */
+    right: calc(24px + env(safe-area-inset-right, 0px));
+    bottom: calc(48px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -88,13 +101,14 @@ export const Root = styled.div`
  *   - 폰트 26→28 — 말풍선 이모지 명료도 ↑
  */
 export const Fab = styled.button`
-  width: 64px;
-  height: 64px;
+  /* 2026-04-24: 크기 확대 64→72px (시인성 강화 + 탭 타겟 확대). 폰트 28→32px. */
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: 3px solid #fff;
   background: ${({ theme }) => theme.gradients?.primary || theme.colors.primary};
   color: #fff;
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 0 rgba(99, 102, 241, 0.55);

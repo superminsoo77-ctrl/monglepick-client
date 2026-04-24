@@ -12,9 +12,14 @@ import { fadeInUp, floatUpDown } from '../../../shared/styles/animations';
 import { glassCard, gradientText } from '../../../shared/styles/mixins';
 import { media } from '../../../shared/styles/media';
 
-/* ── 페이지 전체 컨테이너 ── */
+/* ── 페이지 전체 컨테이너 ──
+ * position: relative — 내부에서 position: absolute 로 배치되는 SideSlideBanner
+ * (좌측상단 고정 배너) 의 기준 컨테이너. Wrapper 바깥으로 튀어나가지 않고
+ * 스크롤에 따라 함께 올라가도록 만드는 역할.
+ */
 export const Wrapper = styled.div`
   width: 100%;
+  position: relative;
 `;
 
 /* ── 히어로 섹션 — floating orb 배경 ── */

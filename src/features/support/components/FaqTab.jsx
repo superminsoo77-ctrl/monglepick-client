@@ -116,26 +116,36 @@ export default function FaqTab({
                   >
                     <S.AnswerText>{faq.answer}</S.AnswerText>
 
-                    {/* 피드백 버튼 (인증 사용자만) */}
+                    {/* 피드백 영역 (인증 사용자만)
+                     *  - 미제출 상태: "도움이 되었나요?" 라벨 + 네/아니요 버튼
+                     *  - 제출 완료 상태: 감사 메시지로 치환 (버튼 숨김)
+                     *    리워드 정책 FAQ_FEEDBACK: 1회당 3P, 일일 5회까지 자동 지급
+                     */}
                     {isAuthenticated && (
                       <S.Feedback>
-                        <S.FeedbackLabel>도움이 되었나요?</S.FeedbackLabel>
-                        <S.FeedbackBtn
-                          $selected={feedbackState === 'helpful'}
-                          onClick={() => onFeedback(faq.id, true)}
-                          disabled={!!feedbackState || feedbackLoadingId === faq.id}
-                          aria-label="도움이 되었습니다"
-                        >
-                          &#128077; 네
-                        </S.FeedbackBtn>
-                        <S.FeedbackBtn
-                          $selected={feedbackState === 'notHelpful'}
-                          onClick={() => onFeedback(faq.id, false)}
-                          disabled={!!feedbackState || feedbackLoadingId === faq.id}
-                          aria-label="도움이 되지 않았습니다"
-                        >
-                          &#128078; 아니요
-                        </S.FeedbackBtn>
+                        {feedbackState ? (
+                          <S.FeedbackThanks role="status" aria-live="polite">
+                            &#128151; 피드백을 해주셔서 감사합니다!
+                          </S.FeedbackThanks>
+                        ) : (
+                          <>
+                            <S.FeedbackLabel>도움이 되었나요?</S.FeedbackLabel>
+                            <S.FeedbackBtn
+                              onClick={() => onFeedback(faq.id, true)}
+                              disabled={feedbackLoadingId === faq.id}
+                              aria-label="도움이 되었습니다"
+                            >
+                              &#128077; 네
+                            </S.FeedbackBtn>
+                            <S.FeedbackBtn
+                              onClick={() => onFeedback(faq.id, false)}
+                              disabled={feedbackLoadingId === faq.id}
+                              aria-label="도움이 되지 않았습니다"
+                            >
+                              &#128078; 아니요
+                            </S.FeedbackBtn>
+                          </>
+                        )}
                       </S.Feedback>
                     )}
                   </S.Answer>

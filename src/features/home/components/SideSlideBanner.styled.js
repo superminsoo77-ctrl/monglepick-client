@@ -1,7 +1,7 @@
 /**
- * SideSlideBanner styled-components — 2026-04-15 (placement v3).
+ * SideSlideBanner styled-components — 2026-04-24 (placement v4).
  *
- * 우측하단 플로팅 슬라이드 배너 위젯. 홈(/home) 어느 섹션을 보고 있어도
+ * 좌측상단 플로팅 슬라이드 배너 위젯. 홈(/home) 어느 섹션을 보고 있어도
  * 시야 안에 항상 노출되도록 `position: fixed` 로 viewport 에 고정한다.
  *
  * 디자인 원칙
@@ -11,11 +11,15 @@
  *   - Hero 의 `overflow: hidden` 영향을 받지 않도록 Wrapper 바깥에서 렌더
  *   - `z-index` 99 — 헤더 TopLoadingBar(z:100) 보다 낮게, 일반 컨텐츠보다 위
  *
- * 2026-04-15 placement v3 변경 사항:
- *   - 우측하단 SupportChatbotWidget(FAB 64×64, right:24/bottom:24, z:900)
- *     과 영역이 겹쳐 챗봇 FAB 가 배너 위에 놓이는 시각 충돌이 발생.
- *   - 배너를 챗봇 FAB 위쪽으로 띄우기 위해 `bottom` 을 FAB 높이 + 여백만큼
- *     상향 조정 (데스크톱 100px / 태블릿 92px). 모바일은 기존대로 숨김.
+ * 2026-04-24 placement v4 변경 사항 (위치 재배치):
+ *   - 기존 우측하단 플로팅 → 좌측상단 헤더 아래로 이동.
+ *     사유: 우측하단이 SupportChatbotWidget(FAB) 와 시선·영역이 계속 겹쳤고,
+ *          유저가 랜딩 진입 즉시 프로모션 배너를 자연스럽게 인지하도록
+ *          헤더 바로 아래의 "눈에 가장 먼저 들어오는" 위치로 옮김.
+ *   - `top`: headerHeight(64px) + 16px 여백 = 80px. 헤더(sticky) 바로 아래에 붙는다.
+ *   - `left`: 20px (태블릿 12px) — 로고 라인과 시각적으로 근접하되 겹치지 않음.
+ *   - Root 컨테이너에 `max-width` 가 있는 HomePage Wrapper 안이 아니라
+ *     viewport 기준 fixed 이므로 좌측 끝에서 일정 거리를 띄우는 쪽이 자연스러움.
  */
 
 import styled, { keyframes } from 'styled-components';
@@ -29,21 +33,28 @@ const fadeSlide = keyframes`
 `;
 
 /**
- * 배너 위젯 전체 프레임 — viewport 우측하단 플로팅.
+ * 배너 위젯 전체 프레임 — 페이지 좌측상단 앵커 (2026-04-24 placement v5).
  *
- * 2026-04-14 placement v2 변경 사항:
- *   - `position: absolute` (Hero 내부) → `position: fixed` (viewport)
- *   - 크기 240×180 → 220×140 (더 작게, 하단 여백 절약)
- *   - `media.desktop` 숨김 → `media.mobile` 숨김 (노출 범위 확대)
+ * 이력:
+ *   - v2(2026-04-14) `position: absolute`(Hero 내부) → `position: fixed`(viewport),
+ *                    240×180 → 220×140, `media.desktop` 숨김 → `media.mobile` 숨김.
+ *   - v3(2026-04-15) 우측하단 고정 + 챗봇 FAB 회피를 위해 `bottom: 100px` 로 상향.
+ *   - v4(2026-04-24) 우측하단 → 좌측상단 헤더 아래 (top:80 / left:20) 로 이동.
+ *   - v5(2026-04-24) `position: fixed` → `absolute` 로 변경. viewport 에 달라붙어
+ *                    스크롤을 따라오던 동작을 제거하고, HomePage Wrapper 기준
+ *                    좌측상단에 한 번 앵커링. 아래로 스크롤하면 배너도 같이
+ *                    위로 밀려 올라가서 자연스럽게 사라진다 ("고정 위치" 요청 반영).
+ *                    Wrapper 에 `position: relative` 가 추가되어 기준점으로 작동.
  */
 export const Frame = styled.div`
-  position: fixed;
-  right: 20px;
+  position: absolute;
   /*
-   * 챗봇 FAB(우측하단 64×64, bottom:24)와 겹치지 않도록 위로 띄움.
-   * 24(FAB 하단 여백) + 64(FAB 높이) + 12(분리 여백) = 100px.
+   * Wrapper(HomePage 루트, position:relative) 좌측상단 기준 오프셋.
+   * Wrapper 는 Header 바로 아래에서 시작하므로 top:16px 이면 "헤더 바로 밑 + 약간 여유".
+   * fixed 가 아니므로 스크롤 시 함께 밀려 올라가 사라진다.
    */
-  bottom: 100px;
+  top: 16px;
+  left: 20px;
   width: 220px;
   height: 140px;
   z-index: 99;
@@ -63,18 +74,17 @@ export const Frame = styled.div`
     transform: translateY(-2px);
   }
 
-  /* 태블릿(≤768px) 에서는 조금 더 작게 */
+  /* 태블릿(≤768px) 에서는 조금 더 작게 + 좌측 여백 축소 */
   ${media.tablet} {
     width: 180px;
     height: 116px;
-    right: 12px;
-    /* 태블릿 챗봇 FAB(bottom:24) 위로 — 24+64+12=100 */
-    bottom: 100px;
+    top: 12px;
+    left: 12px;
   }
 
   /*
-   * 모바일(≤480px) 에서는 숨김. 작은 화면에서는 FAB(고객센터 챗봇 위젯)과
-   * 영역이 겹쳐 사용자 시선을 방해하므로 제외. 태블릿 이상에서만 노출.
+   * 모바일(≤480px) 에서는 숨김. 작은 화면에서는 본문 콘텐츠(검색창·Hero)
+   * 와 겹쳐 사용자 시선을 방해하므로 제외. 태블릿 이상에서만 노출.
    */
   ${media.mobile} {
     display: none;

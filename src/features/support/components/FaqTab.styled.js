@@ -332,3 +332,20 @@ export const FeedbackBtn = styled.button`
     cursor: not-allowed;
   }
 `;
+
+/**
+ * 피드백 제출 완료 후 노출되는 감사 메시지.
+ *
+ * 버튼(네/아니요)을 완전히 대체해 "피드백을 해주셔서 감사합니다!" 텍스트를 표시한다.
+ * 리워드 정책 FAQ_FEEDBACK 으로 1회당 3P (등급 배율 적용), 일일 5회까지 자동 지급되므로
+ * UX 상 포인트 지급 여부는 명시하지 않고 감사 인사만 노출 (서버가 한도 초과 시 조용히 skip).
+ */
+export const FeedbackThanks = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+`;
