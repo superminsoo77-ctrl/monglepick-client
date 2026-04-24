@@ -104,6 +104,8 @@ export const ROUTES = {
   ACCOUNT_STAMP_DETAIL: '/account/stamp/:id',
   /** 도장깨기 리뷰 작성 (구 /stamp/:courseId/review/:movieId) */
   ACCOUNT_STAMP_REVIEW: '/account/stamp/:courseId/review/:movieId',
+  /** 도장깨기 최종 감상평 작성 — 코스 완주 직전 마지막 단계 */
+  ACCOUNT_STAMP_FINAL_REVIEW: '/account/stamp/:id/final-review',
   /** 영화 이상형 월드컵 (구 /worldcup) */
   ACCOUNT_WORLDCUP: '/account/worldcup',
   /** 로드맵 목록 (구 /roadmap) */

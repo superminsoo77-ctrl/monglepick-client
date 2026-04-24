@@ -69,6 +69,7 @@ import AchievementDetailPage from '../features/achievement/pages/AchievementDeta
 import WorldcupPage from '../features/worldcup/pages/WorldcupPage';
 import RoadmapPage from '../features/roadmap/pages/RoadmapPage';
 import StampReviewPage from '../features/roadmap/pages/StampReviewPage';
+import FinalReviewPage from '../features/roadmap/pages/FinalReviewPage';
 
 import NotFoundPage from '../features/error/pages/NotFoundPage';
 import Loading from '../shared/components/Loading/Loading';
@@ -209,6 +210,7 @@ function App() {
             <Route path="stamp"                         element={<RoadmapPage />} />
             <Route path="stamp/:id"                     element={<RoadmapPage />} />
             <Route path="stamp/:courseId/review/:movieId" element={<StampReviewPage />} />
+            <Route path="stamp/:id/final-review"           element={<FinalReviewPage />} />
             <Route path="worldcup"                      element={<WorldcupPage />} />
             <Route path="roadmap"                       element={<RoadmapPage />} />
             <Route path="roadmap/:id"                   element={<RoadmapPage />} />

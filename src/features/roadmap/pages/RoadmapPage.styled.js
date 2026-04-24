@@ -109,24 +109,44 @@ export const CourseGrid = styled.div`
   }
 `;
 
-/** 코스 카드 — Playlist Card와 동일한 패딩/구조 */
+/** 코스 카드 — $completed 시 회색 처리 */
 export const CourseCard = styled.div`
   padding: 28px 24px;
   border-radius: ${({ theme }) => theme.radius.lg};
   background: ${({ theme }) => theme.colors.bgSecondary};
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border: 1px solid ${({ $completed, theme }) =>
+    $completed ? theme.colors.borderDefault : theme.colors.borderDefault};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.base};
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 140px;
+  opacity: ${({ $completed }) => ($completed ? 0.55 : 1)};
+  filter: ${({ $completed }) => ($completed ? 'grayscale(0.4)' : 'none')};
 
   &:hover {
-    border-color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ $completed, theme }) =>
+      $completed ? theme.colors.textMuted : theme.colors.primary};
     box-shadow: ${({ theme }) => theme.shadows.md};
     transform: translateY(-2px);
+    opacity: ${({ $completed }) => ($completed ? 0.75 : 1)};
+    filter: none;
   }
+`;
+
+/** 완료 배지 — 카드 우상단 */
+export const CompletedBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => `${theme.colors.success}22`};
+  color: ${({ theme }) => theme.colors.success};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  align-self: flex-start;
 `;
 
 /** 코스 카드 상단 행 (아이콘 + 제목) */

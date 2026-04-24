@@ -111,6 +111,14 @@ export default function StampReviewPage() {
       const agentAvailable = result?.agentAvailable !== false;
 
       if (reviewStatus === 'AUTO_VERIFIED') {
+        if (result?.requiresFinalReview) {
+          // 마지막 영화 완료 → 코스 완주를 위한 최종 감상평 단계로 이동
+          navigate(buildPath(ROUTES.ACCOUNT_STAMP_FINAL_REVIEW, { id: courseId }), {
+            state: { courseTitle },
+            replace: true,
+          });
+          return;
+        }
         showAlert({
           title: resubmit ? '재인증 완료!' : '도장 완료!',
           message: `'${movieTitle}' 영화 도장을 찍었어요!`,

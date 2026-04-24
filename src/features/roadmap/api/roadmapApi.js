@@ -88,3 +88,30 @@ export async function getMovieReview(courseId, movieId) {
   return res?.data ?? res;
 }
 
+/**
+ * 코스 최종 감상평 제출 → 완주 처리.
+ *
+ * 마지막 영화 AUTO_VERIFIED 후 CourseCompleteResponse.requiresFinalReview=true 를 받으면
+ * FinalReviewPage 에서 이 함수를 호출한다.
+ * 응답 FinalReviewResponse.courseStatus === 'COMPLETED' 이면 코스가 완주 처리되고 리워드가 지급된다.
+ *
+ * @param {string|number} courseId
+ * @param {string} reviewText - 감상평 본문
+ * @returns {Promise<{courseStatus: string, rewardPoints: number, ...}>}
+ */
+export async function submitFinalReview(courseId, reviewText) {
+  requireAuth();
+  return backendApi.post(ROADMAP_ENDPOINTS.FINAL_REVIEW(courseId), { reviewText });
+}
+
+/**
+ * 기 제출한 최종 감상평 조회.
+ *
+ * @param {string|number} courseId
+ * @returns {Promise<{reviewText: string, createdAt: string}>}
+ */
+export async function getFinalReview(courseId) {
+  requireAuth();
+  return backendApi.get(ROADMAP_ENDPOINTS.FINAL_REVIEW(courseId));
+}
+

@@ -58,7 +58,8 @@ const TABS = [
 export default function RoadmapPage() {
   const navigate = useNavigate();
   const { id: detailId } = useParams();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const { showAlert } = useModal();
 
   /**
@@ -69,6 +70,7 @@ export default function RoadmapPage() {
    * pathname 검사는 "/account/stamp" prefix 로 판정 — /account/stamp/123, /account/stamp 모두 true.
    */
   const isStampMode = pathname.startsWith(ROUTES.ACCOUNT_STAMP);
+  const { state: locationState } = location;
 
   /** 목록으로 돌아갈 경로 (진입 모드에 따라 분기) */
   const listRoute = isStampMode ? ROUTES.ACCOUNT_STAMP : ROUTES.ACCOUNT_ROADMAP;
@@ -76,8 +78,8 @@ export default function RoadmapPage() {
   /** 상세 페이지 경로 빌더 (진입 모드에 따라 분기) */
   const detailRoute = isStampMode ? ROUTES.ACCOUNT_STAMP_DETAIL : ROUTES.ACCOUNT_ROADMAP_DETAIL;
 
-  /* ── 탭 상태 ── */
-  const [activeTab, setActiveTab] = useState('all');
+  /* ── 탭 상태 — 코스 시작 후 목록으로 돌아올 때 locationState.defaultTab 으로 복원 ── */
+  const [activeTab, setActiveTab] = useState(locationState?.defaultTab || 'all');
 
   /* ── 목록 상태 ── */
   const [courses, setCourses] = useState([]);
@@ -164,9 +166,9 @@ export default function RoadmapPage() {
     setIsStarting(true);
     try {
       await startCourse(detail.id);
-      showAlert({ title: '시작!', message: `'${detail.title}' 코스를 시작합니다.`, type: 'success' });
-      /* 상세 리로드 */
-      loadDetail(detail.id);
+      await showAlert({ title: '시작!', message: `'${detail.title}' 코스를 시작합니다.`, type: 'success' });
+      /* 시작 완료 후 목록으로 이동하며 "진행 중" 탭을 활성화 */
+      navigate(listRoute, { state: { defaultTab: 'inprogress' }, replace: true });
     } catch (err) {
       showAlert({ title: '오류', message: err.message || '코스 시작에 실패했습니다.', type: 'error' });
     } finally {
@@ -305,18 +307,23 @@ export default function RoadmapPage() {
   /* ── 목록 뷰 ── */
   const visibleCourses = (() => {
     if (activeTab === 'inprogress') {
-      // 진행 중: 진행률이 0보다 크고 100 미만이거나 시작했지만 아직 완료되지 않음
       return courses.filter((c) => {
         const p = c.progressPercent || 0;
-        return (p > 0 && p < 100) || (c.started && p < 100);
+        const done = p >= 100 || c.status === 'COMPLETED';
+        return !done && (p > 0 || c.started);
       });
     }
     if (activeTab === 'completed') {
-      // 완료: 진행률이 100% 이상
-      return courses.filter((c) => (c.progressPercent || 0) >= 100);
+      return courses.filter((c) => (c.progressPercent || 0) >= 100 || c.status === 'COMPLETED');
     }
-    // 전체
-    return courses;
+    // 전체: 완료된 코스를 뒤로 정렬
+    return [...courses].sort((a, b) => {
+      const aDone = (a.progressPercent || 0) >= 100 || a.status === 'COMPLETED';
+      const bDone = (b.progressPercent || 0) >= 100 || b.status === 'COMPLETED';
+      if (aDone && !bDone) return 1;
+      if (!aDone && bDone) return -1;
+      return 0;
+    });
   })();
 
   return (
@@ -364,9 +371,13 @@ export default function RoadmapPage() {
         <S.CourseGrid>
           {visibleCourses.map((course) => {
             const progress = course.progressPercent || 0;
+            const isCompleted = progress >= 100 || course.status === 'COMPLETED';
+            const isInProgress = !isCompleted && (progress > 0 || course.started);
+
             return (
               <S.CourseCard
                 key={course.id}
+                $completed={isCompleted}
                 onClick={() => navigate(buildPath(detailRoute, { id: course.id }))}
               >
                 <S.CourseHeaderRow>
@@ -382,19 +393,29 @@ export default function RoadmapPage() {
                 )}
                 <S.CourseMeta>
                   <span>{course.movieCount || 0}편</span>
-                  {course.difficulty && (
-                    <S.DifficultyBadge $level={course.difficulty}>
-                      {DIFFICULTY_LABELS[course.difficulty] || course.difficulty}
-                    </S.DifficultyBadge>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {isCompleted && (
+                      <S.CompletedBadge>✓ 완료</S.CompletedBadge>
+                    )}
+                    {!isCompleted && isInProgress && (
+                      <S.InProgressBadge>● 진행 중</S.InProgressBadge>
+                    )}
+                    {course.difficulty && (
+                      <S.DifficultyBadge $level={course.difficulty}>
+                        {DIFFICULTY_LABELS[course.difficulty] || course.difficulty}
+                      </S.DifficultyBadge>
+                    )}
+                  </div>
                 </S.CourseMeta>
-                {/* 진행률 바는 진행 중/완료 탭에서 표시 */}
-                {(activeTab === 'inprogress' || activeTab === 'completed') && progress > 0 && (
+                {/* 진행률 바 — 전체/진행 중/완료 탭 모두 progress > 0이면 표시 */}
+                {progress > 0 && (
                   <>
                     <S.ProgressBarOuter>
                       <S.ProgressBarInner $percent={progress} />
                     </S.ProgressBarOuter>
-                    <S.ProgressText>{Math.round(progress)}% 완료</S.ProgressText>
+                    <S.ProgressText>
+                      {isCompleted ? '완료' : `${Math.round(progress)}% 완료`}
+                    </S.ProgressText>
                   </>
                 )}
               </S.CourseCard>
