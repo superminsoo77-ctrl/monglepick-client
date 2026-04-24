@@ -1,25 +1,30 @@
 /**
  * PostForm 컴포넌트 styled-components 정의.
  *
- * PostForm.css의 모든 규칙을 styled-components로 이관한다.
- * BEM 클래스(.post-form__*) → 개별 컴포넌트(S.Wrapper, S.Field 등)로 매핑.
- *
- * $error — transient prop (DOM에 전달하지 않음)
- *   - true 이면 입력 필드/텍스트영역의 테두리를 에러 색상으로 변경한다.
- *
- * $active — transient prop (DOM에 전달하지 않음)
- *   - true 이면 카테고리 버튼에 gradient 배경을 적용한다.
- *
- * 공유 리소스:
- *   - animations.js : fadeInUp
+ * $error  — transient prop: 입력 필드 에러 테두리
+ * $active — transient prop: 카테고리 버튼 활성 상태
+ * $status — transient prop: DraftIndicator 상태 (saving | saved | idle)
+ * $muted  — transient prop: DraftCheck 흐림 처리
  */
 
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { fadeInUp } from '../../../shared/styles/animations';
 
-/**
- * 폼 루트 컨테이너 — glass-card + fadeInUp 진입 애니메이션.
- */
+/* ── 공통 애니메이션 ── */
+
+const slideDown = keyframes`
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+`;
+
+
+/* ── 폼 루트 ── */
+
 export const Wrapper = styled.form`
   display: flex;
   flex-direction: column;
@@ -33,37 +38,136 @@ export const Wrapper = styled.form`
   animation: ${fadeInUp} 0.4s ease forwards;
 `;
 
-/**
- * 개별 필드 그룹 — 라벨 + 입력 요소를 세로로 배치.
- */
+/* ── 임시저장 상태 바 (상단) ── */
+
+export const DraftStatusBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  animation: ${slideDown} 0.25s ease forwards;
+  margin-bottom: -${({ theme }) => theme.spacing.sm};
+`;
+
+/* ── 임시저장 복원 배너 ── */
+
+export const DraftBanner = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.glass.bg};
+  border: 1px solid ${({ theme }) => theme.glass.border};
+  border-left: 3px solid ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  animation: ${slideDown} 0.3s ease forwards;
+  position: relative;
+`;
+
+export const DraftBannerBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  flex: 1;
+`;
+
+export const DraftBannerTitle = styled.p`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  margin: 0;
+`;
+
+export const DraftBannerSub = styled.p`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  margin: 0;
+`;
+
+export const DraftBannerBtns = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-top: ${({ theme }) => theme.spacing.sm};
+`;
+
+export const DraftRestoreBtn = styled.button`
+  padding: 5px 14px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  background: ${({ theme }) => theme.gradients.primary};
+  color: white;
+  border: none;
+
+  &:hover {
+    box-shadow: ${({ theme }) => theme.glows.primary};
+    transform: translateY(-1px);
+  }
+`;
+
+export const DraftDiscardBtn = styled.button`
+  padding: 5px 14px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+`;
+
+export const DraftBannerClose = styled.button`
+  position: absolute;
+  top: ${({ theme }) => theme.spacing.sm};
+  right: ${({ theme }) => theme.spacing.sm};
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: ${({ theme }) => theme.radius.full};
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+`;
+
+/* ── 필드 기본 ── */
+
 export const Field = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
-/**
- * 필드 라벨.
- */
 export const Label = styled.label`
   font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontMedium};
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
-/**
- * 카테고리 버튼 그룹 컨테이너.
- */
 export const Categories = styled.div`
   display: flex;
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
-/**
- * 카테고리 선택 버튼.
- *
- * $active 가 true 이면 gradient 배경 + 투명 테두리로 활성 상태를 표시한다.
- */
 export const CategoryBtn = styled.button`
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
   border-radius: ${({ theme }) => theme.radius.full};
@@ -71,35 +175,21 @@ export const CategoryBtn = styled.button`
   font-weight: ${({ theme }) => theme.typography.fontMedium};
   cursor: pointer;
   transition: all ${({ theme }) => theme.transitions.fast};
+  color: ${({ $active, theme }) => $active ? 'white' : theme.colors.textSecondary};
+  background: ${({ $active, theme }) => $active ? theme.gradients.primary : theme.colors.bgElevated};
+  border: 1px solid ${({ $active }) => $active ? 'transparent' : 'var(--border-default)'};
 
-  /* 비활성 기본 스타일 */
-  color: ${({ $active, theme }) =>
-    $active ? 'white' : theme.colors.textSecondary};
-  background: ${({ $active, theme }) =>
-    $active ? theme.gradients.primary : theme.colors.bgElevated};
-  border: 1px solid ${({ $active }) =>
-    $active ? 'transparent' : 'var(--border-default)'};
-
-  /* 비활성 hover */
   &:hover {
     border-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ $active, theme }) =>
-      $active ? 'white' : theme.colors.primary};
+    color: ${({ $active, theme }) => $active ? 'white' : theme.colors.primary};
   }
 `;
 
-/**
- * 텍스트 입력 필드.
- *
- * $error 가 true 이면 테두리를 에러 색상으로 변경한다.
- * 포커스 시 primary 테두리 + glow 효과를 적용한다.
- */
 export const Input = styled.input`
   width: 100%;
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
   background-color: ${({ theme }) => theme.colors.bgInput};
-  border: 1px solid ${({ $error, theme }) =>
-    $error ? theme.colors.error : theme.colors.borderDefault};
+  border: 1px solid ${({ $error, theme }) => $error ? theme.colors.error : theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.md};
   color: ${({ theme }) => theme.colors.textPrimary};
   font-size: ${({ theme }) => theme.typography.textBase};
@@ -112,18 +202,11 @@ export const Input = styled.input`
   }
 `;
 
-/**
- * 멀티라인 텍스트 영역.
- *
- * $error 가 true 이면 테두리를 에러 색상으로 변경한다.
- * resize: vertical 로 세로 방향만 크기 조정을 허용한다.
- */
 export const Textarea = styled.textarea`
   width: 100%;
   padding: ${({ theme }) => theme.spacing.md};
   background-color: ${({ theme }) => theme.colors.bgInput};
-  border: 1px solid ${({ $error, theme }) =>
-    $error ? theme.colors.error : theme.colors.borderDefault};
+  border: 1px solid ${({ $error, theme }) => $error ? theme.colors.error : theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.md};
   color: ${({ theme }) => theme.colors.textPrimary};
   font-size: ${({ theme }) => theme.typography.textBase};
@@ -140,9 +223,6 @@ export const Textarea = styled.textarea`
   }
 `;
 
-/**
- * 글자 수 카운터 행 — 오른쪽 정렬.
- */
 export const CharCount = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -153,26 +233,31 @@ export const CharCount = styled.div`
   }
 `;
 
-/**
- * 필드별 에러 메시지.
- */
 export const ErrorMsg = styled.span`
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.error};
 `;
 
-/**
- * 버튼 영역 — 오른쪽 정렬.
- */
+/* ── 버튼 영역 ── */
+
 export const Actions = styled.div`
   display: flex;
   justify-content: flex-end;
   gap: ${({ theme }) => theme.spacing.md};
 `;
 
-/**
- * 폼 버튼 기본 스타일.
- */
+export const DraftDot = styled.span`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.textMuted};
+  display: inline-block;
+  animation: ${pulse} 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+`;
+
+/* ── 폼 버튼 기본 ── */
+
 const BtnBase = styled.button`
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.xl};
   border-radius: ${({ theme }) => theme.radius.md};
@@ -183,9 +268,6 @@ const BtnBase = styled.button`
   border: none;
 `;
 
-/**
- * 취소 버튼 — 투명 배경, 테두리.
- */
 export const CancelBtn = styled(BtnBase)`
   background-color: transparent;
   color: ${({ theme }) => theme.colors.textSecondary};
@@ -197,9 +279,6 @@ export const CancelBtn = styled(BtnBase)`
   }
 `;
 
-/**
- * 제출 버튼 — gradient 배경, hover 시 glow + translateY.
- */
 export const SubmitBtn = styled(BtnBase)`
   background: ${({ theme }) => theme.gradients.primary};
   color: white;
@@ -214,6 +293,8 @@ export const SubmitBtn = styled(BtnBase)`
     cursor: not-allowed;
   }
 `;
+
+/* ── 이미지 첨부 ── */
 
 export const ImagePreviewList = styled.div`
   display: flex;

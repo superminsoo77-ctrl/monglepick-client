@@ -3,17 +3,14 @@
  *
  * 제목, 카테고리, 내용, 이미지 첨부를 입력받아 게시글을 생성한다.
  *
- * 이미지 업로드 흐름:
- *   1. 사용자가 이미지 선택
- *   2. 폼 제출 시 /api/v1/images/upload 로 먼저 업로드
- *   3. 반환된 URL 목록을 게시글 데이터에 포함하여 전송
- *
- * 로컬: http://localhost:8080/images/userId/파일명.jpg
- * 서버: http://210.109.15.187/images/userId/파일명.jpg (UPLOAD_URL_PREFIX 환경변수)
- * 추후 S3 전환 시 URL 형식만 바뀌고 프론트 코드는 그대로 유지
+ * 임시저장:
+ *   - 편집 모드(initialData 있음)에서는 비활성.
+ *   - 입력 후 3초 디바운스로 localStorage에 자동 저장.
+ *   - 폼 진입 시 기존 draft가 있으면 복원 배너를 표시한다.
+ *   - 등록/수정 완료 시 draft를 삭제한다.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { validatePostTitle, validateContent } from '../../../shared/utils/validators';
 import { uploadImages } from '../api/communityApi';
 import * as S from './PostForm.styled';
@@ -26,17 +23,94 @@ const CATEGORY_OPTIONS = [
 ];
 
 const MAX_IMAGE_COUNT = 5;
+const DRAFT_KEY = 'community_post_draft';
+
+function formatSavedAt(date) {
+  if (!date) return '';
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 10) return '방금 저장됨';
+  if (diff < 60) return `${diff}초 전 저장됨`;
+  const mins = Math.floor(diff / 60);
+  return `${mins}분 전 저장됨`;
+}
 
 export default function PostForm({ onSubmit, initialData, isSubmitting = false, onCancel }) {
-  const [title, setTitle] = useState(() => initialData?.title ?? '');
-  const [content, setContent] = useState(() => initialData?.content ?? '');
+  const isEditMode = !!initialData;
+
+  const [title, setTitle]       = useState(() => initialData?.title ?? '');
+  const [content, setContent]   = useState(() => initialData?.content ?? '');
   const [category, setCategory] = useState(() => initialData?.category ?? 'FREE');
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]     = useState({});
 
   // 이미지 관련 상태
-  const [imageFiles, setImageFiles] = useState([]);       // 선택한 File 객체 목록
-  const [imagePreviews, setImagePreviews] = useState([]); // 미리보기 URL 목록
-  const [isUploading, setIsUploading] = useState(false);  // 업로드 중 여부
+  const [imageFiles, setImageFiles]       = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [isUploading, setIsUploading]     = useState(false);
+
+  // 임시저장 관련 상태
+  const [draftStatus, setDraftStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+  const [savedAt, setSavedAt]         = useState(null);
+  const [showBanner, setShowBanner]   = useState(false);
+  const saveTimerRef = useRef(null);
+  const idleTimerRef = useRef(null);
+
+  // 마운트 시 기존 draft 확인
+  useEffect(() => {
+    if (isEditMode) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.title?.trim() || parsed.content?.trim()) {
+        setShowBanner(true);
+      }
+    } catch {}
+  }, [isEditMode]);
+
+  // 3초 디바운스 자동 저장
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!title && !content) return;
+
+    clearTimeout(saveTimerRef.current);
+    clearTimeout(idleTimerRef.current);
+    setDraftStatus('saving');
+
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ title, content, category, savedAt: new Date().toISOString() }),
+        );
+        setSavedAt(new Date());
+        setDraftStatus('saved');
+      } catch {}
+      idleTimerRef.current = setTimeout(() => setDraftStatus('idle'), 2000);
+    }, 3000);
+
+    return () => {
+      clearTimeout(saveTimerRef.current);
+      clearTimeout(idleTimerRef.current);
+    };
+  }, [title, content, category, isEditMode]);
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.title    !== undefined) setTitle(parsed.title);
+      if (parsed.content  !== undefined) setContent(parsed.content);
+      if (parsed.category !== undefined) setCategory(parsed.category);
+      if (parsed.savedAt) setSavedAt(new Date(parsed.savedAt));
+    } catch {}
+    setShowBanner(false);
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setShowBanner(false);
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -48,22 +122,18 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
     return Object.keys(newErrors).length === 0;
   };
 
-  // 이미지 선택 핸들러
   const handleImageChange = (e) => {
     const selected = Array.from(e.target.files);
     const combined = [...imageFiles, ...selected];
-
     if (combined.length > MAX_IMAGE_COUNT) {
       alert(`이미지는 최대 ${MAX_IMAGE_COUNT}장까지 첨부 가능합니다.`);
       return;
     }
-
     setImageFiles(combined);
     setImagePreviews(combined.map((f) => URL.createObjectURL(f)));
-    e.target.value = ''; // 같은 파일 재선택 가능하도록 초기화
+    e.target.value = '';
   };
 
-  // 이미지 제거 핸들러
   const handleImageRemove = (index) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
@@ -74,15 +144,11 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
     if (!validateForm()) return;
 
     let imageUrls = [];
-
-    // 이미지가 있으면 먼저 업로드 후 URL 수집
     if (imageFiles.length > 0) {
       setIsUploading(true);
       try {
         imageUrls = await uploadImages(imageFiles);
       } catch {
-        // 업로드 오류 원인은 uploadImages 내부 로거가 기록하므로 여기서 err 객체는 무시.
-        // 사용자에게는 공통 안내만 노출하고 폼 제출을 중단한다.
         alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
         setIsUploading(false);
         return;
@@ -91,11 +157,39 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
       }
     }
 
+    localStorage.removeItem(DRAFT_KEY);
     onSubmit({ title: title.trim(), content: content.trim(), category, imageUrls });
   };
 
   return (
     <S.Wrapper onSubmit={handleSubmit} noValidate>
+
+      {/* 임시저장 상태 인디케이터 — 상단 */}
+      {!isEditMode && (draftStatus !== 'idle' || savedAt) && (
+        <S.DraftStatusBar>
+          {draftStatus === 'saving' && (
+            <><S.DraftDot /><span>저장 중...</span></>
+          )}
+          {draftStatus === 'saved' && <span>자동저장 완료</span>}
+          {draftStatus === 'idle' && savedAt && <span>{formatSavedAt(savedAt)}</span>}
+        </S.DraftStatusBar>
+      )}
+
+      {/* 임시저장 복원 배너 */}
+      {showBanner && (
+        <S.DraftBanner>
+          <S.DraftBannerBody>
+            <S.DraftBannerTitle>이전에 작성 중인 글이 있어요</S.DraftBannerTitle>
+            <S.DraftBannerSub>임시저장된 내용을 불러올까요?</S.DraftBannerSub>
+            <S.DraftBannerBtns>
+              <S.DraftRestoreBtn type="button" onClick={restoreDraft}>불러오기</S.DraftRestoreBtn>
+              <S.DraftDiscardBtn type="button" onClick={discardDraft}>버리기</S.DraftDiscardBtn>
+            </S.DraftBannerBtns>
+          </S.DraftBannerBody>
+          <S.DraftBannerClose type="button" onClick={() => setShowBanner(false)}>✕</S.DraftBannerClose>
+        </S.DraftBanner>
+      )}
+
       {/* 카테고리 선택 */}
       <S.Field>
         <S.Label>카테고리</S.Label>
@@ -152,8 +246,6 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
       {/* 이미지 첨부 */}
       <S.Field>
         <S.Label>이미지 첨부 ({imageFiles.length}/{MAX_IMAGE_COUNT})</S.Label>
-
-        {/* 미리보기 */}
         {imagePreviews.length > 0 && (
           <S.ImagePreviewList>
             {imagePreviews.map((src, i) => (
@@ -170,8 +262,6 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
             ))}
           </S.ImagePreviewList>
         )}
-
-        {/* 파일 선택 버튼 */}
         {imageFiles.length < MAX_IMAGE_COUNT && (
           <S.ImageUploadLabel>
             📷 이미지 추가
@@ -199,13 +289,11 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
             취소
           </S.CancelBtn>
         )}
-        <S.SubmitBtn
-          type="submit"
-          disabled={isSubmitting || isUploading}
-        >
+        <S.SubmitBtn type="submit" disabled={isSubmitting || isUploading}>
           {isSubmitting ? '등록 중...' : (initialData ? '수정하기' : '등록하기')}
         </S.SubmitBtn>
       </S.Actions>
+
     </S.Wrapper>
   );
 }
