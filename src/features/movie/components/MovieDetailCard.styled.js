@@ -248,15 +248,18 @@ export const Label = styled.span`
   color: ${({ theme }) => theme.colors.textMuted};
 `;
 
-/* ── 액션 버튼 영역 — outline → hover gradient 채움 + glow ── */
+/* ── 액션 버튼 영역 — outline → hover gradient 채움 + glow ──
+ * flex-wrap 을 기본으로 활성화해 좁은 컨테이너에서도 버튼이 축소되지 않고
+ * 다음 줄로 넘어가게 한다. 태블릿 이하에선 가운데 정렬만 추가.
+ */
 export const Actions = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: ${({ theme }) => theme.spacing.md};
   margin-top: ${({ theme }) => theme.spacing.sm};
 
   ${media.tablet} {
     justify-content: center;
-    flex-wrap: wrap;
   }
 `;
 
@@ -271,6 +274,9 @@ export const Btn = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
   color: ${({ theme }) => theme.colors.textSecondary};
   background-color: transparent;
+  /* 한글 라벨이 세로로 한 글자씩 쪼개지는 것을 방지 (flex 축소 방어) */
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     background: ${({ theme }) => theme.gradients.primary};
