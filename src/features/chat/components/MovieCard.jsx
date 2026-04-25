@@ -21,6 +21,7 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import { useModal } from '../../../shared/components/Modal';
 import { useRewardToast } from '../../../shared/components/RewardToast';
 import { createReview } from '../../../features/review/api/reviewApi';
+import { toggleDismissed } from '../../../features/recommendation/api/recommendationApi';
 import PostWatchFeedback from '../../../features/movie/components/PostWatchFeedback';
 
 /* styled-components 기반 스타일 — theme 토큰으로 다크/라이트 모드 자동 대응 */
@@ -220,6 +221,10 @@ export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cance
     certification,
     trailer_url,
     explanation,
+    /* P2 (2026-04-24): Backend recommendation_log PK — Agent SSE movie_card payload 로 전달.
+     * 로그인 사용자 + DB 영화일 때만 채워지며, 비로그인/외부 검색 결과는 null.
+     * "관심 없음" 버튼이 이 FK 로 POST /api/v1/recommendations/{id}/dismiss 호출. */
+    recommendation_log_id: recommendationLogId,
   } = movie;
 
   /* 2026-04-23 후속: Agent external_search_node 가 생성한 영화 식별.
@@ -311,10 +316,26 @@ export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cance
     setShowTrailer(true);
   };
 
-  /* Phase 5-1: "관심 없음" 클릭 핸들러 — fade-out + 이벤트 전송 (useCallback 제거: React Compiler 위임) */
-  const handleNotInterested = () => {
+  /**
+   * "관심 없음" 클릭 핸들러 (P2, 2026-04-24).
+   *
+   * UX: 즉시 fade-out (낙관적 처리) + trackEvent.
+   * Backend: recommendationLogId 가 채워진 경우(로그인 + DB 영화) 만 toggleDismissed 호출.
+   *   → recommendation_impact.dismissed=true → Chat Agent context_loader 가 다음 추천에서 자동 제외.
+   * 실패 시 UX 는 그대로 유지 (사용자에게 에러 노출 안 함). 다음 턴 추천에서 다시 노출되면
+   * 사용자가 재시도 가능.
+   */
+  const handleNotInterested = async () => {
     setDismissed(true);
     trackEvent('not_interested', movie.id, { rank, source: 'chat' });
+
+    if (!recommendationLogId) return;
+    try {
+      await toggleDismissed(recommendationLogId);
+    } catch (err) {
+      /* 백엔드 동기화 실패 — 다음 추천에서 재노출될 수 있으나 UX 는 비차단 */
+      console.warn('관심없음 동기화 실패', { recommendationLogId, err });
+    }
   };
 
   /**

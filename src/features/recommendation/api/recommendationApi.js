@@ -49,6 +49,20 @@ export async function toggleWatched(recommendationId) {
 }
 
 /**
+ * 추천 영화 "관심 없음" 토글 (P2, 2026-04-24).
+ *
+ * <p>true 로 전환되면 Backend RecommendationImpact.dismissed=true 가 되어
+ * Chat Agent 의 다음 추천 시 exclude_ids 에 자동 병합 → 같은 영화 재추천 차단.</p>
+ *
+ * @param {string|number} recommendationId - 추천 로그 ID (recommendationLogId)
+ * @returns {Promise<{dismissed: boolean}>}
+ */
+export async function toggleDismissed(recommendationId) {
+  requireAuth();
+  return backendApi.post(RECOMMENDATION_ENDPOINTS.DISMISS(recommendationId));
+}
+
+/**
  * 별점(1~5) 을 Backend 가 요구하는 feedbackType enum 으로 매핑한다.
  *
  * QA #172 (2026-04-23) 근본 해결 (후속): Backend `RecommendationFeedbackRequest` 에

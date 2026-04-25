@@ -198,7 +198,21 @@ export default function SupportPage() {
     try {
       const categoryValue = CATEGORY_FILTERS[faqCategoryIdx]?.value;
       const data = await getFaqs(categoryValue);
-      const list = Array.isArray(data) ? data : [];
+      /*
+       * 응답 형태 방어 (2026-04-24):
+       * Backend 는 List<FaqResponse> 를 직접 반환하지만, 운영 중 다음 케이스가 관측됨:
+       *   - ApiResponse 래핑 변경으로 {content: [...]} 페이징 형태로 전달되는 경우
+       *   - axios 인터셉터 경로 차이로 data 가 {success, data} 형태로 한번 더 감싸지는 경우
+       *   - 네트워크/프록시 오류 시 null/undefined/빈 문자열 반환
+       * 모든 케이스에서 안전하게 리스트를 추출하고, 실패 시 빈 배열로 fallback 한다.
+       */
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.content)
+          ? data.content
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
       setFaqs(list);
 
       /*
@@ -242,7 +256,15 @@ export default function SupportPage() {
     try {
       const categoryValue = CATEGORY_FILTERS[helpCategoryIdx]?.value;
       const data = await getHelpArticles(categoryValue);
-      setHelpArticles(Array.isArray(data) ? data : []);
+      /* loadFaqs 와 동일 응답 형태 방어 (2026-04-24): 리스트/페이징/래핑/null 모두 대응 */
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.content)
+          ? data.content
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setHelpArticles(list);
     } catch (err) {
       console.warn('도움말 조회 실패, 플레이스홀더 데이터 사용:', err.message);
       const categoryValue = CATEGORY_FILTERS[helpCategoryIdx]?.value;

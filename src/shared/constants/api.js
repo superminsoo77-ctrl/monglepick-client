@@ -409,6 +409,8 @@ export const RECOMMENDATION_ENDPOINTS = {
   WATCHED: (id) => `${API_VERSION}/recommendations/${id}/watched`,
   /** 만족도 피드백 - POST (path: recommendationId, body: {rating, comment}) */
   FEEDBACK: (id) => `${API_VERSION}/recommendations/${id}/feedback`,
+  /** 관심없음 토글 - POST (path: recommendationId) (P2, 2026-04-24) */
+  DISMISS: (id) => `${API_VERSION}/recommendations/${id}/dismiss`,
 };
 
 /**

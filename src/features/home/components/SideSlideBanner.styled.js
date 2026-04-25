@@ -1,25 +1,31 @@
 /**
- * SideSlideBanner styled-components — 2026-04-24 (placement v4).
+ * SideSlideBanner styled-components — 2026-04-24 (placement v6, 반응형 가림 방지).
  *
  * 좌측상단 플로팅 슬라이드 배너 위젯. 홈(/home) 어느 섹션을 보고 있어도
- * 시야 안에 항상 노출되도록 `position: fixed` 로 viewport 에 고정한다.
+ * 시야 안에 항상 노출되도록 HomePage Wrapper 기준 `position: absolute` 로 앵커링.
  *
  * 디자인 원칙
  *   - 작고 이쁘게 (220×140) — 메인 콘텐츠를 가리지 않는 크기
  *   - glass-card 톤 + primary glow hover — HomePage 전체 톤과 통일
- *   - 모바일(≤480px)에서만 숨김 — 데스크톱/태블릿/모바일 대부분 노출
- *   - Hero 의 `overflow: hidden` 영향을 받지 않도록 Wrapper 바깥에서 렌더
+ *   - 모바일(≤480px)에서만 숨김 — 데스크톱/태블릿에서는 반응형 재배치로 노출 유지
+ *   - Hero 의 `overflow: hidden` 영향을 받지 않도록 Wrapper 레벨에 배치
  *   - `z-index` 99 — 헤더 TopLoadingBar(z:100) 보다 낮게, 일반 컨텐츠보다 위
  *
- * 2026-04-24 placement v4 변경 사항 (위치 재배치):
- *   - 기존 우측하단 플로팅 → 좌측상단 헤더 아래로 이동.
- *     사유: 우측하단이 SupportChatbotWidget(FAB) 와 시선·영역이 계속 겹쳤고,
- *          유저가 랜딩 진입 즉시 프로모션 배너를 자연스럽게 인지하도록
- *          헤더 바로 아래의 "눈에 가장 먼저 들어오는" 위치로 옮김.
- *   - `top`: headerHeight(64px) + 16px 여백 = 80px. 헤더(sticky) 바로 아래에 붙는다.
- *   - `left`: 20px (태블릿 12px) — 로고 라인과 시각적으로 근접하되 겹치지 않음.
- *   - Root 컨테이너에 `max-width` 가 있는 HomePage Wrapper 안이 아니라
- *     viewport 기준 fixed 이므로 좌측 끝에서 일정 거리를 띄우는 쪽이 자연스러움.
+ * 2026-04-24 placement v6 — 검색창 가림 방지 반응형 재배치:
+ *   기존(v5)은 viewport 전 구간에서 `top: 16px` 고정이었는데, HomeSearch 섹션은
+ *   `max-width: contentMaxWidth(1200)` + `margin: 0 auto` 로 가운데 정렬되므로
+ *   viewport 가 1680px 이하로 좁아지면 배너 우측단(x=240) 과 검색창 좌측단이
+ *   가로로 겹쳐 검색 UI 를 가리는 결함이 있었다.
+ *   (overlap 임계: (viewport − 1200)/2 + 24 ≤ 240  →  viewport ≤ 1632)
+ *
+ *   v6 는 다음 3단 구조로 겹침을 제거한다.
+ *     ① viewport > 1680px : 기존 좌상단 플로팅 유지 (검색창은 중앙에서 충분히 안쪽)
+ *     ② 481~1680px        : 배너를 검색창 아래(top ≈ 120px)로 내려 overlap 회피
+ *     ③ ≤480px (모바일)    : 기존과 동일하게 숨김
+ *
+ *   top 오프셋(120px)은 HomeSearch 섹션 높이(대략 padding lg 48px + form 56~60px
+ *   ≈ 104~108px) 위로 12~16px 여유를 둔 값이다. 태블릿(≤768)은 카드 크기를 축소
+ *   하면서 좌측 패딩도 12px 로 조였기 때문에 top 도 104px 로 살짝 올린다.
  */
 
 import styled, { keyframes } from 'styled-components';
@@ -33,7 +39,7 @@ const fadeSlide = keyframes`
 `;
 
 /**
- * 배너 위젯 전체 프레임 — 페이지 좌측상단 앵커 (2026-04-24 placement v5).
+ * 배너 위젯 전체 프레임 — 페이지 좌측상단 앵커 + 반응형 재배치 (2026-04-24 placement v6).
  *
  * 이력:
  *   - v2(2026-04-14) `position: absolute`(Hero 내부) → `position: fixed`(viewport),
@@ -45,13 +51,18 @@ const fadeSlide = keyframes`
  *                    좌측상단에 한 번 앵커링. 아래로 스크롤하면 배너도 같이
  *                    위로 밀려 올라가서 자연스럽게 사라진다 ("고정 위치" 요청 반영).
  *                    Wrapper 에 `position: relative` 가 추가되어 기준점으로 작동.
+ *   - v6(2026-04-24) 반응형 가림 방지. viewport ≤ 1680px 부터 HomeSearch(중앙 정렬,
+ *                    max-width 1200) 의 좌측단과 배너 우측단이 겹쳐 검색 UI 를
+ *                    가리던 문제를 제거. 좁은 화면에서는 배너를 검색창 아래
+ *                    (top: 120px) 로 내리고, 태블릿에서는 카드 크기와 top 을 동시 축소.
  */
 export const Frame = styled.div`
   position: absolute;
   /*
-   * Wrapper(HomePage 루트, position:relative) 좌측상단 기준 오프셋.
-   * Wrapper 는 Header 바로 아래에서 시작하므로 top:16px 이면 "헤더 바로 밑 + 약간 여유".
-   * fixed 가 아니므로 스크롤 시 함께 밀려 올라가 사라진다.
+   * 기본(넓은 데스크톱, viewport > 1680px) 앵커 위치.
+   * HomeSearch 가 (viewport-1200)/2 + 24 지점에서 시작하므로 viewport > 1680 이면
+   * 배너 우측단(x=240) 과 검색창 좌측단 사이에 여유가 생긴다.
+   * Wrapper 기준 absolute 이므로 스크롤 시 함께 밀려 올라가 자연스럽게 사라진다.
    */
   top: 16px;
   left: 20px;
@@ -74,11 +85,21 @@ export const Frame = styled.div`
     transform: translateY(-2px);
   }
 
-  /* 태블릿(≤768px) 에서는 조금 더 작게 + 좌측 여백 축소 */
+  /*
+   * 검색창 가림 방지 (v6): viewport ≤ 1680px 구간은 HomeSearch 섹션이 content
+   * 영역을 거의 꽉 채워 배너가 입력창·버튼과 가로로 겹친다. 이 구간에서는
+   * 배너를 검색창 바로 아래로 내려 가림 없이 Hero 상단 좌측에 자연스럽게 얹힌다.
+   * top 120px = HomeSearch 섹션 높이(≈ 108px) + 12px 여유.
+   */
+  @media (max-width: 1680px) {
+    top: 120px;
+  }
+
+  /* 태블릿(≤768px) 에서는 조금 더 작게 + 좌측 여백 축소 + top 도 살짝 위로 */
   ${media.tablet} {
     width: 180px;
     height: 116px;
-    top: 12px;
+    top: 104px;
     left: 12px;
   }
 
