@@ -156,17 +156,94 @@ export const FormOverlay = styled.div`
   padding: 20px;
 `;
 
-/** 모달 폼 패널 */
+/** 모달 폼 패널 — $wide: 영화 추가 섹션 포함 시 너비 확장 */
 export const FormPanel = styled.div`
   background: ${({ theme }) => theme.colors.bgCard || theme.colors.bgSecondary};
   border-radius: ${({ theme }) => theme.radius.xl};
   padding: 28px 24px;
   width: 100%;
-  max-width: 440px;
+  max-width: ${({ $wide }) => ($wide ? '640px' : '440px')};
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.borderDefault};
+    border-radius: 4px;
+  }
+`;
+
+/** 생성 폼 내 영화 추가 섹션 구분선 */
+export const FormDivider = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textXs};
+
+  &::before, &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: ${({ theme }) => theme.colors.borderDefault};
+  }
+`;
+
+/** 선택된 영화 칩 목록 (가로 스크롤) */
+export const FormMovieChipList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 32px;
+`;
+
+/** 선택된 영화 칩 */
+export const FormMovieChip = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.primary}20;
+  border: 1px solid ${({ theme }) => theme.colors.primary}40;
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  max-width: 160px;
+`;
+
+/** 칩 제목 */
+export const FormMovieChipTitle = styled.span`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+/** 칩 제거 버튼 */
+export const FormMovieChipRemove = styled.button`
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: ${({ theme }) => theme.colors.primary}30;
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.error};
+    color: #fff;
+  }
 `;
 
 /** 폼 제목 */
