@@ -26,7 +26,7 @@ import {
   addMovieToPlaylist,
 } from '../api/playlistApi';
 import { searchMoviesByKeyword } from '../../movie/api/movieApi';
-import { sharePlaylist } from '../../community/api/communityApi';
+import { sharePlaylist, deletePlaylistPost } from '../../community/api/communityApi';
 import * as S from './PlaylistPage.styled';
 
 /** TMDB 포스터 URL */
@@ -56,6 +56,16 @@ export default function PlaylistPage() {
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* ── 생성 폼 공개 여부 ── */
+  const [formIsPublic, setFormIsPublic] = useState(false);
+
+  /* ── 생성 폼 영화 선택 상태 ── */
+  const [formMovies, setFormMovies] = useState([]);       // 선택된 영화 배열
+  const [formMovieQuery, setFormMovieQuery] = useState('');
+  const [formSearchResults, setFormSearchResults] = useState([]);
+  const [formIsSearching, setFormIsSearching] = useState(false);
+  const formSearchTimerRef = useRef(null);
 
   /* ── 케밥 메뉴 상태 ── */
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -119,44 +129,64 @@ export default function PlaylistPage() {
     return () => document.removeEventListener('click', handler);
   }, [openMenuId]);
 
-  /** 공유 확인 후 바로 커뮤니티 게시 */
-  const handleShare = async (playlist, e) => {
+  /** 공개/비공개 토글 — 공개: 커뮤니티 게시 / 비공개: 커뮤니티 게시글 삭제 */
+  const handleToggleShare = async (playlist, e) => {
     e.stopPropagation();
     setOpenMenuId(null);
 
     if (playlist.isPublic) {
-      showAlert({ title: '알림', message: '이미 공유된 플레이리스트예요.', type: 'info' });
-      return;
-    }
-
-    const confirmed = await showConfirm({
-      title: '플레이리스트 공유',
-      message: `'${playlist.playlistName}'을(를) 커뮤니티에 공유할까요?`,
-      confirmLabel: '공유',
-    });
-    if (!confirmed) return;
-
-    try {
-      await updatePlaylist(playlist.playlistId, {
-        title: playlist.playlistName,
-        description: playlist.description || '',
-        isPublic: true,
+      /* 공개 → 비공개 */
+      const confirmed = await showConfirm({
+        title: '비공개로 전환',
+        message: `'${playlist.playlistName}'을(를) 비공개로 전환할까요?\n커뮤니티 공유도 함께 해제됩니다.`,
+        confirmLabel: '비공개로 전환',
       });
-      setPlaylists((prev) =>
-        prev.map((p) => p.playlistId === playlist.playlistId ? { ...p, isPublic: true } : p)
-      );
+      if (!confirmed) return;
+
       try {
-        await sharePlaylist({
+        await updatePlaylist(playlist.playlistId, {
           title: playlist.playlistName,
-          content: `${playlist.playlistName} 플레이리스트를 공유합니다.`,
-          playlistId: playlist.playlistId,
+          description: playlist.description || '',
+          isPublic: false,
         });
-      } catch {
-        /* 커뮤니티 게시 실패 — DB는 이미 공개 상태이므로 롤백하지 않음 */
+        /* 커뮤니티 게시글 삭제 (best-effort) */
+        try { await deletePlaylistPost(playlist.playlistId); } catch { /* 이미 삭제됐거나 없으면 무시 */ }
+        setPlaylists((prev) =>
+          prev.map((p) => p.playlistId === playlist.playlistId ? { ...p, isPublic: false } : p)
+        );
+        showAlert({ title: '완료', message: '비공개로 전환됐어요.', type: 'success' });
+      } catch (err) {
+        showAlert({ title: '오류', message: err?.message || '전환에 실패했습니다.', type: 'error' });
       }
-      showAlert({ title: '공유 완료', message: '커뮤니티에 공유됐어요!', type: 'success' });
-    } catch (err) {
-      showAlert({ title: '오류', message: err?.message || '공유에 실패했습니다.', type: 'error' });
+    } else {
+      /* 비공개 → 공개 */
+      const confirmed = await showConfirm({
+        title: '플레이리스트 공유',
+        message: `'${playlist.playlistName}'을(를) 커뮤니티에 공유할까요?`,
+        confirmLabel: '공유',
+      });
+      if (!confirmed) return;
+
+      try {
+        await updatePlaylist(playlist.playlistId, {
+          title: playlist.playlistName,
+          description: playlist.description || '',
+          isPublic: true,
+        });
+        setPlaylists((prev) =>
+          prev.map((p) => p.playlistId === playlist.playlistId ? { ...p, isPublic: true } : p)
+        );
+        try {
+          await sharePlaylist({
+            title: playlist.playlistName,
+            content: `${playlist.playlistName} 플레이리스트를 공유합니다.`,
+            playlistId: playlist.playlistId,
+          });
+        } catch { /* 커뮤니티 게시 실패 — isPublic은 이미 true이므로 롤백 안 함 */ }
+        showAlert({ title: '공유 완료', message: '커뮤니티에 공유됐어요!', type: 'success' });
+      } catch (err) {
+        showAlert({ title: '오류', message: err?.message || '공유에 실패했습니다.', type: 'error' });
+      }
     }
   };
 
@@ -167,7 +197,36 @@ export default function PlaylistPage() {
     setEditTarget(null);
     setFormTitle('');
     setFormDesc('');
+    setFormIsPublic(false);
+    setFormMovies([]);
+    setFormMovieQuery('');
+    setFormSearchResults([]);
     setShowForm(true);
+  };
+
+  /** 생성 폼 영화 검색 (디바운스 300ms) */
+  const handleFormMovieQueryChange = (e) => {
+    const q = e.target.value;
+    setFormMovieQuery(q);
+    clearTimeout(formSearchTimerRef.current);
+    if (!q.trim()) { setFormSearchResults([]); return; }
+    formSearchTimerRef.current = setTimeout(async () => {
+      setFormIsSearching(true);
+      try {
+        const res = await searchMoviesByKeyword(q.trim(), 12);
+        setFormSearchResults(res || []);
+      } catch { /* ignore */ } finally {
+        setFormIsSearching(false);
+      }
+    }, 300);
+  };
+
+  /** 생성 폼에서 영화 선택 토글 */
+  const handleFormMovieToggle = (movie) => {
+    setFormMovies((prev) => {
+      const exists = prev.some((m) => m.id === movie.id);
+      return exists ? prev.filter((m) => m.id !== movie.id) : [...prev, movie];
+    });
   };
 
   /** 수정 폼 열기 */
@@ -190,12 +249,30 @@ export default function PlaylistPage() {
           description: formDesc.trim(),
           isPublic: editTarget.isPublic ?? false,
         });
+        setShowForm(false);
+        loadPlaylists();
       } else {
-        /* 생성 시 기본값: 비공개 */
-        await createPlaylist({ title: formTitle.trim(), description: formDesc.trim(), isPublic: false });
+        /* 생성 후 선택한 영화 일괄 추가 → 상세 페이지로 이동 */
+        const created = await createPlaylist({ title: formTitle.trim(), description: formDesc.trim(), isPublic: formIsPublic });
+        const newId = created?.playlistId ?? created?.id ?? created?.data?.playlistId;
+        if (newId && formMovies.length > 0) {
+          await Promise.allSettled(
+            formMovies.map((m) => addMovieToPlaylist(newId, String(m.id)))
+          );
+        }
+        /* 공개로 생성했다면 커뮤니티에도 게시 (best-effort) */
+        if (newId && formIsPublic) {
+          try {
+            await sharePlaylist({ title: formTitle.trim(), content: `${formTitle.trim()} 플레이리스트를 공유합니다.`, playlistId: newId });
+          } catch { /* 커뮤니티 게시 실패는 무시 */ }
+        }
+        setShowForm(false);
+        if (newId) {
+          navigate(buildPath(ROUTES.ACCOUNT_PLAYLIST_DETAIL, { id: newId }));
+        } else {
+          loadPlaylists();
+        }
       }
-      setShowForm(false);
-      loadPlaylists();
     } catch (err) {
       showAlert({ title: '오류', message: err.message || '저장에 실패했습니다.', type: 'error' });
     } finally {
@@ -472,8 +549,8 @@ export default function PlaylistPage() {
                         ✏️ 수정
                       </S.DropdownItem>
                       <S.DropdownDivider />
-                      <S.DropdownItem onClick={(e) => handleShare(pl, e)}>
-                        🔗 공유
+                      <S.DropdownItem onClick={(e) => handleToggleShare(pl, e)}>
+                        {pl.isPublic ? '🔒 비공개로 전환' : '🔗 공유'}
                       </S.DropdownItem>
                       <S.DropdownDivider />
                       <S.DropdownItem $danger onClick={(e) => handleDelete(pl, e)}>
@@ -509,7 +586,7 @@ export default function PlaylistPage() {
       {/* 생성/수정 폼 모달 */}
       {showForm && createPortal(
         <S.FormOverlay onClick={() => setShowForm(false)}>
-          <S.FormPanel onClick={(e) => e.stopPropagation()}>
+          <S.FormPanel $wide={!editTarget} onClick={(e) => e.stopPropagation()}>
             <S.FormTitle>{editTarget ? '플레이리스트 수정' : '새 플레이리스트'}</S.FormTitle>
             <S.FormInput
               placeholder="제목을 입력하세요"
@@ -524,6 +601,82 @@ export default function PlaylistPage() {
               onChange={(e) => setFormDesc(e.target.value)}
               maxLength={200}
             />
+
+            {/* 생성 모드에서만 공개/비공개 토글 + 영화 추가 섹션 표시 */}
+            {!editTarget && (
+              <>
+                <S.ToggleRow>
+                  <S.ToggleLabel>{formIsPublic ? '🌐 공개 — 커뮤니티에 공유됩니다' : '🔒 비공개'}</S.ToggleLabel>
+                  <S.ToggleSwitch
+                    type="button"
+                    $on={formIsPublic}
+                    onClick={() => setFormIsPublic((v) => !v)}
+                    aria-label="공개/비공개 전환"
+                  />
+                </S.ToggleRow>
+
+                <S.FormDivider>영화 추가 (선택)</S.FormDivider>
+
+                {/* 선택된 영화 칩 목록 */}
+                {formMovies.length > 0 && (
+                  <S.FormMovieChipList>
+                    {formMovies.map((m) => (
+                      <S.FormMovieChip key={m.id}>
+                        <S.FormMovieChipTitle>{m.title}</S.FormMovieChipTitle>
+                        <S.FormMovieChipRemove
+                          type="button"
+                          onClick={() => handleFormMovieToggle(m)}
+                          title="제거"
+                        >
+                          ×
+                        </S.FormMovieChipRemove>
+                      </S.FormMovieChip>
+                    ))}
+                  </S.FormMovieChipList>
+                )}
+
+                {/* 영화 검색 입력 */}
+                <S.FormInput
+                  placeholder="영화 제목으로 검색"
+                  value={formMovieQuery}
+                  onChange={handleFormMovieQueryChange}
+                />
+
+                {/* 검색 결과 */}
+                {formIsSearching && (
+                  <S.SearchHint>검색 중...</S.SearchHint>
+                )}
+                {!formIsSearching && formSearchResults.length > 0 && (
+                  <S.SearchResultGrid>
+                    {formSearchResults.map((movie) => {
+                      const isSelected = formMovies.some((m) => m.id === movie.id);
+                      return (
+                        <S.SearchMovieCard
+                          key={movie.id}
+                          className={isSelected ? 'added' : ''}
+                          onClick={() => handleFormMovieToggle(movie)}
+                        >
+                          {isSelected && <S.AddedBadge>선택됨</S.AddedBadge>}
+                          {movie.posterUrl ? (
+                            <S.SearchMoviePoster src={movie.posterUrl} alt={movie.title} loading="lazy" />
+                          ) : (
+                            <S.SearchMoviePlaceholder>&#x1F3AC;</S.SearchMoviePlaceholder>
+                          )}
+                          <S.SearchMovieTitle>{movie.title}</S.SearchMovieTitle>
+                        </S.SearchMovieCard>
+                      );
+                    })}
+                  </S.SearchResultGrid>
+                )}
+                {!formIsSearching && formMovieQuery.trim() && formSearchResults.length === 0 && (
+                  <S.SearchHint>검색 결과가 없어요.</S.SearchHint>
+                )}
+                {!formMovieQuery.trim() && (
+                  <S.SearchHint>영화 제목을 입력하면 검색됩니다.</S.SearchHint>
+                )}
+              </>
+            )}
+
             <S.FormButtons>
               <S.FormBtn $variant="cancel" onClick={() => setShowForm(false)}>
                 취소
@@ -532,7 +685,13 @@ export default function PlaylistPage() {
                 onClick={handleFormSubmit}
                 disabled={!formTitle.trim() || isSubmitting}
               >
-                {isSubmitting ? '저장 중...' : editTarget ? '수정' : '생성'}
+                {isSubmitting
+                  ? '저장 중...'
+                  : editTarget
+                  ? '수정'
+                  : formMovies.length > 0
+                  ? `생성 (${formMovies.length}편 포함)`
+                  : '생성'}
               </S.FormBtn>
             </S.FormButtons>
           </S.FormPanel>
