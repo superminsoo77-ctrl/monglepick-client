@@ -642,32 +642,46 @@ export default function PlaylistPage() {
                   onChange={handleFormMovieQueryChange}
                 />
 
-                {/* 검색 결과 */}
-                {formIsSearching && (
-                  <S.SearchHint>검색 중...</S.SearchHint>
-                )}
+                {/* 검색 결과 — 리스트형 */}
+                {formIsSearching && <S.SearchHint>검색 중...</S.SearchHint>}
+
                 {!formIsSearching && formSearchResults.length > 0 && (
-                  <S.SearchResultGrid>
+                  <S.FormSearchList>
                     {formSearchResults.map((movie) => {
                       const isSelected = formMovies.some((m) => m.id === movie.id);
+                      const year = movie.release_year || movie.releaseYear || movie.year || null;
                       return (
-                        <S.SearchMovieCard
+                        <S.FormSearchItem
                           key={movie.id}
-                          className={isSelected ? 'added' : ''}
+                          $selected={isSelected}
                           onClick={() => handleFormMovieToggle(movie)}
                         >
-                          {isSelected && <S.AddedBadge>선택됨</S.AddedBadge>}
                           {movie.posterUrl ? (
-                            <S.SearchMoviePoster src={movie.posterUrl} alt={movie.title} loading="lazy" />
+                            <S.FormSearchPoster
+                              src={movie.posterUrl}
+                              alt={movie.title}
+                              loading="lazy"
+                            />
                           ) : (
-                            <S.SearchMoviePlaceholder>&#x1F3AC;</S.SearchMoviePlaceholder>
+                            <S.FormSearchPosterFallback>&#x1F3AC;</S.FormSearchPosterFallback>
                           )}
-                          <S.SearchMovieTitle>{movie.title}</S.SearchMovieTitle>
-                        </S.SearchMovieCard>
+                          <S.FormSearchInfo>
+                            <S.FormSearchTitle>{movie.title}</S.FormSearchTitle>
+                            {year && <S.FormSearchMeta>{year}년</S.FormSearchMeta>}
+                          </S.FormSearchInfo>
+                          <S.FormSearchBtn
+                            type="button"
+                            $selected={isSelected}
+                            onClick={(e) => { e.stopPropagation(); handleFormMovieToggle(movie); }}
+                          >
+                            {isSelected ? '✓ 선택됨' : '+ 추가'}
+                          </S.FormSearchBtn>
+                        </S.FormSearchItem>
                       );
                     })}
-                  </S.SearchResultGrid>
+                  </S.FormSearchList>
                 )}
+
                 {!formIsSearching && formMovieQuery.trim() && formSearchResults.length === 0 && (
                   <S.SearchHint>검색 결과가 없어요.</S.SearchHint>
                 )}

@@ -515,6 +515,27 @@ export const ROADMAP_ENDPOINTS = {
   MOVIE_REVIEW: (courseId, movieId) => `${API_VERSION}/roadmap/courses/${courseId}/movies/${movieId}/review`,
   /** 코스 최종 감상평 제출(POST) / 조회(GET) - path: courseId */
   FINAL_REVIEW: (courseId) => `${API_VERSION}/roadmap/courses/${courseId}/final-review`,
+  /**
+   * AI 검증 결과 업데이트 - POST (path: verificationId)
+   * 프론트엔드가 에이전트에서 받은 판정 결과를 Backend에 전달한다.
+   * body: { reviewStatus, similarityScore, matchedKeywords, confidence, rationale }
+   */
+  APPLY_AI_RESULT: (verificationId) => `${API_VERSION}/roadmap/courses/verifications/${verificationId}/ai-result`,
+};
+
+/**
+ * AI 리뷰 검증 에이전트 엔드포인트 (도장깨기 시청 인증).
+ *
+ * Agent 서비스(FastAPI :8000)에 직접 요청 — Nginx 프록시가 라우팅.
+ * 2026-04-24 구조 변경: Backend 내부 호출 → 프론트엔드 직접 호출로 전환.
+ */
+export const REVIEW_VERIFICATION_ENDPOINTS = {
+  /**
+   * 리뷰 검증 요청 - POST (X-Service-Key 없이 직접 호출)
+   * body: { verification_id, user_id, course_id, movie_id, review_text, movie_plot }
+   * 응답: { verification_id, similarity_score, matched_keywords, confidence, review_status, rationale }
+   */
+  VERIFY: `${API_VERSION}/admin/ai/review-verification/verify`,
 };
 
 /**

@@ -7,8 +7,8 @@
  * @module features/roadmap/api/roadmapApi
  */
 
-import { backendApi, requireAuth } from '../../../shared/api/axiosInstance';
-import { ROADMAP_ENDPOINTS } from '../../../shared/constants/api';
+import { backendApi, agentApi, requireAuth } from '../../../shared/api/axiosInstance';
+import { ROADMAP_ENDPOINTS, REVIEW_VERIFICATION_ENDPOINTS } from '../../../shared/constants/api';
 
 /**
  * 코스 목록 조회.
@@ -58,21 +58,76 @@ export async function startCourse(courseId) {
 }
 
 /**
- * 코스 내 영화 시청 완료 마킹 + AI 리뷰 검증 (단일 호출).
+ * 코스 내 영화 시청 완료 마킹 (리뷰 저장 + PENDING 상태로 인증 레코드 생성).
  *
- * 2026-04-22 리팩토링: 기존 3-step(Client → Backend → Agent → Backend) 플로우는
- * AI 우회 취약점(사용자가 AUTO_VERIFIED 결과를 위조해서 전달) 으로 제거되었다.
- * 이제 Backend 가 트랜잭션 내부에서 Agent 를 직접 호출하고 최종 판정을 반환한다.
+ * 2026-04-24 구조 변경: Backend가 에이전트를 직접 호출하던 방식에서
+ * 프론트엔드가 에이전트를 직접 호출하는 방식으로 전환.
+ * Backend는 리뷰/인증 레코드를 PENDING으로 저장하고 verificationId + moviePlot을 반환한다.
+ * 프론트엔드는 이 값으로 callReviewVerificationAgent()를 호출하여 AI 판정을 수행하고,
+ * 결과를 applyAiVerificationResult()로 Backend에 업데이트한다.
  *
  * @param {string|number} courseId
  * @param {string} movieId
  * @param {string} [review] - 도장깨기 인증 한마디 (선택)
- * @returns {Promise<CourseCompleteResponse>} 진행률 + AI 판정(reviewStatus/rationale/similarityScore/agentAvailable)
+ * @returns {Promise<CourseCompleteResponse>} 진행률 + verificationId + moviePlot (reviewStatus="PENDING")
  */
 export async function completeMovie(courseId, movieId, review) {
   requireAuth();
   const body = review ? { review } : {};
   return backendApi.post(ROADMAP_ENDPOINTS.COMPLETE_MOVIE(courseId, movieId), body);
+}
+
+/**
+ * AI 리뷰 검증 에이전트를 직접 호출한다.
+ *
+ * 2026-04-24 신규: 프론트엔드가 에이전트(FastAPI)를 직접 호출하는 방식.
+ * Nginx가 /api/v1/admin/ai/review-verification/verify → ai_agent 서비스로 라우팅한다.
+ *
+ * @param {Object} params
+ * @param {number} params.verificationId - course_verification PK
+ * @param {string} params.userId - 리뷰 작성자 user_id
+ * @param {string} params.courseId - 도장깨기 코스 ID
+ * @param {string} params.movieId - 영화 ID
+ * @param {string} params.reviewText - 사용자가 작성한 리뷰 본문
+ * @param {string} params.moviePlot - 비교 기준 영화 줄거리
+ * @returns {Promise<{verification_id, similarity_score, matched_keywords, confidence, review_status, rationale}>}
+ */
+export async function callReviewVerificationAgent({ verificationId, userId, courseId, movieId, reviewText, moviePlot }) {
+  requireAuth();
+  return agentApi.post(REVIEW_VERIFICATION_ENDPOINTS.VERIFY, {
+    verification_id: verificationId,
+    user_id: userId,
+    course_id: courseId,
+    movie_id: movieId,
+    review_text: reviewText,
+    movie_plot: moviePlot || '',
+  });
+}
+
+/**
+ * AI 에이전트 판정 결과를 Backend에 업데이트한다.
+ *
+ * 2026-04-24 신규: 프론트엔드가 에이전트에서 받은 판정 결과를 Backend에 전달한다.
+ * Backend는 이 결과를 CourseVerification에 적용하고 AUTO_VERIFIED 시 진행률을 반영한다.
+ *
+ * @param {number} verificationId - course_verification PK
+ * @param {Object} aiResult - 에이전트 판정 결과
+ * @param {string} aiResult.reviewStatus - AUTO_VERIFIED / NEEDS_REVIEW / AUTO_REJECTED
+ * @param {number} [aiResult.similarityScore] - 유사도 점수 (0.0~1.0)
+ * @param {string[]} [aiResult.matchedKeywords] - 매칭된 핵심 키워드
+ * @param {number} [aiResult.confidence] - 종합 신뢰도 점수 (0.0~1.0)
+ * @param {string} [aiResult.rationale] - 판정 근거 요약
+ * @returns {Promise<CourseCompleteResponse>} 업데이트된 코스 진행 현황 DTO
+ */
+export async function applyAiVerificationResult(verificationId, aiResult) {
+  requireAuth();
+  return backendApi.post(ROADMAP_ENDPOINTS.APPLY_AI_RESULT(verificationId), {
+    reviewStatus: aiResult.review_status,
+    similarityScore: aiResult.similarity_score,
+    matchedKeywords: aiResult.matched_keywords || [],
+    confidence: aiResult.confidence,
+    rationale: aiResult.rationale,
+  });
 }
 
 /**

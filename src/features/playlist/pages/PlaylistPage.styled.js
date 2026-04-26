@@ -177,6 +177,111 @@ export const FormPanel = styled.div`
   }
 `;
 
+/* ── 생성 폼 전용 영화 검색 결과 (리스트형) ── */
+
+/** 검색 결과 리스트 컨테이너 */
+export const FormSearchList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.borderDefault};
+    border-radius: 4px;
+  }
+`;
+
+/** 검색 결과 아이템 — 가로 행 */
+export const FormSearchItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  border: 1px solid ${({ $selected, theme }) =>
+    $selected ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $selected, theme }) =>
+    $selected ? `${theme.colors.primary}10` : theme.colors.bgSecondary};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => `${theme.colors.primary}08`};
+  }
+`;
+
+/** 썸네일 이미지 */
+export const FormSearchPoster = styled.img`
+  width: 36px;
+  height: 54px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  object-fit: cover;
+  flex-shrink: 0;
+  background: ${({ theme }) => theme.colors.bgElevated};
+`;
+
+/** 썸네일 플레이스홀더 */
+export const FormSearchPosterFallback = styled.div`
+  width: 36px;
+  height: 54px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+`;
+
+/** 영화 정보 (제목 + 연도) */
+export const FormSearchInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+export const FormSearchTitle = styled.div`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+export const FormSearchMeta = styled.div`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  margin-top: 2px;
+`;
+
+/** 추가/선택됨 버튼 */
+export const FormSearchBtn = styled.button`
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1.5px solid ${({ $selected, theme }) =>
+    $selected ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $selected, theme }) =>
+    $selected ? theme.colors.primary : 'transparent'};
+  color: ${({ $selected, theme }) =>
+    $selected ? '#fff' : theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ $selected }) => $selected ? '#fff' : 'inherit'};
+  }
+`;
+
 /** 생성 폼 내 영화 추가 섹션 구분선 */
 export const FormDivider = styled.div`
   display: flex;

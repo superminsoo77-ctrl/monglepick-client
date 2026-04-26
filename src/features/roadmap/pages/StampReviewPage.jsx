@@ -20,7 +20,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useModal } from '../../../shared/components/Modal';
 import { ROUTES, buildPath } from '../../../shared/constants/routes';
-import { completeMovie, getMovieReview } from '../api/roadmapApi';
+import { completeMovie, getMovieReview, callReviewVerificationAgent, applyAiVerificationResult } from '../api/roadmapApi';
+import useAuthStore from '../../../shared/stores/useAuthStore';
 import * as S from './StampReviewPage.styled';
 
 const MAX_LENGTH = 500;
@@ -37,6 +38,8 @@ export default function StampReviewPage() {
   const readOnly = location.state?.readOnly === true;
   const resubmit = location.state?.resubmit === true;
   const rejectionReason = location.state?.rejectionReason || '';
+
+  const user = useAuthStore((s) => s.user);
 
   const [reviewText, setReviewText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,11 +94,14 @@ export default function StampReviewPage() {
   };
 
   /**
-   * 리뷰 제출 (작성/재인증 모드) — Backend 단일 호출 플로우.
+   * 리뷰 제출 (작성/재인증 모드) — 프론트엔드 직접 에이전트 호출 플로우.
    *
-   * 2026-04-22 보안 패치: 기존 3-step (Client→Backend→Agent→Backend) 플로우는
-   * 사용자가 AUTO_VERIFIED 결과를 위조해서 전달하면 AI 우회가 가능한 취약점이 있었다.
-   * 이제 Backend 가 트랜잭션 내부에서 Agent 를 직접 호출하고 판정까지 완료해서 돌려준다.
+   * 2026-04-24 구조 변경:
+   * 1) Backend completeMovie() → 리뷰 저장 + PENDING + verificationId + moviePlot 반환
+   * 2) Agent callReviewVerificationAgent() → AI 판정 (similarity + keyword + LLM)
+   * 3) Backend applyAiVerificationResult() → 판정 결과 반영 + 진행률 업데이트
+   *
+   * 에이전트 호출 실패 시 PENDING 유지 (기존 complete 결과 사용).
    */
   const handleSubmit = async () => {
     if (!reviewText.trim()) {
@@ -105,13 +111,57 @@ export default function StampReviewPage() {
     setIsSubmitting(true);
     setAiRationale('');
     try {
-      const result = await completeMovie(courseId, movieId, reviewText.trim());
+      // Step 1: 리뷰 저장 + 인증 레코드 생성 (PENDING 상태)
+      const completeResult = await completeMovie(courseId, movieId, reviewText.trim());
 
-      const reviewStatus = result?.reviewStatus ?? 'PENDING';
-      const agentAvailable = result?.agentAvailable !== false;
+      const verificationId = completeResult?.verificationId;
+      const moviePlot = completeResult?.moviePlot || '';
+      const userId = user?.id || user?.userId || user?.sub || '';
+
+      let reviewStatus = 'PENDING';
+      let rationale = null;
+      let finalResult = completeResult;
+
+      // Step 2: AI 에이전트 직접 호출 (verificationId가 있을 때만)
+      if (verificationId && userId) {
+        try {
+          const aiResult = await callReviewVerificationAgent({
+            verificationId,
+            userId,
+            courseId,
+            movieId,
+            reviewText: reviewText.trim(),
+            moviePlot,
+          });
+
+          reviewStatus = aiResult?.review_status ?? 'PENDING';
+          rationale = aiResult?.rationale ?? null;
+
+          // Step 3: AI 결과를 Backend에 업데이트
+          try {
+            finalResult = await applyAiVerificationResult(verificationId, aiResult);
+            reviewStatus = finalResult?.reviewStatus ?? reviewStatus;
+            rationale = finalResult?.rationale ?? rationale;
+          } catch (updateErr) {
+            // Backend 업데이트 실패 시 에이전트 결과로 UI 처리 (진행률은 다음 새로고침에 반영)
+            console.warn('[StampReviewPage] AI 결과 Backend 업데이트 실패:', updateErr?.message);
+          }
+        } catch (agentErr) {
+          // 에이전트 호출 실패 시 PENDING 유지 (관리자가 나중에 재검증 가능)
+          console.warn('[StampReviewPage] AI 에이전트 호출 실패 — PENDING 유지:', agentErr?.message);
+          reviewStatus = 'PENDING';
+        }
+      } else {
+        // verificationId가 없는 경우 (이미 인증된 영화 등) — complete 응답의 reviewStatus 사용
+        reviewStatus = completeResult?.reviewStatus ?? 'PENDING';
+        rationale = completeResult?.rationale ?? null;
+      }
+
+      const requiresFinalReview = finalResult?.requiresFinalReview ?? completeResult?.requiresFinalReview;
+      const agentAvailable = finalResult?.agentAvailable !== false;
 
       if (reviewStatus === 'AUTO_VERIFIED') {
-        if (result?.requiresFinalReview) {
+        if (requiresFinalReview) {
           // 마지막 영화 완료 → 코스 완주를 위한 최종 감상평 단계로 이동
           navigate(buildPath(ROUTES.ACCOUNT_STAMP_FINAL_REVIEW, { id: courseId }), {
             state: { courseTitle },
@@ -135,10 +185,10 @@ export default function StampReviewPage() {
         navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
 
       } else if (reviewStatus === 'AUTO_REJECTED') {
-        const rationale =
-          result?.rationale ||
+        const displayRationale =
+          rationale ||
           '영화 내용과 관련 없는 리뷰로 판단되었어요. 영화의 인물, 장면, 줄거리를 바탕으로 다시 작성해 주세요.';
-        setAiRationale(rationale);
+        setAiRationale(displayRationale);
         showAlert({
           title: 'AI 검증 반려',
           message: '리뷰가 영화 내용과 맞지 않아 반려되었어요. 아래 사유를 확인하고 수정해 주세요.',
@@ -146,7 +196,7 @@ export default function StampReviewPage() {
         });
 
       } else {
-        // PENDING — Agent 장애 또는 이미 인증된 영화
+        // PENDING — 에이전트 장애 또는 이미 인증된 영화
         showAlert({
           title: '제출 완료',
           message: agentAvailable
