@@ -409,6 +409,14 @@ export default function PlaylistShareFeed() {
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
+  // Clear cached personal playlists when the authenticated user changes
+  useEffect(() => {
+    setMyPlaylists([]);
+    // also reset share form when user changes
+    setShareForm({ title: '', content: '', playlistId: '' });
+    setShowShareModal(false);
+  }, [currentUser?.id]);
+
   /** 게시글 좋아요 토글 */
   const handleLike = async (post) => {
     if (!isAuthenticated) {
@@ -466,9 +474,35 @@ export default function PlaylistShareFeed() {
       const res = await getPlaylists({ page: 0, size: 50 });
       const list = (res?.content ?? res ?? []).map((pl) => ({
         ...pl,
-        movieCount: pl.movieCount ?? pl.movie_count ?? 0,
+        movieCount:
+          pl.movieCount ??
+          pl.movie_count ??
+          (Array.isArray(pl.items) ? pl.items.length : undefined) ??
+          (Array.isArray(pl.movies) ? pl.movies.length : undefined) ??
+          (Array.isArray(pl.movieIds) ? pl.movieIds.length : undefined) ??
+          0,
       }));
-      if (list.length === 0) {
+      // only include playlists that are NOT public (isPublic !== true)
+      // and exclude playlists that appear to be imported/copied into this account
+      const importedKeys = [
+        'sourcePlaylistId',
+        'originalPlaylistId',
+        'copiedFromPlaylistId',
+        'importedFrom',
+        'originPlaylistId',
+        'isImported',
+      ];
+
+      const isImportedPlaylist = (pl) => {
+        // truthy check on known keys or boolean flag
+        for (const k of importedKeys) {
+          if (pl[k]) return true;
+        }
+        return false;
+      };
+
+      const privateList = list.filter((pl) => !pl.isPublic && !isImportedPlaylist(pl));
+      if (privateList.length === 0) {
         await showAlert({
           title: '플레이리스트 없음',
           message: '먼저 플레이리스트를 만들어보세요.',
@@ -476,7 +510,7 @@ export default function PlaylistShareFeed() {
         });
         return;
       }
-      setMyPlaylists(list);
+      setMyPlaylists(privateList);
       setShareForm({ title: '', content: '', playlistId: '' });
       setShowShareModal(true);
     } catch {

@@ -87,9 +87,16 @@ export default function PlaylistPage() {
       const data = await getPlaylists({ page: 0, size: 50 });
       const rawList = data?.content || data || [];
       // 백엔드가 snake_case(movie_count)로 반환할 경우도 대응
+      // 일부 API는 목록에 movieCount를 포함하지 않을 수 있어, items/movies 배열 길이로 보완합니다.
       setPlaylists(rawList.map((pl) => ({
         ...pl,
-        movieCount: pl.movieCount ?? pl.movie_count ?? 0,
+        movieCount:
+          pl.movieCount ??
+          pl.movie_count ??
+          (Array.isArray(pl.items) ? pl.items.length : undefined) ??
+          (Array.isArray(pl.movies) ? pl.movies.length : undefined) ??
+          (Array.isArray(pl.movieIds) ? pl.movieIds.length : undefined) ??
+          0,
       })));
     } catch (err) {
       console.error('[Playlist] 목록 로드 실패:', err.message);
