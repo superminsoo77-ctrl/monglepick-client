@@ -109,6 +109,10 @@ export default function MyItemsSection({
   const items = itemsPage?.content || [];
   const totalPages = itemsPage?.totalPages || 0;
   const totalElements = itemsPage?.totalElements || 0;
+  /* 현재 필터 라벨 — 빈 상태 메시지에서 "어떤 카테고리가 비었는지" 명시.
+   * 'all' 인데도 0건이면 진짜 보유 0개, 카테고리 키이면 그 카테고리만 0개로 구분. */
+  const activeFilterLabel =
+    CATEGORY_FILTERS.find((c) => c.key === selectedCategory)?.label || '전체';
 
   return (
     <S.Section>
@@ -167,20 +171,24 @@ export default function MyItemsSection({
       {/* 아이템 리스트 */}
       {items.length === 0 ? (
         <S.Empty>
-          보유한 아이템이 없습니다. 아래 "아이템 교환" 섹션에서 포인트로 교환해 보세요.
+          {selectedCategory === 'all'
+            ? '보유한 아이템이 없습니다. "상점" 탭에서 포인트로 교환해 보세요.'
+            : `${activeFilterLabel} 카테고리에 보유한 아이템이 없습니다.`}
         </S.Empty>
       ) : (
         <S.Grid>
           {items.map((item) => {
+            /* 백엔드 raw 카테고리 — historical 잔재로 대문자/혼용이 들어와도 매칭되도록 lowercase 정규화 */
+            const itemCategoryKey = (item.category || '').toLowerCase();
             /* 각 액션 버튼 표시 조건 */
             const canEquip =
-              EQUIPPABLE.has(item.category) &&
+              EQUIPPABLE.has(itemCategoryKey) &&
               item.status === 'ACTIVE';
             const canUnequip =
-              EQUIPPABLE.has(item.category) &&
+              EQUIPPABLE.has(itemCategoryKey) &&
               item.status === 'EQUIPPED';
             const canUse =
-              USABLE.has(item.category) &&
+              USABLE.has(itemCategoryKey) &&
               item.status === 'ACTIVE' &&
               (item.remainingQuantity || 0) > 0;
 
@@ -193,10 +201,10 @@ export default function MyItemsSection({
                 $equipped={item.status === 'EQUIPPED'}
                 $expired={item.status === 'EXPIRED'}
               >
-                {/* 상단 배지 행 — 카테고리 + 상태 */}
+                {/* 상단 배지 행 — 카테고리 + 상태 (lowercase 정규화 후 매핑) */}
                 <S.TagRow>
                   <S.CategoryTag>
-                    {CATEGORY_LABEL[item.category] || item.category}
+                    {CATEGORY_LABEL[itemCategoryKey] || item.category}
                   </S.CategoryTag>
                   <S.StatusBadge $variant={statusVariant}>
                     {STATUS_LABEL[item.status] || item.status}
@@ -222,7 +230,7 @@ export default function MyItemsSection({
                   {item.expiresAt && (
                     <span>만료: {formatDate ? formatDate(item.expiresAt) : item.expiresAt.slice(0, 10)}</span>
                   )}
-                  {USABLE.has(item.category) && item.remainingQuantity != null && (
+                  {USABLE.has(itemCategoryKey) && item.remainingQuantity != null && (
                     <span>잔여: {formatNumber(item.remainingQuantity)}회</span>
                   )}
                 </S.Meta>
