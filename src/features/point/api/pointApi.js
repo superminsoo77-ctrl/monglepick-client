@@ -28,6 +28,30 @@ export async function getBalance() {
   return api.get(POINT_ENDPOINTS.BALANCE);
 }
 
+/**
+ * AI 추천 쿼터 사전 조회 (read-only).
+ *
+ * Backend POST /api/v1/point/check 와 매핑. 차감 없이 현재 사용자의
+ * 일일 무료 한도, 구독 보너스, 구매 토큰 잔여까지 반환한다.
+ * 채팅 화면 mount 시 호출하여 새로고침 후에도 사용 현황 바를 즉시 hydrate 하는 데 사용.
+ *
+ * Backend 의 resolveUserIdWithServiceKey 는 JWT 인증 시 principal 에서 userId 를 추출하지만,
+ * CheckRequest DTO 가 userId 를 @NotBlank 검증하므로 동일한 userId 를 body 로도 보낸다.
+ *
+ * @param {string} userId - 사용자 ID (필수, JWT subject 와 동일)
+ * @returns {Promise<Object>} CheckResponse
+ *   - allowed, balance, cost, message, maxInputLength
+ *   - dailyUsed, dailyLimit, source, subBonusRemaining, purchasedRemaining
+ */
+export async function getQuotaCheck(userId) {
+  requireAuth();
+  if (!userId) {
+    throw new Error('getQuotaCheck: userId 필수');
+  }
+  // cost=0 (v3.0 무과금). 차감 없이 현재 쿼터 상태만 반환받는다.
+  return api.post(POINT_ENDPOINTS.CHECK, { userId, cost: 0 });
+}
+
 // ── 포인트 이력 ──
 
 /**

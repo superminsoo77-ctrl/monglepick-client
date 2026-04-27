@@ -15,11 +15,13 @@
  * - movie_cards: 추천 영화 카드 목록
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 /* react-router-dom — 세션 ID 를 URL 에 반영하여 단일 진실 원본(SSOT)으로 관리 */
 import { useNavigate } from 'react-router-dom';
 /* SSE 채팅 API — 같은 feature 내의 chatApi에서 가져옴 */
 import { sendChatMessage } from '../api/chatApi';
+/* 포인트/쿼터 사전 조회 — 새로고침 후 사용 현황 바 hydrate 용 (2026-04-27) */
+import { getQuotaCheck } from '../../point/api/pointApi';
 
 /**
  * 채팅 상태 관리 훅.
@@ -89,6 +91,60 @@ export function useChat({ userId = '' } = {}) {
   const pendingTheatersRef = useRef([]);
   // 현재 스트리밍 중인 박스오피스 묶음(now_showing 1회) — 외부 지도 연동
   const pendingNowShowingRef = useRef(null);
+  /**
+   * 동기적 전송 중복 차단 ref (2026-04-27).
+   *
+   * `isLoading` (React state) 만으로는 같은 tick 안에 sendMessage 가 두 번 호출되는
+   * 케이스를 막지 못한다. 예) ChatWindow.handleSend 가 `await geo.request()` 로 좌표
+   * 권한 응답을 기다리는 동안 사용자가 Enter 를 한번 더 누르면 handleSend 가 두 번
+   * 진입 → 두 번째도 isLoading 클로저가 false 로 남아있어 sendMessage 까지 그대로 도달.
+   * useState 의 setter 는 다음 렌더에서야 새 값이 반영되므로 클로저 검증은 무력하다.
+   *
+   * ref 는 동기적으로 즉시 갱신되므로 같은 tick 의 재진입을 확실히 막아준다.
+   * sendMessage 시작 시 set, finally 블록에서 reset.
+   */
+  const sendingInFlightRef = useRef(false);
+
+  /**
+   * 포인트/쿼터 hydrate (2026-04-27).
+   *
+   * 새로고침 시 SSE point_update 이벤트를 받기 전이라 ChatPointBar 가 사라지는 문제 해결용.
+   * 인증 사용자에 한해 Backend POST /api/v1/point/check (cost=0, read-only) 를 호출해
+   * 일일 무료 사용량/구독 보너스/구매 토큰 잔여를 즉시 채워 넣는다.
+   *
+   * - 차감 없는 read-only 호출 (consumePoint 와 분리됨, v3.0)
+   * - 게스트(userId 없음)는 게스트 쿼터 클라이언트가 별도로 처리하므로 여기서는 스킵
+   * - 호출 실패 시 조용히 무시 — 채팅 자체 흐름을 막지 않는다
+   */
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getQuotaCheck(userId);
+        if (cancelled || !data) return;
+        setPointInfo({
+          balance: data.balance ?? 0,
+          deducted: 0,
+          freeUsage: data.source === 'GRADE_FREE',
+          source: data.source || 'GRADE_FREE',
+          dailyUsed: data.dailyUsed ?? 0,
+          dailyLimit: data.dailyLimit ?? null,
+          subBonusRemaining: data.subBonusRemaining ?? -1,
+          purchasedRemaining: data.purchasedRemaining ?? 0,
+          message: data.message || '',
+        });
+      } catch (err) {
+        // 인증 만료/네트워크 오류 등은 조용히 무시 — 차감 시점에 SSE 가 다시 채워준다
+        if (import.meta.env.DEV) {
+          console.warn('[useChat] 쿼터 hydrate 실패:', err?.message || err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   /**
    * 메시지를 전송하고 SSE 스트리밍 응답을 처리한다.
@@ -102,15 +158,26 @@ export function useChat({ userId = '' } = {}) {
   const sendMessage = useCallback(async (messageText, imageBase64 = null, location = null) => {
     // 빈 메시지 무시 (이미지만 보내는 것은 허용)
     if (!messageText.trim() && !imageBase64) return;
-    // 이전 요청이 진행 중이면 무시
-    if (isLoading) return;
+    // 동기 ref 가드 — 같은 tick 의 중복 호출 차단 (2026-04-27).
+    // 호출자(handleSend)가 `await geo.request()` 도중 두 번째 Enter 를 받아도
+    // 두 번째 sendMessage 는 여기서 즉시 return → 사용자 메시지·API 모두 1회만 발생.
+    if (sendingInFlightRef.current) return;
+    sendingInFlightRef.current = true;
+    // 이전 요청이 진행 중이면 무시 (state 기반 — UI 표시용 isLoading 과 일관성 유지)
+    if (isLoading) {
+      sendingInFlightRef.current = false;
+      return;
+    }
 
     // 상태 초기화
     setIsLoading(true);
     setError(null);
     setStatus('');
     setClarification(null);
-    setPointInfo(null);
+    // pointInfo 는 의도적으로 null 로 비우지 않는다 (2026-04-27).
+    // 새로고침 시 mount hydrate 로 채운 사용 현황 바가 매 요청마다 깜빡이는 문제 방지.
+    // recommend 의도면 point_update SSE 가 도착해 새 값으로 교체되고,
+    // 그 외 의도(일반대화/정보)는 쿼터가 변하지 않으므로 기존 값을 유지하는 게 옳다.
     setQuotaError(null);
     pendingResponseRef.current = '';
     pendingMoviesRef.current = [];
@@ -278,6 +345,7 @@ export function useChat({ userId = '' } = {}) {
 
             setStatus('');
             setIsLoading(false);
+            sendingInFlightRef.current = false;
           },
 
           // error 이벤트: 에러 처리
@@ -301,6 +369,7 @@ export function useChat({ userId = '' } = {}) {
             setClarification(null);
             setStatus('');
             setIsLoading(false);
+            sendingInFlightRef.current = false;
           },
         },
         abortControllerRef.current.signal,
@@ -380,12 +449,14 @@ export function useChat({ userId = '' } = {}) {
 
         setStatus('');
         setIsLoading(false);
+        sendingInFlightRef.current = false;
         return;
       }
 
       setError(err.message || '서버 연결에 실패했습니다.');
       setStatus('');
       setIsLoading(false);
+      sendingInFlightRef.current = false;
     }
     // navigate 는 setSession 콜백(라인 127) 내부에서 sessionId 발급 시 사용되므로 deps 포함.
     // React Compiler 의 inferred dep 과 source dep 불일치(`navigate` 누락) 해결.
@@ -400,7 +471,8 @@ export function useChat({ userId = '' } = {}) {
     setStatus('');
     setError(null);
     setClarification(null);
-    setPointInfo(null);
+    // pointInfo 는 보존 (2026-04-27). 새 대화를 시작해도 사용자의 일일 쿼터는 그대로이며,
+    // 사용 현황 바를 굳이 비웠다 다음 응답에 다시 채울 필요가 없다.
     setQuotaError(null);
     sessionIdRef.current = '';
     setCurrentSessionId('');
@@ -440,6 +512,21 @@ export function useChat({ userId = '' } = {}) {
    * @param {Array} sessionMessages - 파싱된 메시지 배열 [{role, content, ...}]
    */
   const loadExistingSession = useCallback((sessionId, sessionMessages) => {
+    // 2026-04-27: 진행 중인 SSE 가 있으면 즉시 abort + pending refs 전부 클리어.
+    // 이 가드가 없으면 다른 세션의 응답이 아직 stream 중일 때 사이드바에서 세션 전환을 하면
+    // setMessages(formattedMessages) 로 새 세션 메시지를 덮어쓴 직후 늦게 도착한
+    // onToken / onMovieCard / onDone 핸들러가 prev 함수로 새 세션 위에 누적된다 (사용자 보고 버그).
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    pendingResponseRef.current = '';
+    pendingMoviesRef.current = [];
+    pendingTheatersRef.current = [];
+    pendingNowShowingRef.current = null;
+    setIsLoading(false);
+    setStatus('');
+
     // messages 포맷 변환: Agent 저장 형식 → useChat 내부 형식
     const formattedMessages = [];
     for (const msg of sessionMessages) {
@@ -488,7 +575,8 @@ export function useChat({ userId = '' } = {}) {
     setStatus('');
     setError(null);
     setClarification(null);
-    setPointInfo(null);
+    // pointInfo 는 보존 (2026-04-27). 세션 전환은 메시지 컨텍스트만 바뀌고
+    // 사용자의 쿼터/잔여 횟수는 동일하므로 사용 현황 바를 유지한다.
     setQuotaError(null);
     sessionIdRef.current = sessionId;
     setCurrentSessionId(sessionId);

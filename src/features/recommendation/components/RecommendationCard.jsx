@@ -87,6 +87,17 @@ export default function RecommendationCard({
   /** 평가 완료 여부 — 활성 색상 분기에 사용 */
   const hasFeedback = Boolean(recommendation.feedbackRating);
 
+  /**
+   * 추천 이유 텍스트.
+   *
+   * Backend `recommendation_log.reason` 컬럼이 NOT NULL 이라 Agent 가 explanation 미생성 시
+   * 공백(" ") 으로 저장한다. 단순히 truthy 체크만 하면 공백/줄바꿈만 있는 값도 렌더되어
+   * 빈 보라색 바가 노출됐다 (2026-04-27 사용자 보고). trim 후 길이 체크로 차단.
+   * SSE movie_card payload 의 `explanation` 도 동일 방식으로 폴백.
+   */
+  const rawReason = recommendation.reason || recommendation.explanation || '';
+  const reasonText = typeof rawReason === 'string' ? rawReason.trim() : '';
+
   /** 피드백 제출 핸들러 */
   const handleFeedback = async () => {
     if (rating === 0) return;
@@ -134,10 +145,8 @@ export default function RecommendationCard({
 
         {metaLine && <S.Meta>{metaLine}</S.Meta>}
 
-        {/* 추천 이유 — Backend 는 `reason`, SSE movie_card 는 `explanation` 키. 둘 다 지원. */}
-        {(recommendation.reason || recommendation.explanation) && (
-          <S.Explanation>{recommendation.reason || recommendation.explanation}</S.Explanation>
-        )}
+        {/* 추천 이유 — Backend `reason` 또는 SSE movie_card `explanation`. trim 후 비어있지 않을 때만 렌더. */}
+        {reasonText && <S.Explanation>{reasonText}</S.Explanation>}
 
         {/* 액션 버튼 */}
         <S.Actions>

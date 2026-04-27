@@ -398,7 +398,7 @@ export const MATCH_ENDPOINTS = {
 
 /**
  * 추천 내역(Recommendation) 관련 엔드포인트.
- * AI 추천 이력 조회, 찜/봤어요 토글, 만족도 피드백을 처리한다.
+ * AI 추천 이력 조회, 찜/봤어요 토글, 별점/코멘트 리뷰 작성을 처리한다.
  */
 export const RECOMMENDATION_ENDPOINTS = {
   /** 추천 이력 목록 - GET (query: page, size, status?) */
@@ -407,8 +407,16 @@ export const RECOMMENDATION_ENDPOINTS = {
   WISHLIST: (id) => `${API_VERSION}/recommendations/${id}/wishlist`,
   /** 봤어요 토글 - POST (path: recommendationId) */
   WATCHED: (id) => `${API_VERSION}/recommendations/${id}/watched`,
-  /** 만족도 피드백 - POST (path: recommendationId, body: {rating, comment}) */
-  FEEDBACK: (id) => `${API_VERSION}/recommendations/${id}/feedback`,
+  /**
+   * 추천 카드 별점/코멘트 UPSERT - POST (path: recommendationId, body: {rating, content}).
+   *
+   * 2026-04-27 통합: 기존 /feedback 엔드포인트를 폐기하고 reviews 테이블 단일 진실
+   * 원본으로 통합. 같은 영화에 활성 리뷰가 있으면 업데이트, 없으면 신규 작성.
+   * Backend 가 movie_id 매핑 + reviewSource("rec_log_{id}") + reviewCategoryCode
+   * (AI_RECOMMEND) 자동 세팅. 추천 카드에서 작성된 별점이 reviews 에 저장되어
+   * CF 학습 단일 진실 원본에 즉시 흡수된다.
+   */
+  REVIEW: (id) => `${API_VERSION}/recommendations/${id}/review`,
   /** 관심없음 토글 - POST (path: recommendationId) (P2, 2026-04-24) */
   DISMISS: (id) => `${API_VERSION}/recommendations/${id}/dismiss`,
 };

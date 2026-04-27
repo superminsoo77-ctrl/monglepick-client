@@ -165,12 +165,14 @@ export const ChatHeader = styled.header`
 /**
  * 채팅 좌상단 Floating 햄버거 버튼 — 이전 대화 사이드바 토글.
  *
- * ChatWindowWrapper(position: relative) 기준 absolute. MainLayout Header 아래
- * 12px 여백에서 뜬다. 메시지 영역과 겹치지만 z-index 로 상단 유지.
+ * ChatWindowWrapper(position: relative) 기준 absolute. MainLayout Header +
+ * ChatPointBar(쿼터 사용 현황) 아래로 충분히 내려와 두 영역과 겹치지 않게 한다.
+ * (2026-04-27: 12 → 24 → 56px 로 추가 하향. ChatPointBar 가 항상 노출되는 구조로
+ *  변경된 후 그 아래에 자연스럽게 배치되도록 조정)
  */
 export const ChatFloatingHamburger = styled.button`
   position: absolute;
-  top: 12px;
+  top: 56px;
   left: 12px;
   z-index: 5;
   display: inline-flex;
@@ -384,10 +386,12 @@ export const ChatMessages = styled.main`
   flex: 1;
   overflow-y: auto;
   /*
-   * 상단 패딩 64px: ChatFloatingHamburger / ChatFloatingNewBtn (top:12 + h:40) 이
+   * 상단 패딩 108px: ChatFloatingHamburger (top:56 + h:40 + 12px 여백) 이
    * 위로 뜨므로 콘텐츠 첫 줄이 버튼과 겹치지 않도록 여유 확보.
+   * (2026-04-27: 햄버거 top 12 → 24 → 56 추가 하향에 맞춰 64 → 76 → 108 동반 조정.
+   *  ChatPointBar 가 mount 시 즉시 노출되므로 그 아래로 콘텐츠가 자연스럽게 흐른다.)
    */
-  padding: 64px 16px 16px;
+  padding: 108px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
