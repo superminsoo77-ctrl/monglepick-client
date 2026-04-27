@@ -82,7 +82,13 @@ export default function OnboardingPage() {
       return true;
     }
 
-    return [ROUTES.ONBOARDING, ROUTES.WORLDCUP, ROUTES.MYPAGE].includes(pathname);
+    return [
+      ROUTES.ONBOARDING,
+      ROUTES.WORLDCUP,
+      ROUTES.MYPAGE,
+      ROUTES.ACCOUNT_WORLDCUP,
+      ROUTES.ACCOUNT_PROFILE,
+    ].includes(pathname);
   }, [allowExit, status]);
 
   const confirmExit = useCallback(async () => {
@@ -226,12 +232,12 @@ export default function OnboardingPage() {
   const handleMissionClick = useCallback((missionKey) => {
     switch (missionKey) {
       case MISSION_KEYS.WORLDCUP:
-        navigateWithGuard(ROUTES.WORLDCUP, {
+        navigateWithGuard(ROUTES.ACCOUNT_WORLDCUP, {
           state: { returnTo: ROUTES.ONBOARDING, onboardingMission: MISSION_KEYS.WORLDCUP },
         });
         return;
       case MISSION_KEYS.FAVORITE_GENRES:
-        navigateWithGuard(ROUTES.MYPAGE, {
+        navigateWithGuard(`${ROUTES.ACCOUNT_PROFILE}?tab=preferences`, {
           state: {
             activeTab: 'preferences',
             returnTo: ROUTES.ONBOARDING,
@@ -240,7 +246,7 @@ export default function OnboardingPage() {
         });
         return;
       case MISSION_KEYS.FAVORITE_MOVIES:
-        navigateWithGuard(ROUTES.MYPAGE, {
+        navigateWithGuard(`${ROUTES.ACCOUNT_PROFILE}?tab=preferences`, {
           state: {
             activeTab: 'preferences',
             returnTo: ROUTES.ONBOARDING,

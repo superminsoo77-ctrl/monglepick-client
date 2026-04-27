@@ -134,18 +134,6 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
-        {/* 회원가입 직후 시작 미션 온보딩 페이지 */}
-        <Route
-          path="/onboarding"
-          element={
-            <PrivateRoute>
-              <MainLayout>
-                <OnboardingPage />
-              </MainLayout>
-            </PrivateRoute>
-          }
-        />
-
         {/* OAuth 콜백 페이지 — 구 방식: 인가 코드 직접 처리 (fallback) */}
         <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
         <Route path="/cookie" element={<OAuthCookiePage />} />
@@ -158,6 +146,15 @@ function App() {
             진입 시에만 추가 사이드바를 덧그리는 2중 Outlet 구조.
             ══════════════════════════════════════════════════════════════ */}
         <Route element={<MainLayout />}>
+          {/* 회원가입 직후 시작 미션 온보딩 페이지 */}
+          <Route
+            path="/onboarding"
+            element={(
+              <PrivateRoute>
+                <OnboardingPage />
+              </PrivateRoute>
+            )}
+          />
           {/* 비로그인 허용 */}
           <Route path="/home" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
