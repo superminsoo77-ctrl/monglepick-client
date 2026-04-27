@@ -231,9 +231,14 @@ export default function RoadmapPage() {
                 </S.ProgressText>
               </S.DetailProgress>
               {!detail.started && (
-                <S.StartBtn onClick={handleStart} disabled={isStarting}>
-                  {isStarting ? '시작 중...' : '코스 시작하기'}
-                </S.StartBtn>
+                <>
+                  <S.StartBtn onClick={handleStart} disabled={isStarting}>
+                    {isStarting ? '시작 중...' : '코스 시작하기'}
+                  </S.StartBtn>
+                  <S.StartHint>
+                    ※ 코스 시작하기 버튼을 눌러야 시청 인증을 진행할 수 있습니다.
+                  </S.StartHint>
+                </>
               )}
             </S.DetailHeader>
 
@@ -271,7 +276,7 @@ export default function RoadmapPage() {
                       ) : (
                         <S.MoviePosterPlaceholder>&#x1F3AC;</S.MoviePosterPlaceholder>
                       )}
-                      <S.MovieInfo onClick={() => navigate(buildPath(ROUTES.MOVIE_DETAIL, { id: mid }))}>
+                      <S.MovieInfo>
                         <S.MovieTitle>{movie.title || '제목 없음'}</S.MovieTitle>
                         <S.MovieMeta>
                           {movie.releaseYear && `${movie.releaseYear}년`}

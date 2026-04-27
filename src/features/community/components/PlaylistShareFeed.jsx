@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { getSharedPlaylists, sharePlaylist, togglePostLike } from '../api/communityApi';
-import { getPlaylists, importPlaylist } from '../../playlist/api/playlistApi';
+import { getPlaylists, importPlaylist, updatePlaylist } from '../../playlist/api/playlistApi';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import { useModal } from '../../../shared/components/Modal';
 import { buildPath, ROUTES } from '../../../shared/constants/routes';
@@ -261,17 +261,79 @@ const FormTextarea = styled.textarea`
   &:focus { outline: none; border-color: ${({ theme }) => theme.colors.primary}; }
 `;
 
-const SelectBox = styled.select`
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: ${({ theme }) => theme.radius.md};
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  background: ${({ theme }) => theme.colors.bgSecondary};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  font-size: ${({ theme }) => theme.typography.textBase};
-  font-family: inherit;
+/** 플레이리스트 선택 목록 */
+const PlaylistSelectList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
 
-  &:focus { outline: none; border-color: ${({ theme }) => theme.colors.primary}; }
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.borderDefault};
+    border-radius: 4px;
+  }
+`;
+
+/** 플레이리스트 선택 아이템 */
+const PlaylistSelectItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: ${({ theme }) => theme.radius.md};
+  border: 2px solid ${({ $selected, theme }) =>
+    $selected ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $selected, theme }) =>
+    $selected ? `${theme.colors.primary}10` : theme.colors.bgSecondary};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => `${theme.colors.primary}08`};
+  }
+`;
+
+const PlaylistSelectInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const PlaylistSelectName = styled.div`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const PlaylistSelectMeta = styled.div`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SelectedDot = styled.div`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid ${({ $selected, theme }) =>
+    $selected ? theme.colors.primary : theme.colors.borderDefault};
+  background: ${({ $selected, theme }) => $selected ? theme.colors.primary : 'transparent'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #fff;
+  transition: all ${({ theme }) => theme.transitions.fast};
 `;
 
 const FormLabel = styled.label`
@@ -327,7 +389,17 @@ export default function PlaylistShareFeed() {
     setIsLoading(true);
     try {
       const res = await getSharedPlaylists({ page: 1, size: 30 });
-      setPosts(res.posts || []);
+      const fetchedPosts = res.posts || [];
+      setPosts(fetchedPosts);
+      // API 응답에서 좋아요 상태를 초기화 — 새로고침 후에도 올바른 상태 유지
+      setLikeState(
+        Object.fromEntries(
+          fetchedPosts.map((p) => [
+            p.id,
+            { liked: p.liked ?? false, likeCount: p.likeCount ?? 0 },
+          ])
+        )
+      );
     } catch {
       setPosts([]);
     } finally {
@@ -343,7 +415,7 @@ export default function PlaylistShareFeed() {
       await showAlert({ title: '로그인 필요', message: '로그인 후 좋아요를 누를 수 있어요.', type: 'info' });
       return;
     }
-    const cur = likeState[post.id] ?? { liked: false, likeCount: post.likeCount ?? 0 };
+    const cur = likeState[post.id] ?? { liked: post.liked ?? false, likeCount: post.likeCount ?? 0 };
     // 낙관적 업데이트
     setLikeState((prev) => ({
       ...prev,
@@ -384,7 +456,7 @@ export default function PlaylistShareFeed() {
     }
   };
 
-  /** 공유 모달 열기 — 내 플레이리스트 로드 */
+  /** 공유 모달 열기 — 내 플레이리스트 전체 로드 */
   const openShareModal = async () => {
     if (!isAuthenticated) {
       await showAlert({ title: '로그인 필요', message: '로그인 후 공유할 수 있어요.', type: 'info' });
@@ -392,19 +464,20 @@ export default function PlaylistShareFeed() {
     }
     try {
       const res = await getPlaylists({ page: 0, size: 50 });
-      const list = res?.content ?? res ?? [];
-      // 공개 플레이리스트만 공유 가능
-      const publicOnes = list.filter((pl) => pl.isPublic);
-      if (publicOnes.length === 0) {
+      const list = (res?.content ?? res ?? []).map((pl) => ({
+        ...pl,
+        movieCount: pl.movieCount ?? pl.movie_count ?? 0,
+      }));
+      if (list.length === 0) {
         await showAlert({
-          title: '공개 플레이리스트 없음',
-          message: '공유하려면 먼저 내 플레이리스트를 공개로 설정해야 해요.',
+          title: '플레이리스트 없음',
+          message: '먼저 플레이리스트를 만들어보세요.',
           type: 'info',
         });
         return;
       }
-      setMyPlaylists(publicOnes);
-      setShareForm({ title: '', content: '', playlistId: String(publicOnes[0].playlistId) });
+      setMyPlaylists(list);
+      setShareForm({ title: '', content: '', playlistId: '' });
       setShowShareModal(true);
     } catch {
       await showAlert({ title: '오류', message: '플레이리스트를 불러올 수 없습니다.', type: 'error' });
@@ -415,10 +488,20 @@ export default function PlaylistShareFeed() {
   const handleShareSubmit = async () => {
     if (!shareForm.title.trim() || !shareForm.playlistId) return;
     setIsSharing(true);
+    const selectedPl = myPlaylists.find((pl) => String(pl.playlistId) === shareForm.playlistId);
+    const fallbackContent = `${selectedPl?.playlistName ?? shareForm.title.trim()} 플레이리스트를 공유합니다.`;
     try {
+      // 비공개 플레이리스트면 공개로 전환 후 공유
+      if (selectedPl && !selectedPl.isPublic) {
+        await updatePlaylist(selectedPl.playlistId, {
+          title: selectedPl.playlistName,
+          description: selectedPl.description || '',
+          isPublic: true,
+        });
+      }
       await sharePlaylist({
         title: shareForm.title.trim(),
-        content: shareForm.content.trim() || ' ',
+        content: shareForm.content.trim() || fallbackContent,
         playlistId: Number(shareForm.playlistId),
       });
       setShowShareModal(false);
@@ -509,50 +592,72 @@ export default function PlaylistShareFeed() {
       {showShareModal && (
         <ModalOverlay onClick={() => setShowShareModal(false)}>
           <ModalPanel onClick={(e) => e.stopPropagation()}>
-            <ModalTitle>플레이리스트 공유</ModalTitle>
+            <ModalTitle>내 플레이리스트 공유</ModalTitle>
 
+            {/* 1단계: 플레이리스트 선택 */}
             <div>
-              <FormLabel>공유할 플레이리스트</FormLabel>
-              <SelectBox
-                value={shareForm.playlistId}
-                onChange={(e) => setShareForm((p) => ({ ...p, playlistId: e.target.value }))}
-                style={{ marginTop: 6 }}
-              >
-                {myPlaylists.map((pl) => (
-                  <option key={pl.playlistId} value={String(pl.playlistId)}>
-                    {pl.playlistName}
-                  </option>
-                ))}
-              </SelectBox>
+              <FormLabel>공유할 플레이리스트를 선택해주세요</FormLabel>
+              <PlaylistSelectList style={{ marginTop: 8 }}>
+                {myPlaylists.map((pl) => {
+                  const isSelected = shareForm.playlistId === String(pl.playlistId);
+                  return (
+                    <PlaylistSelectItem
+                      key={pl.playlistId}
+                      $selected={isSelected}
+                      onClick={() => setShareForm((p) => ({
+                        ...p,
+                        playlistId: String(pl.playlistId),
+                        title: p.title || pl.playlistName,
+                      }))}
+                    >
+                      <PlaylistSelectInfo>
+                        <PlaylistSelectName>{pl.playlistName}</PlaylistSelectName>
+                        <PlaylistSelectMeta>
+                          <span>🎬 {pl.movieCount ?? 0}편</span>
+                          <span>{pl.isPublic ? '🌐 공개' : '🔒 비공개'}</span>
+                        </PlaylistSelectMeta>
+                      </PlaylistSelectInfo>
+                      <SelectedDot $selected={isSelected}>
+                        {isSelected && '✓'}
+                      </SelectedDot>
+                    </PlaylistSelectItem>
+                  );
+                })}
+              </PlaylistSelectList>
             </div>
 
-            <div>
-              <FormLabel>제목</FormLabel>
-              <FormInput
-                style={{ marginTop: 6 }}
-                placeholder="게시글 제목을 입력하세요"
-                value={shareForm.title}
-                onChange={(e) => setShareForm((p) => ({ ...p, title: e.target.value }))}
-                maxLength={100}
-                autoFocus
-              />
-            </div>
+            {/* 2단계: 제목 + 한마디 (플레이리스트 선택 후 표시) */}
+            {shareForm.playlistId && (
+              <>
+                <div>
+                  <FormLabel>제목</FormLabel>
+                  <FormInput
+                    style={{ marginTop: 6 }}
+                    placeholder="게시글 제목을 입력하세요"
+                    value={shareForm.title}
+                    onChange={(e) => setShareForm((p) => ({ ...p, title: e.target.value }))}
+                    maxLength={100}
+                    autoFocus
+                  />
+                </div>
 
-            <div>
-              <FormLabel>한마디 (선택)</FormLabel>
-              <FormTextarea
-                style={{ marginTop: 6 }}
-                placeholder="이 플레이리스트에 대해 한마디 남겨보세요"
-                value={shareForm.content}
-                onChange={(e) => setShareForm((p) => ({ ...p, content: e.target.value }))}
-                maxLength={500}
-              />
-            </div>
+                <div>
+                  <FormLabel>한마디 (선택)</FormLabel>
+                  <FormTextarea
+                    style={{ marginTop: 6 }}
+                    placeholder="이 플레이리스트에 대해 한마디 남겨보세요"
+                    value={shareForm.content}
+                    onChange={(e) => setShareForm((p) => ({ ...p, content: e.target.value }))}
+                    maxLength={500}
+                  />
+                </div>
+              </>
+            )}
 
             <BtnRow>
               <Btn $cancel onClick={() => setShowShareModal(false)}>취소</Btn>
               <Btn
-                disabled={!shareForm.title.trim() || isSharing}
+                disabled={!shareForm.playlistId || !shareForm.title.trim() || isSharing}
                 onClick={handleShareSubmit}
               >
                 {isSharing ? '공유 중...' : '공유하기'}

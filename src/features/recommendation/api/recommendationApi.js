@@ -63,40 +63,30 @@ export async function toggleDismissed(recommendationId) {
 }
 
 /**
- * 별점(1~5) 을 Backend 가 요구하는 feedbackType enum 으로 매핑한다.
+ * 추천 카드 별점/코멘트 제출 (UPSERT).
  *
- * QA #172 (2026-04-23) 근본 해결 (후속): Backend `RecommendationFeedbackRequest` 에
- * `rating Integer` 필드가 추가되어 별점을 원시값 그대로 전송 가능. feedbackType 은
- * 여전히 필수이므로 별점에서 파생해 함께 보낸다.
+ * 2026-04-27 통합: 기존 `/feedback` 엔드포인트가 폐기되고 reviews 테이블 단일 진실
+ * 원본으로 통합됐다. 본 함수는 `POST /api/v1/recommendations/{id}/review` 로 호출하며
+ * Backend 가 활성 리뷰 유무에 따라 INSERT/UPDATE 분기한다. 별점은 0.5~5.0 Double
+ * 로 전송되며 (reviews.rating 컬럼은 DOUBLE), 추천 카드 UI 의 정수 1~5 그대로 보내도
+ * Backend 검증을 통과한다 (Math.min/max 클램프).
  *
- * 매핑 규칙:
- *  - 4~5 점 → `like`    (만족)
- *  - 1~3 점 → `dislike` (불만족 — 3점도 완벽 만족은 아니므로 dislike 쪽으로 분류)
- *  - 별점 없음 → `like` (기본값, 호출부가 명시적으로 like/dislike 를 지정하지 않은 경우)
- */
-function mapRatingToFeedbackType(rating) {
-  if (rating == null) return 'like';
-  return rating >= 4 ? 'like' : 'dislike';
-}
-
-/**
- * 만족도 피드백 제출.
+ * Backend 처리:
+ *  - 활성 리뷰 있음 → rating/contents 갱신 (이미 받은 reward 미중복 지급)
+ *  - 활성 리뷰 없음 → 신규 작성 + reward + 첫 리뷰 보너스 + user_watch_history 동기화 +
+ *    recommendation_impact.rated 마킹
+ *  - reviewSource = `rec_log_{id}`, reviewCategoryCode = `AI_RECOMMEND` 자동 세팅
  *
- * QA #172 근본해결: 별점을 `rating` 필드로 별도 전송. 과거엔 `[별점 N/5]` 프리픽스를 comment 에
- * 합쳐 보냈으나 Backend 엔티티에 rating 컬럼이 추가되어 원시값을 그대로 보관할 수 있게 됐다.
- *
- * @param {string|number} recommendationId - 추천 ID
- * @param {Object} feedback - 피드백 데이터
- * @param {number} [feedback.rating] - 별점 (1~5, 선택)
- * @param {string} [feedback.comment] - 코멘트 (선택)
- * @returns {Promise<Object>} Backend `RecommendationFeedbackResponse`
+ * @param {string|number} recommendationId - 추천 로그 ID
+ * @param {Object} feedback - 평가 데이터
+ * @param {number} feedback.rating - 별점 (필수, 0.5~5.0)
+ * @param {string} [feedback.comment] - 코멘트 (선택, null/빈 문자열 허용)
+ * @returns {Promise<Object>} Backend `ReviewResponse`
  */
 export async function submitFeedback(recommendationId, { rating, comment }) {
   requireAuth();
-  const feedbackType = mapRatingToFeedbackType(rating);
-  return backendApi.post(RECOMMENDATION_ENDPOINTS.FEEDBACK(recommendationId), {
-    feedbackType,
-    rating: rating ?? null,
-    comment: comment || null,
+  return backendApi.post(RECOMMENDATION_ENDPOINTS.REVIEW(recommendationId), {
+    rating,
+    content: comment || null,
   });
 }

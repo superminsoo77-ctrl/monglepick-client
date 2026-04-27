@@ -147,8 +147,11 @@ export default function ChatWindow() {
 
   /**
    * 사이드바에서 세션 선택 시: 메시지 로드 + URL 업데이트.
+   * 2026-04-27: 같은 세션 재클릭 시 noop (불필요한 fetch + setMessages 회피).
    */
   const handleSelectSession = async (session) => {
+    if (!session?.sessionId) return;
+    if (session.sessionId === currentSessionId) return;
     try {
       const detail = await loadSessionMessages(session.sessionId);
       loadExistingSession(detail.sessionId, detail.messages);
@@ -203,8 +206,12 @@ export default function ChatWindow() {
    */
   useEffect(() => {
     if (urlSessionId && urlSessionId !== currentSessionId && isAuthenticated) {
+      // 2026-04-27: race guard — fetch 진행 중에 사용자가 다른 세션으로 또 이동하면
+      // 늦게 도착한 응답이 새 세션 메시지를 덮어쓰지 않도록 cancelled 플래그로 무시.
+      let cancelled = false;
       loadSessionMessages(urlSessionId)
         .then((detail) => {
+          if (cancelled) return;
           loadExistingSession(detail.sessionId, detail.messages);
         })
         .catch(() => {
@@ -212,6 +219,9 @@ export default function ChatWindow() {
              sessionIdRef 가 비어있으면 서버가 새 세션을 발급하지만,
              URL 에 기존 id 가 남아있으면 onSession 콜백이 다시 동기화한다. */
         });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [urlSessionId, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -772,10 +782,20 @@ export default function ChatWindow() {
                       movie={movie}
                       /* 리뷰 작성 시 reviewSource 로 기록되는 현재 세션 ID. 신규 세션이면 빈 문자열 → 'chat' fallback */
                       sessionId={currentSessionId}
-                      /* "근처 영화관" 클릭 시 입력창에 자동 채움 + 포커스. NowShowingPanel 과 동일 패턴 — 자동 전송 X. */
-                      onFindNearbyTheater={(text) => {
-                        setInputText(text);
-                        inputRef.current?.focus();
+                      /* "🏢 영화관" 클릭 시 1-탭 플로우 (2026-04-27):
+                         ① 좌표 캐시가 없으면 navigator.geolocation 권한 즉시 요청
+                         ② 동의 → 좌표 포함 즉시 sendMessage (Agent 가 카카오 Local 로 근처 영화관 검색)
+                         ③ 거부/타임아웃 → 좌표 없이 텍스트만 전송 (Agent 가 지역명 재질문) */
+                      onFindNearbyTheater={async ({ title }) => {
+                        if (isLoading) return;
+                        const text = `${title} 근처에서 볼 수 있는 영화관 알려줘`;
+                        let location = geo.coords;
+                        if (!location) {
+                          // 거부/타임아웃은 null 반환 — 그대로 좌표 없이 진행 (3.b 정책)
+                          const requested = await geo.request();
+                          if (requested) location = requested;
+                        }
+                        sendMessage(text, null, location || null);
                       }}
                       /* SSE 도중 취소된 부분 데이터는 dimmed 시각화 (활성 결과와 혼동 방지) */
                       cancelled={msg.cancelled === true}

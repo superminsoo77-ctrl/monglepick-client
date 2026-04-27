@@ -197,10 +197,12 @@ function getYouTubeEmbedUrl(url) {
  * @param {string} [props.movie.certification] - 관람등급
  * @param {string} [props.movie.trailer_url] - 트레일러 URL
  * @param {string} [props.movie.explanation] - 추천 이유
+ * @param {boolean} [props.movie.is_now_showing] - KOBIS 일별 박스오피스 Top-10 매칭 결과 (2026-04-27).
+ *   true 일 때만 "🏢 영화관" 버튼이 노출된다. false 면 현재 국내 극장 상영 가능성 낮음으로 판단.
  * @param {string} [props.sessionId] - 현재 채팅 세션 ID (리뷰 작성 시 reviewSource 로 기록)
- * @param {(text:string)=>void} [props.onFindNearbyTheater] - "근처 영화관" 버튼 클릭 시 호출.
- *   ChatWindow 가 setInputText 를 wrap 해서 전달하면 입력창에 "○○○ 근처 영화관 알려줘" 자동 채움.
- *   자동 전송하지 않고 사용자가 검토 후 직접 보내도록 한다 (사용자 의도 존중, NowShowingPanel 과 동일 패턴).
+ * @param {(args:{title:string})=>void} [props.onFindNearbyTheater] - "🏢 영화관" 버튼 클릭 시 호출.
+ *   ChatWindow 핸들러가 navigator.geolocation 권한을 받고 좌표 포함해 즉시 sendMessage 한다.
+ *   사용자가 입력창을 통해 한 번 더 보낼 필요 없이 1-탭 플로우 (2026-04-27 변경).
  * @param {boolean} [props.cancelled] - SSE 도중 취소된 부분 데이터. true 면 dimmed 시각화.
  */
 export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cancelled = false }) {
@@ -225,6 +227,9 @@ export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cance
      * 로그인 사용자 + DB 영화일 때만 채워지며, 비로그인/외부 검색 결과는 null.
      * "관심 없음" 버튼이 이 FK 로 POST /api/v1/recommendations/{id}/dismiss 호출. */
     recommendation_log_id: recommendationLogId,
+    /* 2026-04-27: Agent recommendation_ranker / external_search_node 가 KOBIS Top-10 매칭으로 채움.
+     * true 일 때만 영화관 버튼 노출. snake_case 단일 키 (Pydantic model_dump 결과). */
+    is_now_showing: isNowShowing = false,
   } = movie;
 
   /* 2026-04-23 후속: Agent external_search_node 가 생성한 영화 식별.
@@ -553,10 +558,13 @@ export default function MovieCard({ movie, sessionId, onFindNearbyTheater, cance
                 ✕ 관심 없음
               </NotInterestedButton>
             )}
-            {!reviewed && typeof onFindNearbyTheater === 'function' && (
+            {/* "🏢 영화관" — KOBIS 일별 박스오피스 Top-10 매칭 (is_now_showing=true) 시에만 노출.
+                현재 극장가 상영작이 아닌 영화에 영화관 버튼이 보이는 거짓 긍정 방지 (2026-04-27).
+                클릭 시 onFindNearbyTheater({title}) 로 위임 → ChatWindow 가 위치 동의 → 자동 전송. */}
+            {!reviewed && isNowShowing && typeof onFindNearbyTheater === 'function' && (
               <NotInterestedButton
                 type="button"
-                onClick={() => onFindNearbyTheater(`${title} 근처에서 볼 수 있는 영화관 알려줘`)}
+                onClick={() => onFindNearbyTheater({ title })}
                 aria-label={`${title} 근처 영화관 찾기`}
               >
                 🏢 영화관
