@@ -23,8 +23,14 @@
  */
 
 import { Link } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 import { glassCard } from '../../../shared/styles/mixins';
+
+const starPop = keyframes`
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1.15); }
+`;
 
 /** 리뷰 목록 컨테이너 */
 export const Wrapper = styled.div`
@@ -290,14 +296,67 @@ export const EditControlsRow = styled.div`
   flex-wrap: wrap;
 `;
 
-/** 수정 폼 평점 선택 */
-export const EditSelect = styled.select`
-  min-width: 100px;
-  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
-  border-radius: ${({ theme }) => theme.radius.md};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.textPrimary};
+/** 수정 폼 별점 영역 */
+export const EditRatingSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+export const EditStarRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+
+export const EditStarButton = styled.button`
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ $active, theme }) =>
+    $active
+      ? (theme.colors.warning || '#f59e0b')
+      : (theme.colors.borderDefault || theme.colors.border || '#d1d5db')};
+  transition: color 0.15s, transform 0.12s;
+
+  svg {
+    width: 28px;
+    height: 28px;
+    filter: ${({ $active }) =>
+      $active ? 'drop-shadow(0 2px 6px rgba(245, 158, 11, 0.35))' : 'none'};
+  }
+
+  &:hover {
+    transform: scale(1.12);
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ${({ $pop }) =>
+    $pop &&
+    css`
+      animation: ${starPop} 0.28s ease-out;
+    `}
+`;
+
+export const EditStarLabel = styled.p`
+  min-height: 18px;
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ $active, theme }) =>
+    $active
+      ? (theme.colors.warning || '#f59e0b')
+      : (theme.colors.textMuted || theme.colors.textSecondary)};
 `;
 
 /** 스포일러 체크박스 라벨 */

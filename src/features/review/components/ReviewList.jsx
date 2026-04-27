@@ -28,6 +28,27 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import { deleteReview, toggleReviewLike, updateReview } from '../api/reviewApi';
 import * as S from './ReviewList.styled';
 
+const RATING_LABELS = [
+  '',
+  '별로예요',
+  '아쉬워요',
+  '괜찮아요',
+  '좋아요',
+  '최고예요!',
+];
+
+const StarFilledIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+  </svg>
+);
+
+const StarEmptyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+  </svg>
+);
+
 export default function ReviewList({
   reviews = [],
   loading = false,
@@ -42,6 +63,8 @@ export default function ReviewList({
   const [editingContent, setEditingContent] = useState('');
   const [editingRating, setEditingRating] = useState(0);
   const [editingSpoiler, setEditingSpoiler] = useState(false);
+  const [hoveredEditingStar, setHoveredEditingStar] = useState(0);
+  const [poppedEditingStar, setPoppedEditingStar] = useState(0);
 
   /**
    * 각 리뷰의 좋아요 상태 맵 (렌더링용).
@@ -130,6 +153,14 @@ export default function ReviewList({
     setEditingContent('');
     setEditingRating(0);
     setEditingSpoiler(false);
+    setHoveredEditingStar(0);
+    setPoppedEditingStar(0);
+  }, []);
+
+  const handleEditingStarClick = useCallback((star) => {
+    setEditingRating(star);
+    setPoppedEditingStar(star);
+    setTimeout(() => setPoppedEditingStar(0), 280);
   }, []);
 
   /** 리뷰 수정 결과를 상위 상태에 반영한다. */
@@ -207,6 +238,7 @@ export default function ReviewList({
       {reviews.map((review) => {
         const currentLiked = likedMap[review.id] ?? review.liked ?? false;
         const currentLikeCount = likeCountMap[review.id] ?? review.likeCount ?? 0;
+        const editingDisplayStar = hoveredEditingStar || Math.round(editingRating);
 
         return (
           <S.Item key={review.id}>
@@ -247,14 +279,34 @@ export default function ReviewList({
                 placeholder="리뷰 내용을 수정해주세요"
               />
               <S.EditControlsRow>
-                <S.EditSelect
-                  value={editingRating}
-                  onChange={(e) => setEditingRating(Number(e.target.value))}
-                >
-                  {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((score) => (
-                    <option key={score} value={score}>{score.toFixed(1)}</option>
-                  ))}
-                </S.EditSelect>
+                <S.EditRatingSection>
+                  <S.EditStarRow role="radiogroup" aria-label="리뷰 평점 수정">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const active = star <= editingDisplayStar;
+                      return (
+                        <S.EditStarButton
+                          key={star}
+                          type="button"
+                          role="radio"
+                          aria-checked={Math.round(editingRating) === star}
+                          aria-label={`${star}점`}
+                          $active={active}
+                          $pop={poppedEditingStar === star}
+                          onMouseEnter={() => setHoveredEditingStar(star)}
+                          onMouseLeave={() => setHoveredEditingStar(0)}
+                          onClick={() => handleEditingStarClick(star)}
+                        >
+                          {active ? <StarFilledIcon /> : <StarEmptyIcon />}
+                        </S.EditStarButton>
+                      );
+                    })}
+                  </S.EditStarRow>
+                  <S.EditStarLabel $active={editingDisplayStar > 0}>
+                    {editingDisplayStar > 0
+                      ? RATING_LABELS[editingDisplayStar]
+                      : '별점을 선택해 주세요'}
+                  </S.EditStarLabel>
+                </S.EditRatingSection>
                 <S.SpoilerToggleLabel>
                   <input
                     type="checkbox"
