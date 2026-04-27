@@ -112,8 +112,10 @@ export default function PointPage() {
   const [attendanceResult, setAttendanceResult] = useState(null);
   /* 포인트 아이템 목록 */
   const [items, setItems] = useState([]);
-  /* 현재 선택된 아이템 카테고리 */
-  const [selectedCategory, setSelectedCategory] = useState('전체');
+  /* 현재 선택된 아이템 카테고리 — 백엔드 PointItemCategory 정규값(소문자 5종) 또는 'all'.
+   * 과거 한글 라벨('전체'/'쿠폰'/'아바타')을 그대로 쿼리 파라미터로 보내 backend 필터가
+   * 항상 0건을 반환하던 버그를 해소하기 위해 ItemExchange 의 cat.key 값과 동일한 키로 통일. */
+  const [selectedCategory, setSelectedCategory] = useState('all');
   /* 포인트 상점(AI 이용권) 상태 — PointShopController 응답 ({ currentBalance, currentAiTokens, items }) */
   const [shopState, setShopState] = useState(null);
   /* 포인트 상점 로딩 플래그 */
@@ -244,7 +246,8 @@ export default function PointPage() {
   const loadItems = useCallback(async () => {
     setIsLoadingItems(true);
     try {
-      const category = selectedCategory === '전체' ? undefined : selectedCategory;
+      /* 'all' 이면 필터 미적용 — 그 외는 backend 정규값(coupon/avatar/badge/apply/hint) 그대로 전달 */
+      const category = selectedCategory === 'all' ? undefined : selectedCategory;
       const data = await getPointItems(category);
       setItems(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
