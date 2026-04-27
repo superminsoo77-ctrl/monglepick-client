@@ -136,6 +136,12 @@ export async function getAutocompleteSuggestions({ query, limit = 8 }) {
  * @param {string} [params.searchType='all'] - 검색 대상 (all, title, director, actor)
  * @param {string} [params.genre] - 장르 필터
  * @param {Array<string>} [params.genres] - 장르만 검색용 다중 선택 장르 목록
+ * @param {number|null} [params.yearFrom] - 개봉 연도 시작값
+ * @param {number|null} [params.yearTo] - 개봉 연도 종료값
+ * @param {number|null} [params.ratingMin] - 최소 평점
+ * @param {number|null} [params.ratingMax] - 최대 평점
+ * @param {number|null} [params.popularityMin] - 최소 인기도
+ * @param {number|null} [params.popularityMax] - 최대 인기도
  * @param {string} [params.sort='relevance'] - 정렬 기준 (relevance, rating, date)
  * @param {number} [params.page=1] - 페이지 번호
  * @param {number} [params.size=20] - 페이지 크기
@@ -146,6 +152,12 @@ export async function searchMovies({
   searchType = 'all',
   genre,
   genres = [],
+  yearFrom = null,
+  yearTo = null,
+  ratingMin = null,
+  ratingMax = null,
+  popularityMin = null,
+  popularityMax = null,
   sort = 'relevance',
   page = 1,
   size = 20,
@@ -156,6 +168,12 @@ export async function searchMovies({
   if (query) params.q = query;
   if (genre) params.genre = genre;
   if (genres.length > 0) params.genres = genres.join(',');
+  if (yearFrom !== null && yearFrom !== undefined) params.year_from = yearFrom;
+  if (yearTo !== null && yearTo !== undefined) params.year_to = yearTo;
+  if (ratingMin !== null && ratingMin !== undefined) params.rating_min = ratingMin;
+  if (ratingMax !== null && ratingMax !== undefined) params.rating_max = ratingMax;
+  if (popularityMin !== null && popularityMin !== undefined) params.popularity_min = popularityMin;
+  if (popularityMax !== null && popularityMax !== undefined) params.popularity_max = popularityMax;
   if (sort === 'relevance') {
     params.sort_by = 'relevance';
     params.sort_order = 'desc';

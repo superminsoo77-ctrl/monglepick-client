@@ -713,6 +713,227 @@ export const RecentStatus = styled.p`
   text-align: center;
 `;
 
+export const FilterAccordion = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  background: ${({ theme }) => theme.colors.bgCard};
+`;
+
+export const FilterAccordionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+  flex-wrap: wrap;
+`;
+
+export const FilterAccordionHeading = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const FilterAccordionTitle = styled.h2`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const FilterAccordionSummary = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+export const FilterAccordionToggle = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: 8px 14px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+  }
+`;
+
+export const FilterAccordionIcon = styled.span`
+  display: inline-flex;
+  transition: transform ${({ theme }) => theme.transitions.fast};
+  transform: rotate(${({ $expanded }) => ($expanded ? '0deg' : '-90deg')});
+`;
+
+export const FilterAccordionContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding-top: ${({ theme }) => theme.spacing.sm};
+`;
+
+export const FilterSectionDivider = styled.div`
+  width: 100%;
+  height: 1px;
+  background: ${({ theme }) => theme.colors.borderLight};
+`;
+
+export const AdvancedFilterSection = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+export const AdvancedFilterHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const AdvancedFilterTitle = styled.h2`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const AdvancedFilterDescription = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+export const AdvancedFilterGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${({ theme }) => theme.spacing.md};
+
+  ${mediaSmall} {
+    grid-template-columns: 1fr;
+  }
+`;
+
+export const AdvancedFilterGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const AdvancedFilterLabel = styled.label`
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const AdvancedFilterRange = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: ${({ theme }) => theme.spacing.xs};
+  align-items: center;
+`;
+
+export const AdvancedFilterDivider = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  text-align: center;
+`;
+
+export const AdvancedFilterInput = styled.input`
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+    outline: none;
+  }
+`;
+
+export const AdvancedFilterActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  flex-wrap: wrap;
+`;
+
+export const AdvancedFilterApplyButton = styled.button`
+  padding: 10px 18px;
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.gradients.primary};
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: opacity ${({ theme }) => theme.transitions.fast},
+              transform ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: ${({ theme }) => theme.glows.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+export const AdvancedFilterResetButton = styled.button`
+  padding: 10px 18px;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              opacity ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+export const AdvancedFilterError = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+`;
+
 /**
  * 텍스트 검색 없이 장르만 선택할 때 사용하는 전용 섹션.
  * 기존 단일 장르 필터와 다른 역할이라 시각적으로 분리한다.
@@ -721,10 +942,6 @@ export const SearchGenreSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.sm};
-  padding: ${({ theme }) => theme.spacing.md};
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  border-radius: ${({ theme }) => theme.radius.xl};
-  background: ${({ theme }) => theme.colors.bgCard};
 `;
 
 /**
