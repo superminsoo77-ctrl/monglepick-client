@@ -85,7 +85,12 @@ export default function PlaylistPage() {
     setIsLoading(true);
     try {
       const data = await getPlaylists({ page: 0, size: 50 });
-      setPlaylists(data?.content || data || []);
+      const rawList = data?.content || data || [];
+      // 백엔드가 snake_case(movie_count)로 반환할 경우도 대응
+      setPlaylists(rawList.map((pl) => ({
+        ...pl,
+        movieCount: pl.movieCount ?? pl.movie_count ?? 0,
+      })));
     } catch (err) {
       console.error('[Playlist] 목록 로드 실패:', err.message);
       setPlaylists([]);

@@ -291,27 +291,31 @@ export const StartBtn = styled.button`
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
 
+/** 코스 시작 안내 문구 */
+export const StartHint = styled.p`
+  margin: 6px 0 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.textMuted};
+`;
+
 /** 영화 체크리스트 */
 export const MovieList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 `;
 
 /** 영화 아이템 */
 export const MovieItem = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 16px;
+  padding: 16px 20px;
   border-radius: ${({ theme }) => theme.radius.md};
   background: ${({ theme }) => theme.colors.bgSecondary};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  transition: all ${({ theme }) => theme.transitions.fast};
-
-  &:hover {
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
+  transition: border-color ${({ theme }) => theme.transitions.fast};
+  min-height: 88px;
 `;
 
 /** 시청 인증 버튼 — $done(완료), $rejected(반려), $pending(검토 중), 기본(미인증) */
@@ -359,10 +363,10 @@ export const VerifyBtn = styled.button`
   }
 `;
 
-/** 영화 포스터 (작은) */
+/** 영화 포스터 */
 export const MoviePoster = styled.img`
-  width: 40px;
-  height: 60px;
+  width: 54px;
+  height: 80px;
   border-radius: ${({ theme }) => theme.radius.sm};
   object-fit: cover;
   flex-shrink: 0;
@@ -370,40 +374,36 @@ export const MoviePoster = styled.img`
 
 /** 영화 포스터 플레이스홀더 */
 export const MoviePosterPlaceholder = styled.div`
-  width: 40px;
-  height: 60px;
+  width: 54px;
+  height: 80px;
   border-radius: ${({ theme }) => theme.radius.sm};
   background: ${({ theme }) => theme.colors.bgElevated};
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 22px;
   flex-shrink: 0;
 `;
 
-/** 영화 정보 */
+/** 영화 정보 — 클릭 이동 없음 */
 export const MovieInfo = styled.div`
   flex: 1;
   min-width: 0;
-  cursor: pointer;
-
-  &:hover h4 { color: ${({ theme }) => theme.colors.primary}; }
 `;
 
 /** 영화 제목 */
 export const MovieTitle = styled.h4`
   margin: 0;
-  font-size: ${({ theme }) => theme.typography.textSm};
+  font-size: ${({ theme }) => theme.typography.textBase};
   font-weight: ${({ theme }) => theme.typography.fontMedium};
   color: ${({ theme }) => theme.colors.textPrimary};
-  transition: color ${({ theme }) => theme.transitions.fast};
 `;
 
 /** 영화 메타 */
 export const MovieMeta = styled.div`
-  font-size: ${({ theme }) => theme.typography.textXs};
+  font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textMuted};
-  margin-top: 2px;
+  margin-top: 4px;
 `;
 
 /** 빈 상태 */
