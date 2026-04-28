@@ -175,9 +175,11 @@ export default function ChatbotTab({ onSwitchToTicket }) {
         {/* 메시지 목록 */}
         {messages.map((msg, idx) => (
           <div key={idx}>
-            {/* SSE 자리표시자(토큰 수신 전) 의 빈 봇 버블은 렌더하지 않는다 —
-                바로 아래 타이핑 인디케이터가 시각적 자리 표시를 대체한다. */}
-            {!(msg.role === 'bot' && msg.pending && !msg.content) && (
+            {/* SSE 자리표시자(토큰 수신 전) 또는 본문이 비어 있는 봇 메시지는 렌더하지 않는다 —
+                자리표시자 단계에서는 타이핑 인디케이터가 시각적 자리 표시를 대체하고,
+                token 미수신·SSE 에러 등으로 pending 이 클리어됐지만 content 가 빈 예외
+                상황에서도 빈 말풍선이 남지 않도록 방어한다 (QA 2026-04-28). */}
+            {!(msg.role === 'bot' && !(msg.content || '').trim()) && (
               <S.MsgRow $isUser={msg.role === 'user'}>
                 <S.MsgBubble $isUser={msg.role === 'user'}>
                   {msg.content}

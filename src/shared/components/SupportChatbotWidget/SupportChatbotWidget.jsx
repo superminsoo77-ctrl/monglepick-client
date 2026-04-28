@@ -272,9 +272,11 @@ export default function SupportChatbotWidget() {
             {/* 대화 메시지 */}
             {messages.map((msg, idx) => (
               <div key={idx}>
-                {/* SSE 자리표시자(아직 token 수신 전) 의 빈 봇 버블은 숨긴다 —
-                    타이핑 인디케이터가 시각적으로 대체 역할을 수행한다. */}
-                {!(msg.role === 'bot' && msg.pending && !msg.content) && (
+                {/* SSE 자리표시자(token 수신 전) 또는 본문이 비어 있는 봇 메시지는 숨긴다 —
+                    자리표시자 구간은 타이핑 인디케이터가 대체하고, token 미수신·SSE 에러
+                    등으로 pending 이 클리어됐지만 content 가 빈 예외 상황에서도
+                    빈 말풍선이 남지 않도록 방어한다 (QA 2026-04-28). */}
+                {!(msg.role === 'bot' && !(msg.content || '').trim()) && (
                   <S.MsgRow $isUser={msg.role === 'user'}>
                     <S.MsgBubble $isUser={msg.role === 'user'}>
                       {msg.content}
