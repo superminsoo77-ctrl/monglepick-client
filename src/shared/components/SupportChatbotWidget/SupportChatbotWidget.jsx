@@ -151,13 +151,17 @@ export default function SupportChatbotWidget() {
 
       /* Agent v3 matched_faq 페이로드 shape: {faq_id, category, question}
          → UI 는 {id, question} 키를 사용하므로 여기서 매핑한다. (점수는 더 이상
-         전송되지 않음 — LLM 이 직접 '관련 FAQ' 선정하므로 점수 개념 없음) */
+         전송되지 않음 — LLM 이 직접 '관련 FAQ' 선정하므로 점수 개념 없음)
+         question 이 비어 있는 항목은 카드 본문이 "📋 "만 찍히는 빈 박스로
+         노출되므로 클라이언트에서도 방어적으로 필터링한다 (QA 2026-04-28). */
       const mapMatchedFaqs = (items) =>
-        (items || []).map((m) => ({
-          id: m.faq_id,
-          category: m.category,
-          question: m.question,
-        }));
+        (items || [])
+          .filter((m) => (m?.question || '').trim().length > 0)
+          .map((m) => ({
+            id: m.faq_id,
+            category: m.category,
+            question: m.question,
+          }));
 
       try {
         await sendSupportChatSse(
@@ -268,9 +272,11 @@ export default function SupportChatbotWidget() {
             {/* 대화 메시지 */}
             {messages.map((msg, idx) => (
               <div key={idx}>
-                {/* SSE 자리표시자(아직 token 수신 전) 의 빈 봇 버블은 숨긴다 —
-                    타이핑 인디케이터가 시각적으로 대체 역할을 수행한다. */}
-                {!(msg.role === 'bot' && msg.pending && !msg.content) && (
+                {/* SSE 자리표시자(token 수신 전) 또는 본문이 비어 있는 봇 메시지는 숨긴다 —
+                    자리표시자 구간은 타이핑 인디케이터가 대체하고, token 미수신·SSE 에러
+                    등으로 pending 이 클리어됐지만 content 가 빈 예외 상황에서도
+                    빈 말풍선이 남지 않도록 방어한다 (QA 2026-04-28). */}
+                {!(msg.role === 'bot' && !(msg.content || '').trim()) && (
                   <S.MsgRow $isUser={msg.role === 'user'}>
                     <S.MsgBubble $isUser={msg.role === 'user'}>
                       {msg.content}
