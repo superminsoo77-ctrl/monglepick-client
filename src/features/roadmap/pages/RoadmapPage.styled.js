@@ -217,6 +217,20 @@ export const DifficultyBadge = styled.span`
   }};
 `;
 
+/** 소형 배지 (카드 내 안내용) */
+export const SmallBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => `${theme.colors.warning}14`};
+  color: ${({ theme }) => theme.colors.warning};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  margin-top: 8px;
+`;
+
 /** 진행률 바 외부 */
 export const ProgressBarOuter = styled.div`
   width: 100%;
@@ -429,6 +443,20 @@ export const EmptyText = styled.p`
   font-size: ${({ theme }) => theme.typography.textSm};
   margin: 0;
   line-height: 1.5;
+`;
+
+/** 상세 헤더용 안내 문구 (진행률 100% 후 최종 감상평 안내) */
+export const HeaderHint = styled.p`
+  margin: 8px 0 0;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.primary};
+`;
+
+/** 경고/안내 텍스트 (카드 내 소형 메시지) */
+export const WarningText = styled.p`
+  margin: 8px 0 0;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  color: ${({ theme }) => theme.colors.warning};
 `;
 
 /* ── 도장깨기 인증 리뷰 모달 (미사용, 보존) ── */

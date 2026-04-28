@@ -57,7 +57,10 @@ export default function FinalReviewPage() {
         });
       }
 
-      navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }), { replace: true });
+      navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }), {
+        replace: true,
+        state: { finalReviewSubmitted: true },
+      });
     } catch (err) {
       showAlert({
         title: '오류',

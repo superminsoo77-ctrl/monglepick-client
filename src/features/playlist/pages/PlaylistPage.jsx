@@ -575,7 +575,6 @@ export default function PlaylistPage() {
 
               {pl.description && <S.CardDesc>{pl.description}</S.CardDesc>}
               <S.CardMeta>
-                <span>{pl.movieCount ?? 0}편</span>
                 <span>{pl.isPublic ? '🌐 공개' : '🔒 비공개'}</span>
               </S.CardMeta>
             </S.Card>

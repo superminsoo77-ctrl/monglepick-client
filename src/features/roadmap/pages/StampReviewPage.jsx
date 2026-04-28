@@ -25,6 +25,7 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import * as S from './StampReviewPage.styled';
 
 const MAX_LENGTH = 500;
+const MIN_REVIEW_LENGTH = 20;
 
 export default function StampReviewPage() {
   const { courseId, movieId } = useParams();
@@ -104,8 +105,17 @@ export default function StampReviewPage() {
    * 에이전트 호출 실패 시 PENDING 유지 (기존 complete 결과 사용).
    */
   const handleSubmit = async () => {
-    if (!reviewText.trim()) {
+    const trimmed = reviewText.trim();
+    if (!trimmed) {
       showAlert({ title: '안내', message: '리뷰를 작성해 주세요.', type: 'info' });
+      return;
+    }
+    if (trimmed.length < MIN_REVIEW_LENGTH) {
+      showAlert({
+        title: '안내',
+        message: `AI 검증을 위해 리뷰는 최소 ${MIN_REVIEW_LENGTH}자 이상이어야 합니다. 현재 ${trimmed.length}자입니다.`,
+        type: 'info',
+      });
       return;
     }
     setIsSubmitting(true);
@@ -185,13 +195,14 @@ export default function StampReviewPage() {
         navigate(buildPath(ROUTES.ACCOUNT_STAMP_DETAIL, { id: courseId }));
 
       } else if (reviewStatus === 'AUTO_REJECTED') {
-        const displayRationale =
-          rationale ||
-          '영화 내용과 관련 없는 리뷰로 판단되었어요. 영화의 인물, 장면, 줄거리를 바탕으로 다시 작성해 주세요.';
+        // 에이전트가 반환한 자세한 사유는 개발/로깅 용도로 콘솔에 남겨두고
+        // 사용자에게는 이해하기 쉬운 짧은 안내문을 제공한다.
+        if (rationale) console.info('[StampReviewPage] AI rejection rationale:', rationale);
+        const displayRationale = 'AI 검증 점수가 기준에 미달합니다. 영화의 줄거리, 인상적 장면, 배우의 연기 등을 구체적으로 추가해 주세요.';
         setAiRationale(displayRationale);
         showAlert({
           title: 'AI 검증 반려',
-          message: '리뷰가 영화 내용과 맞지 않아 반려되었어요. 아래 사유를 확인하고 수정해 주세요.',
+          message: 'AI 검증 점수가 기준에 미달했습니다. 작성하신 리뷰를 보완해 주세요.',
           type: 'error',
         });
 
@@ -235,7 +246,11 @@ export default function StampReviewPage() {
         <S.RejectionBanner>
           <S.RejectionTitle>반려 사유</S.RejectionTitle>
           <S.RejectionReason>
-            {rejectionReason || '관리자가 별도 사유를 남기지 않았습니다.'}
+            {/* 원본 사유는 로그에 남기고 사용자에게는 이해하기 쉬운 안내로 노출 */}
+            {(() => {
+              if (rejectionReason) console.info('[StampReviewPage] admin rejection reason:', rejectionReason);
+              return 'AI 검증 또는 관리자 검토에서 기준에 미달했습니다. 아래 안내를 참고해 리뷰를 보완해 주세요.';
+            })()}
           </S.RejectionReason>
         </S.RejectionBanner>
       )}
@@ -259,10 +274,13 @@ export default function StampReviewPage() {
             : '이 영화를 보고 느낀 점을 자유롭게 적어주세요.'}
         </S.Label>
         {isEditable && !resubmit && !aiRationale && (
-          <S.Hint>
-            줄거리, 인상적인 장면, 감독의 연출 방식, 배우의 연기 등
-            영화와 관련된 내용이라면 무엇이든 좋아요.
-          </S.Hint>
+          <>
+            <S.Hint>
+              줄거리, 인상적인 장면, 감독의 연출 방식, 배우의 연기 등
+              영화와 관련된 내용이라면 무엇이든 좋아요.
+            </S.Hint>
+            <S.Hint>AI 검증을 위해 리뷰는 최소 {MIN_REVIEW_LENGTH}자 이상이어야 합니다.</S.Hint>
+          </>
         )}
         {resubmit && (
           <S.Hint>반려 사유를 참고하여 리뷰를 보완한 후 다시 제출해 주세요.</S.Hint>
@@ -312,9 +330,9 @@ export default function StampReviewPage() {
         </S.CancelBtn>
         {isEditable && (
           <S.SubmitBtn
-            onClick={handleSubmit}
-            disabled={isSubmitting || !reviewText.trim()}
-          >
+              onClick={handleSubmit}
+              disabled={isSubmitting || !(reviewText.trim().length >= MIN_REVIEW_LENGTH)}
+            >
             {isSubmitting
               ? 'AI 검증 중...'
               : resubmit || aiRationale

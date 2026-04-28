@@ -96,6 +96,24 @@ export default function RoadmapPage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
+  /**
+   * 코스가 완주(완료)로 처리되었는지 여부를 안정적으로 판정.
+   * Backend 응답에서 필드명이 snake_case/camelCase 또는 boolean/string 등으로 달라질 수 있으므로
+   * 다양한 케이스를 포괄적으로 검사한다.
+   * @param {object} c - course/detail 객체
+   * @returns {boolean}
+   */
+  const isCourseCompletedFlag = (c) => {
+    if (!c) return false;
+    const strEqCompleted = (v) => typeof v === 'string' && v.toLowerCase() === 'completed';
+    if (strEqCompleted(c.status) || strEqCompleted(c.courseStatus) || strEqCompleted(c.course_status)) return true;
+    if (c.completedFinalReview === true || c.completed_final_review === true) return true;
+    if (c.isCompleted === true || c.completed === true) return true;
+    // 숫자 1로 표현되는 경우까지 방어적으로 체크
+    if (c.completed === 1 || c.completedFinalReview === 1) return true;
+    return false;
+  };
+
 
   /**
    * 코스 목록 로드.
@@ -230,16 +248,36 @@ export default function RoadmapPage() {
                   {completedCount} / {totalCount}편 ({progressPercent}%)
                 </S.ProgressText>
               </S.DetailProgress>
-              {!detail.started && (
-                <>
-                  <S.StartBtn onClick={handleStart} disabled={isStarting}>
-                    {isStarting ? '시작 중...' : '코스 시작하기'}
-                  </S.StartBtn>
-                  <S.StartHint>
-                    ※ 코스 시작하기 버튼을 눌러야 시청 인증을 진행할 수 있습니다.
-                  </S.StartHint>
-                </>
+              {/* 진행률 100%이지만 최종 감상평 미작성 시 상세 헤더 안내 */}
+              {(progressPercent >= 100 && !isCourseCompletedFlag(detail) && locationState?.finalReviewSubmitted !== true && detail?.requiresFinalReview !== false) && (
+                <S.HeaderHint>
+                  🎉 진행률이 모두 완료되었어요! 최종 감상평을 작성하시면 도장깨기가 완료됩니다. 지금 작성해 보세요.
+                </S.HeaderHint>
               )}
+              {/* 최종 감상평 버튼: 진행도 100% 또는 서버에서 requiresFinalReview를 전달했을 때 표시 (완주 전인 경우에만) */}
+              {(() => {
+                const isCourseFullyCompleted = isCourseCompletedFlag(detail) || locationState?.finalReviewSubmitted === true;
+                if (isStampMode && (progressPercent >= 100 || detail?.requiresFinalReview) && !isCourseFullyCompleted) {
+                  return (
+                    <S.StartBtn onClick={() => navigate(buildPath(ROUTES.ACCOUNT_STAMP_FINAL_REVIEW, { id: detail.id }), { state: { courseTitle: detail.title } })}>
+                      최종 감상평 작성하기
+                    </S.StartBtn>
+                  );
+                }
+                if (!detail.started) {
+                  return (
+                    <>
+                      <S.StartBtn onClick={handleStart} disabled={isStarting}>
+                        {isStarting ? '시작 중...' : '코스 시작하기'}
+                      </S.StartBtn>
+                      <S.StartHint>
+                        ※ 코스 시작하기 버튼을 눌러야 시청 인증을 진행할 수 있습니다.
+                      </S.StartHint>
+                    </>
+                  );
+                }
+                return null;
+              })()}
             </S.DetailHeader>
 
             {movies.length > 0 ? (
@@ -393,18 +431,22 @@ export default function RoadmapPage() {
                   />
                   <S.CourseTitle>{course.title}</S.CourseTitle>
                 </S.CourseHeaderRow>
-                {course.description && (
-                  <S.CourseDesc>{course.description}</S.CourseDesc>
-                )}
+                    {course.description && (
+                      <S.CourseDesc>{course.description}</S.CourseDesc>
+                    )}
                 <S.CourseMeta>
-                  <span>{course.movieCount || 0}편</span>
+                      <span>{course.movieCount || 0}편</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {isCompleted && (
                       <S.CompletedBadge>✓ 완료</S.CompletedBadge>
                     )}
-                    {!isCompleted && isInProgress && (
-                      <S.InProgressBadge>● 진행 중</S.InProgressBadge>
-                    )}
+                        {!isCompleted && isInProgress && (
+                          <S.InProgressBadge>● 진행 중</S.InProgressBadge>
+                        )}
+                        {/* 최종 감상평만 남음 배지 (옵션1) */}
+                        {activeTab === 'inprogress' && progress >= 100 && !isCourseCompletedFlag(course) && course.requiresFinalReview !== false && (
+                          <S.SmallBadge>✍️ 최종 감상평만 남음</S.SmallBadge>
+                        )}
                     {course.difficulty && (
                       <S.DifficultyBadge $level={course.difficulty}>
                         {DIFFICULTY_LABELS[course.difficulty] || course.difficulty}
@@ -423,6 +465,14 @@ export default function RoadmapPage() {
                     </S.ProgressText>
                   </>
                 )}
+                {/* 진행률이 100%이지만 최종 감상평이 작성되지 않은 경우 안내 문구 표시 (진행중 탭 내) */}
+                {activeTab === 'inprogress' && progress >= 100 && !isCourseCompletedFlag(course) && course.requiresFinalReview !== false && (
+                  <S.WarningText>
+                    🎉 진행률이 100%에 도달했어요. 마지막 감상평을 작성하여 도장깨기를 완료해 주세요.
+                  </S.WarningText>
+                )}
+                {/* 진행률이 100%이지만 최종 감상평이 작성되지 않은 경우 안내 문구 표시 (진행중 탭 내) */}
+                
               </S.CourseCard>
             );
           })}
