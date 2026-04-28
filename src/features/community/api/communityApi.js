@@ -38,11 +38,8 @@ export async function getPosts({ page = 1, size = 20, sort = 'latest', category,
 
   const pageData = await api.get(COMMUNITY_ENDPOINTS.POSTS, { params });
 
-  const filtered = (pageData?.content ?? []).filter(
-    (p) => p.category !== 'PLAYLIST_SHARE'
-  );
   return {
-    posts: filtered.map(normalizePost),
+    posts: (pageData?.content ?? []).map(normalizePost),
     total: pageData?.totalElements ?? 0,
     page: (pageData?.number ?? 0) + 1,
     totalPages: pageData?.totalPages ?? 0,

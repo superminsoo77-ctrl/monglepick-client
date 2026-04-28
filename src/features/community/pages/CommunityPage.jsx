@@ -57,14 +57,30 @@ export default function CommunityPage() {
   const [sort, setSort] = useState('latest');
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(
+    Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+  );
   const [totalPages, setTotalPages] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // ✅ 추가
+
+  const goToPage = (page) => {
+    setCurrentPage(page);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (page > 1) next.set('page', String(page));
+        else next.delete('page');
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
+    setCurrentPage(1);
     if (tabId === 'posts') {
       setSearchParams({}, { replace: true });
     } else {
@@ -101,20 +117,20 @@ export default function CommunityPage() {
 
   const handleCategoryChange = (id) => {
     setCategory(id);
-    setCurrentPage(1);
+    goToPage(1);
     setKeyword('');
     setSearchInput('');
   };
 
   const handleSortChange = (id) => {
     setSort(id);
-    setCurrentPage(1);
+    goToPage(1);
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
     setKeyword(searchInput);
-    setCurrentPage(1);
+    goToPage(1);
   };
 
   const handleCreatePost = async (postData) => {
@@ -122,7 +138,7 @@ export default function CommunityPage() {
     try {
       const newPost = await createPost(postData);
       setShowForm(false);
-      setCurrentPage(1);
+      goToPage(1);
       setKeyword('');
       setSearchInput('');
       setCategory('all');
@@ -235,7 +251,7 @@ export default function CommunityPage() {
               {totalPages > 1 && (
                 <S.Pagination>
                   <S.PageBtn
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onClick={() => goToPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                   >
                     ◀
@@ -245,14 +261,14 @@ export default function CommunityPage() {
                     <S.PageBtn
                       key={page}
                       $active={page === currentPage}
-                      onClick={() => setCurrentPage(page)}
+                      onClick={() => goToPage(page)}
                     >
                       {page}
                     </S.PageBtn>
                   ))}
 
                   <S.PageBtn
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                   >
                     ▶

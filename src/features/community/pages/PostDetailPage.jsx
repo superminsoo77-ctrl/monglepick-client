@@ -139,7 +139,7 @@ export default function PostDetailPage() {
     return (
       <S.PageWrapper>
         <S.PageInner>
-          <S.BackButton onClick={() => navigate('/community')}>← 목록으로</S.BackButton>
+          <S.BackButton onClick={() => navigate(-1)}>← 목록으로</S.BackButton>
           <S.Status>{error || '게시글을 찾을 수 없습니다.'}</S.Status>
         </S.PageInner>
       </S.PageWrapper>
@@ -149,7 +149,7 @@ export default function PostDetailPage() {
   return (
     <S.PageWrapper>
       <S.PageInner>
-        <S.BackButton onClick={() => navigate('/community')}>← 목록으로</S.BackButton>
+        <S.BackButton onClick={() => navigate(-1)}>← 목록으로</S.BackButton>
 
         <S.Card>
           {/* 헤더 — 카테고리, 시간, 삭제 버튼 */}
