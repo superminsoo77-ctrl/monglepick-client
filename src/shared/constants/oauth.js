@@ -20,7 +20,7 @@ export const OAUTH_CONFIG = {
   kakao: {
     clientId: import.meta.env.VITE_KAKAO_CLIENT_ID || '',
     authorizeUrl: 'https://kauth.kakao.com/oauth/authorize',
-    scope: 'profile_nickname profile_image account_email',
+    scope: 'profile_nickname account_email',
   },
   naver: {
     clientId: import.meta.env.VITE_NAVER_CLIENT_ID || '',
