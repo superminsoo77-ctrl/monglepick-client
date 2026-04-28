@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { getSharedPlaylists, sharePlaylist, togglePostLike } from '../api/communityApi';
-import { getPlaylists, importPlaylist, updatePlaylist } from '../../playlist/api/playlistApi';
+import { getShareablePlaylists, importPlaylist, updatePlaylist } from '../../playlist/api/playlistApi';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import { useModal } from '../../../shared/components/Modal';
 import { buildPath, ROUTES } from '../../../shared/constants/routes';
@@ -471,7 +471,10 @@ export default function PlaylistShareFeed() {
       return;
     }
     try {
-      const res = await getPlaylists({ page: 0, size: 50 });
+      // Backend `/playlists/shareable` 가 PLAYLIST_SHARE 미공유분만 반환하므로
+      // 클라이언트 측 isPublic/isShared 필터링이 불필요. movieCount/isShared 는
+      // ShareablePlaylistResponse 가 이미 포함.
+      const res = await getShareablePlaylists({ page: 0, size: 50 });
       const list = (res?.content ?? res ?? []).map((pl) => ({
         ...pl,
         movieCount:
@@ -482,35 +485,26 @@ export default function PlaylistShareFeed() {
           (Array.isArray(pl.movieIds) ? pl.movieIds.length : undefined) ??
           0,
       }));
-      // only include playlists that are NOT public (isPublic !== true)
-      // and exclude playlists that appear to be imported/copied into this account
-      const importedKeys = [
-        'sourcePlaylistId',
-        'originalPlaylistId',
-        'copiedFromPlaylistId',
-        'importedFrom',
-        'originPlaylistId',
-        'isImported',
-      ];
-
-      const isImportedPlaylist = (pl) => {
-        // truthy check on known keys or boolean flag
-        for (const k of importedKeys) {
-          if (pl[k]) return true;
-        }
-        return false;
-      };
-
-      const privateList = list.filter((pl) => !pl.isPublic && !isImportedPlaylist(pl));
-      if (privateList.length === 0) {
+      // 가져온(import) 플레이리스트는 원작자 공유가 우선이므로 모달에서 제외.
+      const isImportedPlaylist = (pl) => Boolean(
+        pl.isImported
+        || pl.is_imported
+        || pl.sourcePlaylistId
+        || pl.originalPlaylistId
+        || pl.copiedFromPlaylistId
+        || pl.importedFrom
+        || pl.originPlaylistId,
+      );
+      const candidates = list.filter((pl) => !isImportedPlaylist(pl));
+      if (candidates.length === 0) {
         await showAlert({
           title: '플레이리스트 없음',
-          message: '먼저 플레이리스트를 만들어보세요.',
+          message: '공유할 수 있는 플레이리스트가 없어요. 먼저 플레이리스트를 만들거나, 이미 공유한 목록은 커뮤니티 글에서 관리해주세요.',
           type: 'info',
         });
         return;
       }
-      setMyPlaylists(privateList);
+      setMyPlaylists(candidates);
       setShareForm({ title: '', content: '', playlistId: '' });
       setShowShareModal(true);
     } catch {

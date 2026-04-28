@@ -428,6 +428,8 @@ export const RECOMMENDATION_ENDPOINTS = {
 export const PLAYLIST_ENDPOINTS = {
   /** 플레이리스트 목록 - GET (query: page, size) */
   LIST: `${API_VERSION}/playlists`,
+  /** 커뮤니티 공유 모달용 — 미공유 플레이리스트만 GET (query: page, size) */
+  SHAREABLE: `${API_VERSION}/playlists/shareable`,
   /** 플레이리스트 생성 - POST (body: {title, description}) */
   CREATE: `${API_VERSION}/playlists`,
   /** 플레이리스트 상세 - GET (path: playlistId) */

@@ -25,6 +25,24 @@ export async function getPlaylists({ page = 0, size = 20 } = {}) {
 }
 
 /**
+ * 커뮤니티 공유 모달용 — 아직 공유하지 않은 내 플레이리스트만 조회.
+ *
+ * Backend `findShareableByUserId` 가 PLAYLIST_SHARE 미공유분만 반환하므로
+ * 클라이언트에서 별도 필터링 불필요. 응답은 ShareablePlaylistResponse
+ * (movieCount/isShared 포함) 의 페이지.
+ *
+ * @param {Object} params
+ * @param {number} [params.page=0]
+ * @param {number} [params.size=20]
+ * @returns {Promise<{content: Array, totalPages: number, totalElements: number}>}
+ */
+export async function getShareablePlaylists({ page = 0, size = 20 } = {}) {
+  requireAuth();
+  const res = await backendApi.get(PLAYLIST_ENDPOINTS.SHAREABLE, { params: { page, size } });
+  return res?.data ?? res;
+}
+
+/**
  * 플레이리스트 상세 조회 (영화 목록 포함).
  *
  * @param {string|number} playlistId
