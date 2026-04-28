@@ -29,12 +29,19 @@ export default function ChatbotTab({ onSwitchToTicket }) {
   /* 세션 ID */
   const [sessionId, setSessionId] = useState(null);
 
-  /* 메시지 영역 스크롤 ref */
-  const messagesEndRef = useRef(null);
+  /* 메시지 영역 스크롤 ref — 컨테이너 자체에 ref 를 걸어 내부 scrollTop 만 조정한다.
+     scrollIntoView 를 쓰면 앵커 div 가 viewport 안에 들어오도록 부모 window 까지
+     스크롤되어, 고객센터 페이지에 진입하자마자 페이지 전체가 챗봇 영역 끝으로
+     강제 이동하는 버그가 발생했다 (QA 2026-04-28). */
+  const messagesContainerRef = useRef(null);
 
-  /** 자동 스크롤 */
+  /** 메시지 추가/로딩 시 채팅창 내부만 하단으로 스크롤. */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    /* 대화 시작 전(메시지 0건 + 로딩 X) 에는 스크롤 자체를 skip — 첫 진입 시
+       페이지 스크롤이 의도치 않게 이동하지 않도록 한다. */
+    if (messages.length === 0 && !isLoading) return;
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, isLoading]);
 
   /**
@@ -152,7 +159,7 @@ export default function ChatbotTab({ onSwitchToTicket }) {
       </S.Header>
 
       {/* 메시지 영역 */}
-      <S.Messages>
+      <S.Messages ref={messagesContainerRef}>
         {/* 환영 메시지 (대화 시작 전) */}
         {messages.length === 0 && (
           <S.WelcomeMsg>
@@ -226,8 +233,6 @@ export default function ChatbotTab({ onSwitchToTicket }) {
           </S.MsgRow>
         )}
 
-        {/* 자동 스크롤 앵커 */}
-        <div ref={messagesEndRef} />
       </S.Messages>
 
       {/* 입력 영역 */}

@@ -32,6 +32,7 @@ import FaqTab from '../components/FaqTab';
 import HelpTab from '../components/HelpTab';
 import TicketTab from '../components/TicketTab';
 import ChatbotTab from '../components/ChatbotTab';
+import TicketDetailModal from '../components/TicketDetailModal';
 
 /* 포맷 유틸 — shared/utils에서 가져옴 */
 import { formatDate } from '../../../shared/utils/formatters';
@@ -180,6 +181,16 @@ export default function SupportPage() {
   const [ticketPage, setTicketPage] = useState(0);
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
 
+  /*
+   * 선택된 티켓 ID — null 이면 상세 모달 닫힘 상태.
+   *
+   * 모달 열림/닫힘은 URL 쿼리(useModalRoute) 대신 단순 state 로 관리한다.
+   *   - "?tab=history" 쿼리가 이미 사용 중이라 modal 키와 동시에 다루기 번잡
+   *   - 상세 모달은 본인 인증 필수 + 짧은 수명이라 딥링크 가치가 낮음
+   *   - 활성 섹션이 history 가 아니면 자동으로 닫혀야 안전
+   */
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
+
   /* ── 글로벌 에러 ── */
   const [error, setError] = useState(null);
 
@@ -308,6 +319,16 @@ export default function SupportPage() {
   useEffect(() => {
     if (activeSection === 'history' && isAuthenticated) loadMyTickets();
   }, [activeSection, isAuthenticated, loadMyTickets]);
+
+  /*
+   * 활성 섹션이 history 가 아닐 때 상세 모달이 열려 있으면 닫는다.
+   * (탭 전환/로그아웃 등으로 컨텍스트가 바뀌었는데 모달만 남아있는 어색한 상태 방지)
+   */
+  useEffect(() => {
+    if (activeSection !== 'history' || !isAuthenticated) {
+      setSelectedTicketId(null);
+    }
+  }, [activeSection, isAuthenticated]);
 
   /* ══════════════════════════════════════════
      이벤트 핸들러
@@ -554,6 +575,20 @@ export default function SupportPage() {
             isLoadingTickets={isLoadingTickets}
             onPageChange={setTicketPage}
             ticketCategories={TICKET_CATEGORIES}
+            categoryLabelMap={CATEGORY_LABEL_MAP}
+            statusLabelMap={STATUS_LABEL_MAP}
+            formatDate={formatDate}
+            onSelectTicket={setSelectedTicketId}
+          />
+        )}
+
+        {/* ── 문의 상세 모달 ──
+            선택된 ticketId 가 있을 때만 마운트.
+            모달 내부에서 getTicketDetail() 로 본문/답변 이력을 fetch 한다. */}
+        {selectedTicketId != null && (
+          <TicketDetailModal
+            ticketId={selectedTicketId}
+            onClose={() => setSelectedTicketId(null)}
             categoryLabelMap={CATEGORY_LABEL_MAP}
             statusLabelMap={STATUS_LABEL_MAP}
             formatDate={formatDate}

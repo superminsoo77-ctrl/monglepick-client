@@ -400,6 +400,12 @@ export const List = styled.div`
  * 개별 티켓 항목 — 정보(좌)와 상태 배지(우)를 가로로 배치.
  * 태블릿(768px) 이하에서 세로 방향으로 전환하고,
  * 상태 배지는 align-self: flex-start 로 왼쪽 정렬.
+ *
+ * 부모에서 `as="button"` 과 `$clickable` transient prop 을 함께 넘겨
+ * 클릭 가능한 카드로 사용할 수 있다. 이 때:
+ *   - 브라우저 기본 button 스타일을 reset 해 div 와 동일한 외형 유지
+ *   - hover 시 primary 테두리 + glow 로 클릭 가능함을 시각적으로 알림
+ *   - keyboard focus 링 노출
  */
 export const Item = styled.div`
   display: flex;
@@ -410,6 +416,30 @@ export const Item = styled.div`
   border-radius: ${({ theme }) => theme.radius.md};
   padding: ${({ theme }) => theme.spacing.md};
   gap: ${({ theme }) => theme.spacing.sm};
+  /* as="button" 으로 렌더링될 때 기본 스타일 reset — div 외형과 동일하게 맞춤 */
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: ${({ $clickable }) => ($clickable ? 'pointer' : 'default')};
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+    box-shadow ${({ theme }) => theme.transitions.fast},
+    transform ${({ theme }) => theme.transitions.fast};
+
+  ${({ $clickable, theme }) =>
+    $clickable &&
+    `
+    &:hover {
+      border-color: ${theme.colors.primary};
+      box-shadow: ${theme.glows.primary};
+      transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+      outline: 2px solid ${theme.colors.primary};
+      outline-offset: 2px;
+    }
+  `}
 
   ${media.tablet} {
     flex-direction: column;

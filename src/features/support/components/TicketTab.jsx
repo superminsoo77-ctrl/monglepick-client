@@ -27,6 +27,7 @@
  * @param {Object} props.categoryLabelMap - 카테고리 라벨 매핑
  * @param {Object} props.statusLabelMap - 티켓 상태 라벨 매핑
  * @param {Function} props.formatDate - 날짜 포맷팅 함수
+ * @param {Function} props.onSelectTicket - 티켓 항목 클릭 시 호출되는 콜백 (ticketId 인자)
  */
 
 import { ROUTES } from '../../../shared/constants/routes';
@@ -55,6 +56,7 @@ export default function TicketTab({
   categoryLabelMap,
   statusLabelMap,
   formatDate,
+  onSelectTicket,
 }) {
   /* ── 문의하기 섹션 ── */
   if (activeSection === 'ticket') {
@@ -225,26 +227,43 @@ export default function TicketTab({
           </S.Empty>
         ) : (
           <>
-            {/* 티켓 목록 */}
+            {/* 티켓 목록 — 항목 클릭 시 onSelectTicket(ticketId) 으로 상세 모달 오픈.
+                onSelectTicket 이 없으면 기존처럼 정적 카드만 렌더한다 (storybook/테스트 호환). */}
             <S.List role="list">
-              {myTickets.content.map((ticket) => (
-                <S.Item key={ticket.ticketId} role="listitem">
-                  <S.ItemInfo>
-                    <S.ItemTitle>{ticket.title}</S.ItemTitle>
-                    <S.ItemMeta>
-                      <S.ItemCategoryBadge>
-                        {categoryLabelMap[ticket.category] || ticket.category}
-                      </S.ItemCategoryBadge>
-                      <S.ItemDate>
-                        {formatDate(ticket.createdAt)}
-                      </S.ItemDate>
-                    </S.ItemMeta>
-                  </S.ItemInfo>
-                  <S.StatusBadge $status={ticket.status}>
-                    {statusLabelMap[ticket.status] || ticket.status}
-                  </S.StatusBadge>
-                </S.Item>
-              ))}
+              {myTickets.content.map((ticket) => {
+                const clickable = typeof onSelectTicket === 'function';
+                return (
+                  <S.Item
+                    key={ticket.ticketId}
+                    role="listitem"
+                    $clickable={clickable}
+                    /* clickable 일 때만 button 시멘틱 적용 → 키보드 enter/space + 포커스 링 자동 지원 */
+                    {...(clickable
+                      ? {
+                          as: 'button',
+                          type: 'button',
+                          onClick: () => onSelectTicket(ticket.ticketId),
+                          'aria-label': `${ticket.title} 상세 보기`,
+                        }
+                      : {})}
+                  >
+                    <S.ItemInfo>
+                      <S.ItemTitle>{ticket.title}</S.ItemTitle>
+                      <S.ItemMeta>
+                        <S.ItemCategoryBadge>
+                          {categoryLabelMap[ticket.category] || ticket.category}
+                        </S.ItemCategoryBadge>
+                        <S.ItemDate>
+                          {formatDate(ticket.createdAt)}
+                        </S.ItemDate>
+                      </S.ItemMeta>
+                    </S.ItemInfo>
+                    <S.StatusBadge $status={ticket.status}>
+                      {statusLabelMap[ticket.status] || ticket.status}
+                    </S.StatusBadge>
+                  </S.Item>
+                );
+              })}
             </S.List>
 
             {/* 페이지네이션 */}
