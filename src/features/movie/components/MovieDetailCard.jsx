@@ -18,12 +18,19 @@
  * @param {Object} props.movie - 영화 상세 정보 객체
  * @param {function} [props.onWishlistToggle] - 위시리스트 토글 콜백
  * @param {boolean} [props.isWishlisted=false] - 위시리스트 포함 여부
+ * @param {boolean} [props.wishlistLoading=false] - 위시리스트 요청 진행 여부
  * @param {number} [props.likeCount=0] - 영화 좋아요 수
  * @param {boolean} [props.isLiked=false] - 현재 사용자의 좋아요 여부
  * @param {function} [props.onLikeToggle] - 좋아요 토글 콜백 (movieId 전달)
+ * @param {Array} [props.collectionMovies=[]] - 같은 컬렉션 작품 목록
+ * @param {boolean} [props.collectionMoviesLoading=false] - 컬렉션 작품 로딩 여부
+ * @param {Array} [props.relatedMovies=[]] - 컬렉션을 제외한 연관 영화 목록
+ * @param {boolean} [props.relatedMoviesLoading=false] - 일반 연관 영화 로딩 여부
  */
 
 import { useState } from 'react';
+/* 라우트 경로 상수 + 경로 빌더 — shared/constants에서 가져옴 */
+import { buildPath, ROUTES } from '../../../shared/constants/routes';
 /* 포맷팅 유틸 — shared/utils에서 가져옴 */
 /* formatGenres: 장르 태그는 movie.genres 배열을 직접 순회하므로 미사용 */
 import { formatRating, formatRatingStars, formatRuntime, formatDate } from '../../../shared/utils/formatters';
@@ -32,6 +39,10 @@ import * as S from './MovieDetailCard.styled';
 
 export default function MovieDetailCard({
   movie,
+  collectionMovies = [],
+  collectionMoviesLoading = false,
+  relatedMovies = [],
+  relatedMoviesLoading = false,
   onWishlistToggle,
   isWishlisted = false,
   wishlistLoading = false,
@@ -77,8 +88,40 @@ export default function MovieDetailCard({
     return genres.split(',').map((genre) => genre.trim()).filter(Boolean);
   };
 
+  const resolveMovieId = (targetMovie) => (
+    targetMovie?.movie_id || targetMovie?.movieId || targetMovie?.id || null
+  );
+
+  const resolveMovieTitle = (targetMovie) => (
+    targetMovie?.title || targetMovie?.title_ko || '제목 없음'
+  );
+
+  const resolveReleaseYear = (targetMovie) => {
+    if (targetMovie?.releaseYear) return targetMovie.releaseYear;
+    if (targetMovie?.release_year) return targetMovie.release_year;
+    if (typeof targetMovie?.release_date === 'string' && targetMovie.release_date.length >= 4) {
+      return targetMovie.release_date.slice(0, 4);
+    }
+    return null;
+  };
+
   const posterSrc = resolveImageUrl(
     movie.posterUrl || movie.poster_url || movie.poster_path
+  );
+  const buildMovieSkeletons = (movies) => Array.from(
+    { length: movies.length > 0 ? 3 : 5 },
+    (_, index) => index
+  );
+  const collectionMovieSeedExists = Boolean(
+    movie.collection_name || collectionMoviesLoading || collectionMovies.length > 0
+  );
+  const relatedMovieSeedExists = Boolean(
+    relatedMoviesLoading
+      || relatedMovies.length > 0
+      || movie.director
+      || (movie.cast && movie.cast.length > 0)
+      || movie.overview
+      || parseGenres(movie.genres).length > 0
   );
 
   /**
@@ -121,6 +164,126 @@ export default function MovieDetailCard({
   };
 
   const embedUrl = getYouTubeEmbedUrl(movie.trailer_url);
+
+  const renderMovieCarousel = ({
+    movies,
+    loading,
+    emptyText,
+    loadingText,
+    loadingMoreText,
+  }) => {
+    const movieSkeletons = buildMovieSkeletons(movies);
+
+    if (movies.length > 0) {
+      return (
+        <>
+          <S.RelatedMovieGrid>
+            {movies.map((targetMovie) => {
+              const targetMovieId = resolveMovieId(targetMovie);
+              const targetPosterSrc = resolveImageUrl(
+                targetMovie.posterUrl || targetMovie.poster_url || targetMovie.poster_path
+              );
+
+              if (!targetMovieId) {
+                return null;
+              }
+
+              return (
+                <S.RelatedMovieCard
+                  key={targetMovieId}
+                  to={buildPath(ROUTES.MOVIE_DETAIL, { id: targetMovieId })}
+                  aria-label={`${resolveMovieTitle(targetMovie)} 상세 보기`}
+                >
+                  <S.RelatedPoster>
+                    {targetPosterSrc ? (
+                      <S.RelatedPosterImg
+                        src={targetPosterSrc}
+                        alt={`${resolveMovieTitle(targetMovie)} 포스터`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <S.RelatedPosterPlaceholder>
+                        <S.RelatedPosterPlaceholderIcon>🎬</S.RelatedPosterPlaceholderIcon>
+                        <span>포스터 없음</span>
+                      </S.RelatedPosterPlaceholder>
+                    )}
+
+                    <S.RelatedMovieBody>
+                      <S.RelatedMovieTitle>{resolveMovieTitle(targetMovie)}</S.RelatedMovieTitle>
+                      <S.RelatedMovieMeta>
+                        {resolveReleaseYear(targetMovie) || '연도 미상'}
+                      </S.RelatedMovieMeta>
+
+                      {targetMovie.relationReasons?.length > 0 && (
+                        <S.RelatedReasonList>
+                          {targetMovie.relationReasons.map((reason) => (
+                            <S.RelatedReasonTag key={`${targetMovieId}-${reason}`}>
+                              {reason}
+                            </S.RelatedReasonTag>
+                          ))}
+                        </S.RelatedReasonList>
+                      )}
+                    </S.RelatedMovieBody>
+                  </S.RelatedPoster>
+                </S.RelatedMovieCard>
+              );
+            })}
+
+            {loading && movieSkeletons.map((index) => (
+              <S.RelatedMovieSkeletonCard key={`related-skeleton-${index}`} aria-hidden="true">
+                <S.RelatedPosterSkeleton>
+                  <S.RelatedMovieSkeletonBody>
+                    <S.RelatedSkeletonLine $width="76%" $height="12px" />
+                    <S.RelatedSkeletonLine $width="34%" $height="9px" />
+                    <S.RelatedSkeletonTagRow>
+                      <S.RelatedSkeletonTag $width="48px" />
+                      <S.RelatedSkeletonTag $width="56px" />
+                    </S.RelatedSkeletonTagRow>
+                  </S.RelatedMovieSkeletonBody>
+                </S.RelatedPosterSkeleton>
+              </S.RelatedMovieSkeletonCard>
+            ))}
+          </S.RelatedMovieGrid>
+
+          {loading && (
+            <S.RelatedStatusText>
+              {loadingMoreText || loadingText}
+            </S.RelatedStatusText>
+          )}
+        </>
+      );
+    }
+
+    if (loading) {
+      return (
+        <>
+          <S.RelatedMovieGrid>
+            {movieSkeletons.map((index) => (
+              <S.RelatedMovieSkeletonCard key={`related-skeleton-empty-${index}`} aria-hidden="true">
+                <S.RelatedPosterSkeleton>
+                  <S.RelatedMovieSkeletonBody>
+                    <S.RelatedSkeletonLine $width="76%" $height="12px" />
+                    <S.RelatedSkeletonLine $width="34%" $height="9px" />
+                    <S.RelatedSkeletonTagRow>
+                      <S.RelatedSkeletonTag $width="48px" />
+                      <S.RelatedSkeletonTag $width="56px" />
+                    </S.RelatedSkeletonTagRow>
+                  </S.RelatedMovieSkeletonBody>
+                </S.RelatedPosterSkeleton>
+              </S.RelatedMovieSkeletonCard>
+            ))}
+          </S.RelatedMovieGrid>
+          <S.RelatedStatusText>{loadingText}</S.RelatedStatusText>
+        </>
+      );
+    }
+
+    return (
+      <S.RelatedStatusText>
+        {emptyText}
+      </S.RelatedStatusText>
+    );
+  };
 
   return (
     <S.Wrapper>
@@ -289,6 +452,45 @@ export default function MovieDetailCard({
         <S.Section>
           <S.SectionTitle>추천 이유</S.SectionTitle>
           <S.Recommendation>{movie.recommendation_reason}</S.Recommendation>
+        </S.Section>
+      )}
+
+      {/* ── 같은 시리즈 작품 ── */}
+      {collectionMovieSeedExists && (
+        <S.Section>
+          <S.SectionTab>시리즈</S.SectionTab>
+          <S.SectionTitle>
+            {movie.collection_name || '같은 시리즈 작품'}
+          </S.SectionTitle>
+          <S.RelatedSectionDescription>
+            같은 컬렉션에 속한 작품만 따로 모았습니다. 순서대로 훑어보시고, 마우스를 올리면 상세 정보가 나타납니다.
+          </S.RelatedSectionDescription>
+
+          {renderMovieCarousel({
+            movies: collectionMovies,
+            loading: collectionMoviesLoading,
+            emptyText: '같은 시리즈 작품이 아직 없습니다.',
+            loadingText: '시리즈 작품을 찾는 중입니다.',
+            loadingMoreText: '추가 시리즈 작품을 찾는 중입니다.',
+          })}
+        </S.Section>
+      )}
+
+      {/* ── 연관 영화 ── */}
+      {relatedMovieSeedExists && (
+        <S.Section>
+          <S.SectionTitle>연관 영화</S.SectionTitle>
+          <S.RelatedSectionDescription>
+            줄거리 유사도와 메타데이터를 바탕으로 찾은 별도 추천입니다. 좌우로 넘겨 보시고, 마우스를 올리면 상세 정보가 나타납니다.
+          </S.RelatedSectionDescription>
+
+          {renderMovieCarousel({
+            movies: relatedMovies,
+            loading: relatedMoviesLoading,
+            emptyText: '연관 영화 후보를 아직 찾지 못했습니다.',
+            loadingText: '연관 영화를 찾는 중입니다.',
+            loadingMoreText: '추가 연관 영화를 찾는 중입니다.',
+          })}
         </S.Section>
       )}
 
