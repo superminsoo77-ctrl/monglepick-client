@@ -146,7 +146,7 @@ export default function OcrVerificationModal({
     // 3) OCR 분석 — 업로드 성공 후 자동 실행
     setAnalyzing(true);
     try {
-      const result = await analyzeOcrImage(serverUrl);
+      const result = await analyzeOcrImage(serverUrl, event.eventId);
       setOcrResult(result);
     } catch (err) {
       console.warn('[OCR 인증] 분석 실패 (제출은 가능):', err);

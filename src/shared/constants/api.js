@@ -191,7 +191,7 @@ export const COMMUNITY_ENDPOINTS = {
    * 바디: { imageUrl }
    * 반환: { extractedMovieName, extractedWatchDate, extractedHeadcount, ocrConfidence }
    */
-  OCR_ANALYZE: `${API_VERSION}/ocr-events/analyze`,
+  OCR_ANALYZE: (eventId) => `${API_VERSION}/ocr-events/${eventId}/analyze`,
   /**
    * 2026-04-14 신규: OCR 실관람 인증 제출 - POST (JWT 필수).
    * 바디: { imageUrl, extractedMovieName?, extractedWatchDate?, extractedHeadcount?, ocrConfidence? }
