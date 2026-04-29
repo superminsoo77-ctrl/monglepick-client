@@ -44,6 +44,24 @@ import { logoutAPI } from '../../features/auth/api/authApi';
  * 선택적 구독(selector)으로 불필요한 리렌더링을 방지한다.
  */
 /**
+ * JWT 토큰의 payload(2번째 세그먼트)를 디코딩하여 JSON 객체로 반환한다.
+ * 디코딩 실패 시 null 반환 — 호출자가 안전하게 fallback 처리.
+ *
+ * @param {string} token - JWT 토큰 문자열
+ * @returns {Object|null} 디코딩된 payload, 실패 시 null
+ */
+function decodeTokenPayload(token) {
+  try {
+    if (typeof token !== 'string') return null;
+    const segments = token.split('.');
+    if (segments.length < 2) return null;
+    return JSON.parse(atob(segments[1]));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * JWT 토큰의 만료 여부를 검사한다.
  * payload의 exp 클레임을 디코딩하여 현재 시간과 비교한다.
  *
@@ -51,29 +69,70 @@ import { logoutAPI } from '../../features/auth/api/authApi';
  * @returns {boolean} 만료되었으면 true
  */
 function isTokenExpired(token) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    /* exp는 초 단위이므로 밀리초로 변환하여 비교 */
-    return payload.exp * 1000 < Date.now();
-  } catch {
-    return true;
-  }
+  const payload = decodeTokenPayload(token);
+  if (!payload || typeof payload.exp !== 'number') return true;
+  /* exp는 초 단위이므로 밀리초로 변환하여 비교 */
+  return payload.exp * 1000 < Date.now();
+}
+
+/**
+ * 응답으로 받은 user 객체에 id 가 비어 있을 경우 JWT 의 sub claim 으로 보강한다.
+ *
+ * <p>2026-04-29 안전망 — Backend 는 {@code /jwt/exchange} 응답에 user 정보를 동봉하도록
+ * 변경됐지만(JwtController.ExchangeResponseBody), 다음 두 가지 경계 상황에 대비한다.</p>
+ * <ul>
+ *   <li>구버전 Backend 가 아직 운영에 배포되지 않은 캐시 환경 — accessToken 만 내려와도
+ *     sub claim 으로 user.id 를 채워 PointPage 등의 가드를 통과시킨다.</li>
+ *   <li>다른 인증 경로(예: 로컬 회원가입 직후 redirect, refresh 후 user 미동봉)
+ *     에서도 동일하게 동작 — 단일 진실 원본(login 진입점)에서 보장.</li>
+ * </ul>
+ *
+ * <p>id 외 필드(email/nickname/profileImage/provider/role) 는 access token claims 에
+ * 포함돼 있지 않으므로 그대로 둔다(있으면 사용, 없으면 null/undefined). MyPage 진입 시
+ * {@code GET /api/v1/users/me} 호출로 자연스럽게 채워진다.</p>
+ *
+ * @param {string} token - JWT Access Token (id 추출용)
+ * @param {Object} userData - 응답에 포함된 user 객체 (없을 수 있음)
+ * @returns {Object|null} id 가 보장된 user 객체, 어떤 정보도 없으면 null
+ */
+function ensureUserId(token, userData) {
+  /* userData 자체가 null/undefined 인 경우, JWT sub 만으로 최소 user 객체 생성.
+   * userData 에 id 가 이미 있으면 변형 없이 그대로 반환. */
+  const hasId = userData && typeof userData === 'object' && userData.id;
+  if (hasId) return userData;
+
+  const payload = decodeTokenPayload(token);
+  const sub = payload && typeof payload.sub === 'string' ? payload.sub : null;
+
+  /* JWT sub 가 없으면 보강 불가. 기존 userData 그대로 반환(null 포함). */
+  if (!sub) return userData ?? null;
+
+  /* 기존 userData 의 다른 필드(닉네임 등)를 보존하면서 id 만 보강.
+   * userData 가 null 이면 sub 만 담은 minimal 객체. */
+  return { ...(userData || {}), id: sub };
 }
 
 const useAuthStore = create((set, get) => {
   /* ── 초기 상태: localStorage에서 복원 (만료된 토큰은 무시) ── */
   const savedToken = getToken();
-  const savedUser = getUser();
-  const isValid = savedToken && savedUser && !isTokenExpired(savedToken);
+  const savedUserRaw = getUser();
+  const isValid = savedToken && savedUserRaw && !isTokenExpired(savedToken);
 
   /* 만료된 토큰이 있으면 즉시 정리 */
   if (savedToken && !isValid) {
     clearAll();
   }
 
+  /* 옛 세션이 user.id 없이 저장돼 있던 경우(소셜 로그인 회귀 이전 데이터)
+   * sub claim 으로 보강해 하위 호환성 확보. */
+  const savedUser = isValid ? ensureUserId(savedToken, savedUserRaw) : null;
+  if (isValid && savedUser !== savedUserRaw && savedUser) {
+    setUser(savedUser);
+  }
+
   return {
     /** 사용자 정보 (null이면 미인증) */
-    user: isValid ? savedUser : null,
+    user: savedUser,
 
     /** JWT 액세스 토큰 */
     token: isValid ? savedToken : null,
@@ -107,12 +166,18 @@ const useAuthStore = create((set, get) => {
      */
     // eslint-disable-next-line no-unused-vars
     login: ({ accessToken, refreshToken, user: userData }) => {
+      /* 2026-04-29 안전망 — 응답에 user 객체가 누락되거나 user.id 가 없는 경우
+       * accessToken 의 sub claim 으로 user.id 를 보강한다. 소셜 로그인 흐름에서
+       * Backend 가 구버전이라 accessToken 만 내려오는 캐시 상황에서도 PointPage 등
+       * 개인화 데이터 로더의 user.id 가드가 정상 통과되도록 보장. */
+      const safeUser = ensureUserId(accessToken, userData);
+
       /* Zustand 상태 업데이트 */
-      set({ token: accessToken, user: userData });
+      set({ token: accessToken, user: safeUser });
 
       /* localStorage에 영속 저장 (새로고침 후 인증 상태 복원용) */
       setToken(accessToken);
-      setUser(userData);
+      setUser(safeUser);
 
       // [이슈6] refreshToken은 서버 HttpOnly 쿠키로 관리하므로 저장하지 않음
     },

@@ -65,12 +65,18 @@ export default function OAuthCookiePage() {
         // 쿠키→헤더 교환 API 호출
         const response = await exchangeToken();
 
-        // AuthContext에 인증 정보 저장
-        // refreshToken은 서버가 HttpOnly 쿠키로 관리하므로 body에 포함되지 않음
-        // accessToken만 localStorage에 저장하고, Refresh Token은 쿠키로 자동 처리됨
+        /*
+         * AuthContext 에 인증 정보 저장.
+         * - refreshToken 은 서버가 HttpOnly 쿠키로 관리하므로 body 에 포함되지 않는다.
+         * - 2026-04-29 — Backend 신규 응답 컨트랙트({ accessToken, user })에 맞춰
+         *   response.user 를 그대로 전달한다. user.id 가 비어 있는 환경(구버전 백엔드
+         *   캐시 등) 에 대비해 useAuthStore.login 내부에서 JWT sub claim 으로 보강한다.
+         * - response.userNickname 은 과거 폴백 필드명이지만 신규 응답에서는 미사용
+         *   이므로, response.user 가 없을 때만 닉네임 한정으로 임시 객체를 넘겨 둔다.
+         */
         login({
           accessToken: response.accessToken,
-          user: response.user || { nickname: response.userNickname },
+          user: response.user || (response.userNickname ? { nickname: response.userNickname } : null),
         });
 
         /*

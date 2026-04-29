@@ -28,7 +28,7 @@ import AgentInfoModal, { AGENT_MODAL_CONTENT } from '../components/AgentInfoModa
 const AGENT_DEEP_CARDS = [
   /* ── 전체 흐름을 가장 앞에 ── */
   { id: 'e2eJourney', icon: '🛤️', title: 'End-to-End Journey', sub: '가입 → 콜드스타트 → 추천 → 결제 → 관람 → 리뷰 → 리워드 한 루프', color: '#7c6cf0' },
-  { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 16노드 · 4분기 흐름 · SSE 8 이벤트',          color: '#ef476f' },
+  { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 18노드 · 4분기 흐름 · SSE 10 이벤트',         color: '#ef476f' },
   { id: 'ragPipeline', icon: '🔎', title: 'RAG Pipeline',      sub: 'Qdrant+ES+Neo4j 병렬 · RRF k=60 · 4단계 완화 · MMR λ=0.7', color: '#f97316' },
   { id: 'matchAgent', icon: '🎬', title: 'Movie Match v3',     sub: '7노드 · LLM 리랭커 + Centroid + Co-watched CF',          color: '#a78bfa' },
   { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 테마별 큐레이션 · 단계별 진행 · 완주 뱃지',          color: '#ffd166' },
@@ -54,16 +54,27 @@ const AGENT_DEEP_CARDS = [
   { id: 'dataPipeline',icon: '🏭', title: 'Data Pipeline',     sub: '910K편 · TMDB/KOBIS/KMDb/Kaggle · Solar 임베딩 · 5DB 동기', color: '#f97316' },
   { id: 'adminConsole',icon: '👑', title: 'Admin Console',      sub: '10탭 · 96 API · 운영 11서브탭 · 통계 12탭 · 감사 로그',   color: '#ef476f' },
   { id: 'observability', icon: '🔭', title: 'Monitoring & Observability', sub: 'Prometheus · Grafana · ELK · Alertmanager · LangSmith', color: '#118ab2' },
+  /* ── 2026-04 신규 4종 (랜딩 Recent Updates 섹션과 연동) ──
+     Support v4 / Admin v3 / 오늘의 퀴즈 / 꾸미기 6슬롯
+     각 ID 는 AGENT_MODAL_CONTENT 의 키와 1:1 매칭되어야 빈 모달이 안 뜸 */
+  { id: 'supportAgentV4', icon: '🛟', title: 'Support Agent v4', sub: '9노드 ReAct · Read tool 8개 · RedisSaver 멀티턴 · capability 가드',     color: '#118ab2' },
+  { id: 'adminAgentV3',   icon: '👑', title: 'Admin Agent v3',   sub: '11노드 ReAct · Tool 79개 (Read 54+Draft 11+Navigate 14) · MAX_HOPS=5', color: '#ef476f' },
+  { id: 'todayQuiz',      icon: '🎯', title: '오늘의 퀴즈',       sub: 'LangGraph 7노드 · 매일 00:00 KST 자동 발행 · QuizPublishScheduler',   color: '#ffd166' },
+  { id: 'avatarDeco6',    icon: '🎀', title: '꾸미기 6슬롯',      sub: '아바타·배지·프레임·배경·칭호·이펙트 · 시드 40종 · 등급 자동 칭호',     color: '#a78bfa' },
 ];
 
-/* ── 피처 데이터 ── */
+/* ── 피처 데이터 ──
+   2026-04 정합화:
+     - 슬롯 5: "블라인드 데이트 추천"(미구현) → "둘이 영화 고르기" v3 (LLM 리랭커 7노드 그래프)
+     - 슬롯 6: "AI 퀴즈 & 씬 맞추기"(씬 맞추기 미구현) → "오늘의 퀴즈" (매일 자동 발행 7노드 LangGraph)
+   슬롯 4 "시네마 소울메이트" 는 chat agent 의 group recommendation sub-feature 로 살아있어 유지. */
 const FEATURES = [
   { icon: '🎭', title: '감정 기반 AI 추천', desc: '"오늘 좀 우울해" 한 마디면 충분해요. 기분을 읽고 딱 맞는 영화를 골라드려요.', tag: 'AI 채팅', color: '#ef476f' },
   { icon: '⚔️', title: '영화 월드컵', desc: '이지선다로 나의 취향을 정밀하게 파악해요. 고를수록 추천이 정확해져요.', tag: '취향 분석', color: '#ffd166' },
   { icon: '🏆', title: '도장깨기 플레이리스트', desc: 'AI가 테마별 영화 로드맵을 짜드려요. 완주하면 뱃지도 드려요!', tag: '게임화', color: '#06d6a0' },
   { icon: '👥', title: '시네마 소울메이트', desc: '취향이 비슷한 유저를 찾아드려요. 함께 볼 영화 고르는 그룹 추천도 가능해요.', tag: '소셜', color: '#118ab2' },
-  { icon: '🎲', title: '블라인드 데이트 추천', desc: '제목은 숨기고 힌트만! 뜻밖의 명작을 발견하는 즐거움을 드려요.', tag: '서프라이즈', color: '#a78bfa' },
-  { icon: '🎬', title: 'AI 퀴즈 & 씬 맞추기', desc: '매일 새로운 영화 퀴즈와 스틸컷 맞추기 게임으로 커뮤니티가 살아있어요.', tag: '커뮤니티', color: '#f97316' },
+  { icon: '🎬', title: '둘이 영화 고르기', desc: '두 명이 좋아하는 영화 한 편씩만 골라주세요. 7노드 그래프 + LLM 리랭커가 두 취향 교차점에서 함께 볼 5편을 추천해드려요.', tag: '함께 시청', color: '#a78bfa' },
+  { icon: '🎯', title: '오늘의 퀴즈', desc: '매일 자정 새 영화 4지선다 퀴즈가 자동 출제. 응시 기록 + 정답 해설 + 랭킹으로 매일 들르고 싶은 데일리 챌린지.', tag: '데일리 챌린지', color: '#f97316' },
 ];
 
 /**
@@ -188,9 +199,9 @@ const MOVIE_CARDS = [
 const TEAM_MEMBERS = [
   {
     initials: 'YH', name: '윤형주', role: 'Backend Developer · AI Engineer', color: '#7c6cf0',
-    desc: 'AI Agent 16노드 그래프, 추천/매칭/콘텐츠분석/로드맵 4종 에이전트, 결제·포인트·리워드 시스템, 관리자 페이지 72 EP, 인프라(4-VM/Docker/CI-CD) 총괄',
+    desc: 'AI Agent 18노드 그래프, 추천/매칭/콘텐츠분석/로드맵/관리자v3/고객센터v4/퀴즈 7종 에이전트, 결제·포인트·리워드, 관리자 페이지 72 EP, 인프라(4-VM/Docker/CI-CD) 총괄 + 4월 신규 4종(오늘의 퀴즈/꾸미기 6슬롯/티켓 추첨/몽글봇 v4.2)',
     tags: ['LangGraph', 'FastAPI', 'Spring Boot', 'Toss Pay', 'Ollama', 'CI/CD'],
-    progress: 90, req: '146건 중 49 완료 + 5 진행 · 전 영역 리딩',
+    progress: 92, req: '146건 중 51 완료 + 5 진행 · 전 영역 리딩',
   },
   {
     initials: 'MG', name: '김민규', role: 'Team Lead · Backend Developer', color: '#ef476f',
@@ -342,9 +353,11 @@ export default function LandingPage() {
           <S.NavLogoImg src="/mongle-transparent.png" alt="몽글픽" />
           <span>MONGLEPICK</span>
         </S.NavLogo>
-        {/* 데스크톱/태블릿 — 가로 링크 (600px 이하에서 숨김) */}
+        {/* 데스크톱/태블릿 — 가로 링크 (600px 이하에서 숨김)
+            2026-04-29: 4월 신규 4종 노출용 "최신" 앵커 추가 (기능 소개 직후) */}
         <S.NavLinks>
           <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
+          <a href="#lp-recent" onClick={e => scrollTo(e, 'lp-recent')}>최신</a>
           <a href="#lp-agent" onClick={e => scrollTo(e, 'lp-agent')}>AI Agent</a>
           <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
           <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
@@ -367,6 +380,7 @@ export default function LandingPage() {
       {/* 모바일 전체화면 메뉴 오버레이 */}
       <S.NavMobileMenu $isOpen={isMobileNavOpen}>
         <a href="#lp-features" onClick={e => scrollTo(e, 'lp-features')}>기능 소개</a>
+        <a href="#lp-recent" onClick={e => scrollTo(e, 'lp-recent')}>최신 업데이트</a>
         <a href="#lp-agent" onClick={e => scrollTo(e, 'lp-agent')}>AI Agent</a>
         <a href="#lp-howto" onClick={e => scrollTo(e, 'lp-howto')}>사용방법</a>
         <a href="#lp-team" onClick={e => scrollTo(e, 'lp-team')}>팀 소개</a>
@@ -557,6 +571,69 @@ export default function LandingPage() {
         </S.Container>
       </S.Features>
 
+      {/* ── 최신 업데이트 (2026-04 신규 4종) ──
+          오늘의 퀴즈(04-29) / 꾸미기 6슬롯(04-28) / 영화 티켓 추첨(04-28) / 몽글봇 v4.2(04-29).
+          기능 소개와 사용방법 사이에 배치해 "방금 무엇이 새로 들어왔는지" 를 한 눈에.
+          라우트:
+            - 오늘의 퀴즈    → ROUTES.QUIZ ('/quiz' → App.jsx 에서 '/community?tab=quiz' 로 redirect)
+            - 꾸미기 6슬롯   → ROUTES.ACCOUNT_PROFILE (꾸미기는 프로필 페이지 내부 탭)
+            - 영화 티켓 추첨 → ROUTES.ACCOUNT_POINT (응모권/포인트 영역, 별도 /lottery 라우트 미정의)
+            - 몽글봇 v4.2   → ROUTES.SUPPORT
+          ────────────────────────────────────────────────────────────── */}
+      <S.Recent id="lp-recent">
+        <S.Container>
+          <S.Reveal className="lp-reveal">
+            <S.SectionLabel>What&apos;s New &middot; 2026-04</S.SectionLabel>
+            <S.SectionTitle>
+              방금 도착한<br />
+              <S.GradientText>4월 업데이트</S.GradientText>
+            </S.SectionTitle>
+            <S.SectionSubtitle style={{ margin: '0 auto' }}>
+              지난 4주 사이 새로 추가된 기능들이에요
+            </S.SectionSubtitle>
+          </S.Reveal>
+          <S.Reveal className="lp-reveal" $delay="0.1s">
+            <S.RecentGrid>
+              {[
+                {
+                  icon: '🎯', title: '오늘의 퀴즈', date: '2026-04-29', color: '#ffd166',
+                  desc: '매일 자정 새 영화 4지선다 퀴즈가 자동 출제 + 응시 기록 + 정답 해설',
+                  to: ROUTES.QUIZ,
+                },
+                {
+                  icon: '🎀', title: '꾸미기 6슬롯', date: '2026-04-28', color: '#a78bfa',
+                  desc: '아바타·배지·프레임·배경·칭호·이펙트 40종 + 등급 자동 칭호',
+                  to: ROUTES.ACCOUNT_PROFILE,
+                },
+                {
+                  icon: '🎫', title: '영화 티켓 추첨', date: '2026-04-28', color: '#ef476f',
+                  desc: '응모권으로 회차별 추첨 응모 + 관리자 수동 추첨 + 당첨 내역',
+                  to: ROUTES.ACCOUNT_POINT,
+                },
+                {
+                  icon: '🛟', title: '몽글봇 v4.2', date: '2026-04-29', color: '#06d6a0',
+                  desc: 'ReAct 9노드 + Read tool 8개 + 멀티턴(RedisSaver) + 나의 데이터 직접 조회',
+                  to: ROUTES.SUPPORT,
+                },
+              ].map((u) => (
+                <S.RecentCard
+                  key={u.title}
+                  as={Link}
+                  to={u.to}
+                  $color={u.color}
+                >
+                  <S.RecentDateChip>{u.date}</S.RecentDateChip>
+                  <S.RecentIcon $color={u.color}>{u.icon}</S.RecentIcon>
+                  <S.RecentTitle>{u.title}</S.RecentTitle>
+                  <S.RecentDesc>{u.desc}</S.RecentDesc>
+                  <S.RecentArrow>&rarr;</S.RecentArrow>
+                </S.RecentCard>
+              ))}
+            </S.RecentGrid>
+          </S.Reveal>
+        </S.Container>
+      </S.Recent>
+
       {/* ── 사용 방법 3스텝 ── */}
       <S.HowTo id="lp-howto">
         <S.Container>
@@ -711,7 +788,7 @@ export default function LandingPage() {
           </S.TechHeader>
           <S.TechCategories>
             {[
-              { title: 'AI / LLM', dot: '#7c6cf0', items: ['EXAONE 4.0 32B (한국어 생성)', 'Qwen 3.5 35B (의도/감정/이미지)', 'Upstage Solar (임베딩 4096D)', 'LangGraph StateGraph', 'LangSmith Tracing', 'Ollama (Apple Silicon Metal)'] },
+              { title: 'AI / LLM', dot: '#7c6cf0', items: ['EXAONE 4.0 32B (한국어 생성)', 'Qwen 3.5 35B (의도/감정/이미지)', 'Upstage Solar (임베딩 4096D)', 'LangGraph StateGraph', 'LangSmith Tracing', 'Ollama (Apple Silicon Metal)', 'Support Agent v4 (9노드 ReAct + RedisSaver)', 'Admin Agent v3 (11노드 ReAct + Tool 79개)', 'Quiz Agent (7노드 LangGraph + 자동 발행)'] },
               { title: 'Backend', dot: '#ef476f', items: ['Spring Boot 4.0.3 (Java 21)', 'FastAPI + uvicorn', 'JWT Authentication', 'SSE Streaming', 'structlog Logging'] },
               { title: 'Database (5)', dot: '#118ab2', items: ['MySQL 8.0 (36 Tables)', 'Qdrant (Vector, 4096D)', 'Neo4j 5 (Graph)', 'Elasticsearch 8.17 (Nori)', 'Redis 7 (Cache + Session)'] },
               { title: 'Infrastructure', dot: '#06d6a0', items: ['Docker Compose (Multi VM)', 'Nginx (SSL + SSE Proxy)', 'GitHub Actions CI/CD', 'Prometheus + Grafana + Loki', 'Kakao Cloud (4 VM)'] },
@@ -863,15 +940,19 @@ export default function LandingPage() {
           <S.Reveal className="lp-reveal">
             <S.TimelineList>
               {[
-                /* 진행 현황 — CLAUDE.md 기준 (2026-04-08 업데이트)
-                   Phase 0~9 + R-0~R-6 + 관리자 + 활동 리워드까지 모두 완료.
+                /* 진행 현황 — CLAUDE.md 기준 (2026-04-29 업데이트)
+                   Phase 0~9 + R-0~R-6 + 관리자 + 활동 리워드 + 4월 신규 4종(둘이/계정허브/꾸미기/퀴즈/티켓/몽글봇v4) 모두 완료.
                    현재 운영 환경 다국어 검색 재적재(ML-4)와 LoRA 파인튜닝이 남아있다 */
-                { dot: 'done', title: 'Phase 0~4 — 데이터 + RAG + Chat Agent + 추천 엔진', desc: '5DB 하이브리드 RAG, LangGraph 16노드 StateGraph(relation 포함), CF+CBF+MMR 추천 엔진', badge: 'done' },
+                { dot: 'done', title: 'Phase 0~4 — 데이터 + RAG + Chat Agent + 추천 엔진', desc: '5DB 하이브리드 RAG, LangGraph 18노드 StateGraph(relation 포함), CF+CBF+MMR 추천 엔진', badge: 'done' },
                 { dot: 'done', title: 'Phase 5~8 — Movie Match + 콘텐츠 분석 + 로드맵', desc: 'Movie Match 6노드, 4기능 콘텐츠 분석(포스터/혐오/패턴), 개인화 로드맵 LangGraph, 332 tests pass', badge: 'done' },
                 { dot: 'done', title: 'Phase 9 + R-0~R-6 — 결제 + 인증 + 포인트', desc: 'Toss Payments 실연동, JWT/OAuth2, 6등급 팝콘 쿼터, 포인트 단일 재화(1P=10원), 55개 활동 리워드 정책', badge: 'done' },
                 { dot: 'done', title: '관리자 페이지 + 운영 도구 (10탭 + 운영 11서브탭)', desc: 'Backend 72 EP 충족, 운영 도구 통합 페이지(사용자 제재/포인트 조정/이용권/앱 공지)', badge: 'done' },
                 { dot: 'done', title: '910K건 5DB 적재 + 유저 활동 수집', desc: '910,140건 영화 데이터, 무드태그 보강, 다국어 검색 코드(ML-1~3), 유저 활동 수집 Phase 0~5', badge: 'done' },
                 { dot: 'done', title: 'Client 윤형주 영역 + 다크/라이트 모드', desc: '채팅+포인트+결제+고객센터+추천내역+플레이리스트+업적+월드컵+로드맵, 반응형 + 테마 시스템', badge: 'done' },
+                /* ── 4월 신규 3종 (2026-04-14 ~ 04-29) ── */
+                { dot: 'done', title: '둘이 영화 고르기 v3 (2026-04-14)', desc: '7노드 LangGraph + Solar LLM 리랭커 + Co-watched CF + 4단계 완화 → Top 5 추천 + Zustand persist 뒤로가기 복원', badge: 'done' },
+                { dot: 'done', title: '계정 허브 /account/* + 꾸미기 6슬롯 (2026-04-23 ~ 04-28)', desc: '마이페이지·포인트·결제·도장깨기·업적 통합 사이드바. 아바타·배지·프레임·배경·칭호·이펙트 6슬롯 + 시드 40종 + 등급 자동 칭호 6종(REQUIRES_NEW 멱등 INSERT)', badge: 'done' },
+                { dot: 'done', title: '오늘의 퀴즈 + 티켓 추첨 + 몽글봇 v4.2 (2026-04-28 ~ 04-29)', desc: '오늘의 퀴즈 (LangGraph 7노드 + QuizPublishScheduler 매일 00:00 KST 자동 발행), 영화 티켓 추첨 (응모권/회차/관리자 수동 추첨), 고객센터 v4.2 (ReAct 9노드 + Read tool 8개 + RedisSaver 멀티턴 + capability 가드)', badge: 'done' },
                 { dot: 'active', title: '다국어 검색 Phase ML-4 — 운영 재적재', desc: '운영 서버 Qdrant 임베딩 재적재 + Elasticsearch 인덱스 재생성 진행 중', badge: 'active' },
                 { dot: '', title: '몽글이 LoRA 파인튜닝', desc: 'EXAONE 4.0 1.2B 페르소나 파인튜닝 → vLLM 서빙(Tesla T4)', badge: 'pending' },
               ].map((item) => (

@@ -1169,6 +1169,152 @@ export const FeatureMiniTitle = styled.div`
 `;
 
 /* ================================================================
+   최신 업데이트 — .lp-recent (2026-04-29 신설)
+
+   기능 소개와 사용 방법 사이에 배치되는 "What's New" 섹션.
+   기존 SectionBase + Features 패턴(120px 패딩, 글래스 카드)을 그대로 따르되,
+   각 카드에 좌측 색상 보더 + 상단 날짜 칩 + 호버 시 살짝 떠오르는 효과.
+
+   $color prop: 카드 고유 색상 (#ffd166 / #a78bfa / #ef476f / #06d6a0).
+   theme.landing.* 토큰으로 다크/라이트 양쪽 호환.
+   ================================================================ */
+
+/** 최신 업데이트 섹션 */
+export const Recent = styled(SectionBase)`
+  padding: 120px 0;
+
+  @media (max-width: 600px) {
+    padding: 60px 0;
+  }
+`;
+
+/** 4 카드 grid — 데스크톱 4열 / 태블릿 2열 / 모바일 1열 */
+export const RecentGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 48px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+`;
+
+/**
+ * 최신 업데이트 카드.
+ *
+ * Link 컴포넌트로 렌더되며 (as={Link}), 클릭 시 to 경로로 이동.
+ * 좌측 4px 색상 보더 + 호버 시 보더 강조 + 살짝 위로 이동.
+ *
+ * @prop {string} $color - 카드 고유 색상
+ */
+export const RecentCard = styled.div`
+  position: relative;
+  display: block;
+  padding: 28px 22px 24px;
+  background: ${({ theme }) => theme.landing.bgGlass};
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid ${({ theme }) => theme.landing.border};
+  border-left: 4px solid ${({ $color, theme }) => $color || theme.landing.borderHover};
+  border-radius: 16px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+
+  /* 호버 시 위로 살짝 이동 + 카드 색상 톤의 글로우 */
+  &:hover {
+    transform: translateY(-4px);
+    border-color: ${({ $color, theme }) => $color || theme.landing.borderHover};
+    box-shadow: 0 14px 40px ${({ $color }) => $color ? $color + '33' : 'rgba(124, 108, 240, 0.2)'};
+  }
+
+  /* 호버 시 화살표 우측 이동 */
+  &:hover > .recent-arrow {
+    transform: translateX(4px);
+    opacity: 1;
+  }
+
+  @media (max-width: 600px) {
+    padding: 22px 18px 20px;
+  }
+`;
+
+/**
+ * 카드 우상단 날짜 칩 (2026-04-29 형태).
+ *
+ * absolute 배치라 RecentCard 의 padding-top 22px 가 칩 영역 확보.
+ */
+export const RecentDateChip = styled.div`
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: ${({ theme }) => theme.landing.textMuted};
+  background: ${({ theme }) => theme.landing.bgCard};
+  border: 1px solid ${({ theme }) => theme.landing.border};
+  border-radius: 100px;
+  font-family: 'Inter', sans-serif;
+`;
+
+/**
+ * 카드 아이콘 (이모지).
+ *
+ * @prop {string} $color - 아이콘 배경 글로우 색상
+ */
+export const RecentIcon = styled.div`
+  font-size: 2.2rem;
+  line-height: 1;
+  margin-bottom: 14px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: ${({ $color }) => $color ? $color + '1c' : 'rgba(124, 108, 240, 0.12)'};
+  border: 1px solid ${({ $color }) => $color ? $color + '44' : 'rgba(124, 108, 240, 0.3)'};
+`;
+
+/** 카드 제목 */
+export const RecentTitle = styled.h4`
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: ${({ theme }) => theme.landing.textPrimary};
+  letter-spacing: -0.2px;
+`;
+
+/** 카드 본문 설명 */
+export const RecentDesc = styled.p`
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: ${({ theme }) => theme.landing.textSecondary};
+  margin: 0;
+`;
+
+/** 카드 우하단 화살표 (호버 시 우측 이동) */
+export const RecentArrow = styled.span.attrs({ className: 'recent-arrow' })`
+  position: absolute;
+  bottom: 16px;
+  right: 18px;
+  font-size: 1.1rem;
+  color: ${({ theme }) => theme.landing.textMuted};
+  opacity: 0.55;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+`;
+
+/* ================================================================
    사용 방법 — .lp-howto
    ================================================================ */
 

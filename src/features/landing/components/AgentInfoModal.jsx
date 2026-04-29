@@ -2540,4 +2540,239 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
       },
     ],
   },
+
+  /* ─────────── 27. Support Agent v4 (2026-04-29) ───────────
+     출처: docs/progress/customer_support.md
+           monglepick-agent/src/monglepick/agents/support_assistant/graph_v4.py
+     - 9노드 ReAct + Read tool 8개 + RedisSaver 멀티턴
+     - capability 가드(LLM 우회 + 키워드 14종) · 서비스 이름 정규화 · v4.2 환각 차단 */
+  supportAgentV4: {
+    icon: '🛟',
+    tag: 'SUPPORT AGENT V4',
+    title: '몽글봇 고객센터 · ReAct 9노드 + 나의 데이터 직접 조회',
+    desc: '"내 포인트 얼마 남았어?" "이번 달 AI 이용권 몇 번 썼어?" 처럼 사용자의 실제 계정 데이터에 묻는 질문을 챗봇이 직접 Backend 에 조회해 답합니다. 9개 노드로 구성된 ReAct 루프(생각→도구 호출→관찰→다시 생각)가 의도 분류부터 응답 정형화까지를 자동으로 진행하며, 8개의 Read 전용 Tool 만 부여되어 챗봇이 사용자 데이터를 수정·삭제할 수 없도록 안전 가드되어 있어요. 멀티턴 대화 맥락은 Redis 에 보존되어 "그럼 그건 얼마야?" 같은 짧은 후속 질문도 이전 답변과 연결해 처리합니다.',
+    color: '#118ab2',
+    stats: [
+      { value: '9', label: '노드' },
+      { value: '8', label: 'Read Tool' },
+      { value: 'RedisSaver', label: '멀티턴' },
+      { value: '300', label: 'PASS 테스트' },
+    ],
+    sections: [
+      {
+        title: '9노드 ReAct 그래프',
+        steps: [
+          { title: 'intent_classifier (capability 가드 우선)', desc: '사용자 메시지가 "넌 뭐야?" 같은 capability 질의면 LLM 우회하고 smalltalk 강제. 14개 키워드 패턴 매칭으로 환각을 사전 차단해요.' },
+          { title: 'smalltalk_responder', desc: '"몽글픽" 서비스 이름이 환각으로 다른 이름(예: "몽블랑")으로 출력되지 않도록 fixed-string 응답 + 후처리 정규화 이중 방어.' },
+          { title: 'tool_selector ↔ tool_executor ↔ observation', desc: 'ReAct 루프 — 도구 선택 → 호출 → 결과 관찰 → 다음 행동 결정을 MAX_HOPS 까지 반복. 가상 finish_task 툴로 종결.' },
+          { title: 'faq_search · policy_rag', desc: 'FAQ 검색(BM25 + 벡터) 과 정책 문서 RAG 가 평행으로 작동. 사용자 질문이 "환불 정책" 같은 일반론이면 정책 RAG, "내 결제내역" 이면 Read tool 로 분기.' },
+          { title: 'response_formatter', desc: '최종 응답에 [이전 대화] prefix 추가 + 서비스 이름 강제 정규화 + needs_human 플래그 부착.' },
+        ],
+      },
+      {
+        title: 'Read Tool 8개 (lookup_my_*)',
+        list: [
+          'lookup_my_point_balance — 현재 포인트 잔액 + 이번 달 누적 적립',
+          'lookup_my_point_history — Page<HistoryResponse> 응답 평면 정규화 + days 필터',
+          'lookup_my_subscription — 활성 구독 플랜 + 다음 결제일',
+          'lookup_my_ai_quota — 일일 GRADE_FREE / SUB_BONUS / PURCHASED 3-소스 잔량',
+          'lookup_my_orders — 결제 이력 (Toss tx + 환불 상태)',
+          'lookup_my_tickets — 도장깨기 응모 + 추첨 회차 결과',
+          'lookup_my_grade — 6등급 팝콘 테마 + 다음 등급까지 활동량',
+          'lookup_my_recent_activity — 최근 7일 시청/리뷰/좋아요 요약',
+        ],
+      },
+      {
+        title: '🛡️ 안전 가드 (v4.2 환각 차단)',
+        text: '운영 몽글봇이 "포인트 내역 조회 실패" 회귀를 일으키며 capability 우회 / 환각 응답 / X-User-Id 헤더 미수신 등 다층 결함이 드러난 사건을 정리한 결과입니다. (1) intent_classifier 진입 시 키워드 매칭이 LLM 보다 먼저 작동, (2) response_formatter 가 최종 출력에 _normalize_service_name 강제, (3) Backend BaseControllerResolverTest 7케이스로 ServiceKey 인증 컨트랙트 회귀 차단 — 3중 방어망.',
+        note: '회귀 178 PASS (support_assistant_v4 88 + intent 26 + tools 28 + faq_search 21 + policy_rag 15) + Backend 7 PASS.',
+      },
+      {
+        title: '📊 사용 통계 & 감사',
+        list: [
+          'SupportChatLog JPA 엔티티 — Agent 가 fire-and-forget INSERT 로 모든 상호작용 기록',
+          'Admin 3 EP 추가 — KPI / 의도 분포 / TOP 10 / 세션 트레이스',
+          'Client ChatbotLogTab — 운영자가 실시간 챗봇 사용 패턴 분석',
+        ],
+      },
+    ],
+  },
+
+  /* ─────────── 28. Admin Agent v3 (2026-04-29) ───────────
+     출처: docs/progress/admin_assistant.md · docs/관리자_AI에이전트_v3_재설계.md
+     - 11노드 ReAct + Tool 79개 (Read 54 + Draft 11 + Navigate 14)
+     - 핵심: AI는 조회/폼 채우기/화면 이동만, 생성·수정·삭제는 절대 수행하지 않음 */
+  adminAgentV3: {
+    icon: '👑',
+    tag: 'ADMIN AGENT V3',
+    title: '관리자 AI · Read 54 + Draft 11 + Navigate 14 ReAct 에이전트',
+    desc: '"환불 요청 3일 이상 미처리 건 보여줘" "어제 결제 실패율 차트 그려줘" 처럼 관리자가 자연어로 묻기만 하면 11개 노드의 ReAct 루프가 79개 도구 중 적합한 것을 골라 호출하고, 결과를 표/차트/폼 프리필 형태로 자동 렌더링합니다. 핵심 안전 원칙은 "AI 는 절대 데이터를 만들지/고치지/지우지 않는다" — 모든 도구는 Read(조회), Draft(폼 채우기), Navigate(화면 이동) 3종으로만 분류되어 있고, 실제 변경 작업은 항상 사람 관리자가 폼을 검토하고 직접 제출해야 진행돼요.',
+    color: '#ef476f',
+    stats: [
+      { value: '11', label: 'ReAct 노드' },
+      { value: '79', label: 'Tool 총수' },
+      { value: 'MAX=5', label: 'Hops 제한' },
+      { value: '8', label: 'AdminRole' },
+    ],
+    sections: [
+      {
+        title: '11노드 ReAct 루프',
+        steps: [
+          { title: 'context_loader', desc: '관리자 ID·역할(8 AdminRole)·세션 컨텍스트 로딩. MemorySaver 로 대화 이력 자동 보존.' },
+          { title: 'intent_classifier', desc: 'Intent 6종 — query / action / stats / report / sql(미지원) / smalltalk. SQL 직접 실행은 의도적으로 차단(보안).' },
+          { title: 'tool_selector ↔ tool_executor ↔ observation', desc: 'ReAct 핵심 루프. MAX_HOPS=5 까지 반복하며, 가상 finish_task tool 로 명시적 종결.' },
+          { title: 'draft_emitter', desc: 'Draft tool 결과를 Client 폼에 프리필. mode("create"|"update") + target_id 로 신규/수정 분기 명확화.' },
+          { title: 'navigator', desc: 'Navigate tool 결과를 Client 라우팅으로 전달. goto_notice_detail/list 등 14개.' },
+          { title: 'narrator → response_formatter', desc: '결과를 자연어로 요약 + SSE 13 이벤트로 스트리밍.' },
+        ],
+      },
+      {
+        title: 'Tool 79개 분류',
+        table: {
+          headers: ['카테고리', '개수', '예시'],
+          rows: [
+            ['Read · stats',         '5',  'today_kpi · weekly_revenue · daily_active_users · ...'],
+            ['Read · stats_extended','16', 'cohort_retention · funnel_drop · ai_quota_distribution · ...'],
+            ['Read · dashboard',     '3',  'live_metrics · system_health · alert_overview'],
+            ['Read · users',         '7',  'find_user · user_grade_history · user_ai_quota · user_payments · ...'],
+            ['Read · content',       '4',  'movie_search · review_pending · faq_list · notice_list'],
+            ['Read · payment',       '5',  'tx_search · refund_queue · subscription_status · ...'],
+            ['Read · support',       '6',  'ticket_list · ticket_detail · chatbot_log · ...'],
+            ['Read · ai_ops',        '7',  'agent_traces · prompt_versions · embedding_jobs · ...'],
+            ['Read · system',        '2',  'monitoring_link · deploy_status'],
+            ['Read · settings',      '4',  'point_policy · grade_policy · subscription_plan · feature_flag'],
+            ['Read · chat_suggestions','1', 'top_chat_suggestions'],
+            ['Draft',                '11', 'notice_draft · faq_draft · ticket_reply_draft · point_grant_draft · ...'],
+            ['Navigate',             '14', 'goto_user_detail · goto_payment_detail · goto_notice_detail · ...'],
+          ],
+        },
+        note: '모든 Draft Args 에 mode("create"|"update") + target_id 추가 — 수정 의도를 AI 가 임의 추론하지 않고 명시적으로 분기.',
+      },
+      {
+        title: '🔒 절대 안전 원칙',
+        list: [
+          'AI 는 INSERT/UPDATE/DELETE SQL 을 직접 실행하지 않음 — Draft tool 만 부여',
+          'Draft 결과는 Client 폼에 프리필될 뿐 — 사람 관리자가 검토 후 직접 제출',
+          'Navigate tool 도 화면 이동만 — 자동 액션 실행 없음',
+          'SQL Intent 는 "미지원" 으로 분류 — 임의 쿼리 차단',
+          'AdminRole 8종 별 도구 도메인 제한 (SUPER_ADMIN/ADMIN=76, MODERATOR/SUPPORT_ADMIN/FINANCE_ADMIN 등은 제한)',
+        ],
+      },
+      {
+        title: '📡 SSE 13 이벤트',
+        text: 'session · status · tool_call · tool_result · token · form_prefill · navigation · table_data · chart_data · confirmation_required(예비) · report_chunk(예비) · done · error. table_data 는 list/Page row_count ≥ 3 일 때 자동 발행 (cols ≤6, rows ≤10, navigate_path 동봉). chart_data 는 stats tool 11종 화이트리스트(line/bar/pie). Client 가 dedup_key 로 upsert.',
+      },
+    ],
+  },
+
+  /* ─────────── 29. 오늘의 퀴즈 (2026-04-29) ───────────
+     출처: docs/progress/quiz_generation.md
+           monglepick-agent/src/monglepick/agents/quiz_generation/graph.py
+     - LangGraph 7노드 + QuizPublishScheduler 매일 00:00 KST 자동 발행
+     - 47 PASS 테스트 (헬퍼 26 + 7노드 19 + graph 1 + 2026-04-28) */
+  todayQuiz: {
+    icon: '🎯',
+    tag: '오늘의 퀴즈',
+    title: '데일리 영화 퀴즈 · 7노드 LangGraph + 매일 자동 발행',
+    desc: '매일 자정(00:00 KST) Quiz Agent 가 영화 후보를 샘플링해 4지선다 퀴즈를 자동 생성하고 PUBLISHED 상태로 노출합니다. 사용자는 응시 기록·정답 해설·랭킹을 마이페이지에서 확인할 수 있어요. 7노드 LangGraph 가 영화 후보 → 메타 보강 → LLM 4지선다 → 품질·다양성 검증 → fallback → DB INSERT 까지를 자동으로 처리하고, 멱등 보장으로 같은 날짜에 두 번 발행되지 않아요.',
+    color: '#ffd166',
+    stats: [
+      { value: '7', label: 'LangGraph 노드' },
+      { value: '00:00', label: 'KST 자동 발행' },
+      { value: '47', label: 'PASS 테스트' },
+      { value: '4지선다', label: '문항 형식' },
+    ],
+    sections: [
+      {
+        title: '7노드 그래프',
+        steps: [
+          { title: '영화 후보 샘플링', desc: '운영 DB 에서 PUBLISHED 영화 풀 + KOBIS Top 영화 가중치로 후보군 추출. 너무 마이너한 영화는 제외해 사용자 친숙도 보장.' },
+          { title: '메타 보강', desc: '감독·배우·줄거리·개봉년도·장르·러닝타임 등 퀴즈 출제에 필요한 메타데이터를 5DB(MySQL/Qdrant/Neo4j) 에서 병합.' },
+          { title: 'LLM 4지선다 생성', desc: 'Solar AI 가 "이 영화의 감독은?" "이 영화의 개봉 연도는?" 등 다양한 질문 패턴으로 4지선다를 구조화 출력.' },
+          { title: '품질 검증', desc: '정답이 명확한가 / 오답 보기 3개가 그럴듯한가 / 너무 쉬운/어려운 문제는 아닌가 자동 평가.' },
+          { title: '다양성 검증', desc: '최근 7일간 출제된 영화·감독·연도와 중복되지 않는지 확인. 매일 새로운 분위기.' },
+          { title: 'fallback', desc: '품질·다양성 검증 실패 시 미리 큐레이션된 fallback 풀에서 차감 — 발행 누락 사고 방지.' },
+          { title: 'DB INSERT (PENDING)', desc: 'quizzes 테이블에 PENDING 상태로 저장 → 운영자 검수 후 PUBLISHED 또는 자동 PUBLISHED.' },
+        ],
+      },
+      {
+        title: '⏰ QuizPublishScheduler (Backend Spring Scheduler)',
+        list: [
+          '@Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul") — 매일 자정 KST 발행',
+          '멱등 보장 — 같은 publish_date 가 이미 PUBLISHED 면 skip',
+          'FIFO — 가장 오래된 PENDING 부터 PUBLISHED 로 전이',
+          '후보 0건 시 fallback 풀 사용 + Slack 운영팀 알림',
+          'runDaily / manual 두 진입점 모두 6 PASS 테스트',
+        ],
+      },
+      {
+        title: '🎮 사용자 응시 흐름',
+        steps: [
+          { title: 'GET /api/v1/quizzes/today', desc: '오늘 PUBLISHED 퀴즈 1건 반환. 비로그인 가능 — SecurityConfig 화이트리스트.' },
+          { title: 'POST /api/v1/quizzes/{id}/submit', desc: 'JWT 필수. 정답이면 +10 포인트 적립 (오답은 0). 같은 날 재제출 차단.' },
+          { title: 'GET /me/stats · /me/history', desc: '내 통계(응시·정답·연속정답·획득포인트) + 최근 30일 응시 이력. JPA 멀티 SELECT 회귀 픽스(2026-04-29) 로 안정.' },
+        ],
+      },
+      {
+        title: '🐛 v1 회귀 픽스 (2026-04-29)',
+        list: [
+          'GET /quizzes/today 401 → SecurityConfig.apiFilterChain 에 공개 EP 명시 화이트리스트 추가 (/today + /movie/**)',
+          'GET /me/stats 500 → JPA 멀티 SELECT 매핑 회귀 (Object[] → List<Object[]>) 픽스 + H2 통합 테스트 2건 추가',
+          'QuizService 19 PASS · QuizParticipationRepositoryTest 2 PASS · QuizPublishScheduler 6 PASS — 회귀 차단 완료',
+        ],
+      },
+    ],
+  },
+
+  /* ─────────── 30. 꾸미기 6슬롯 (2026-04-28) ───────────
+     출처: docs/progress/avatar_decoration.md
+     - 6슬롯 통합 (아바타·배지·프레임·배경·칭호·이펙트)
+     - 시드 40종 + 등급 자동 칭호 6종 (REQUIRES_NEW 멱등 INSERT) */
+  avatarDeco6: {
+    icon: '🎀',
+    tag: '꾸미기 6슬롯',
+    title: '프로필 꾸미기 · 6 카테고리 통합 + 등급 자동 칭호',
+    desc: '아바타·배지·프레임·배경·칭호·이펙트 6 카테고리를 하나의 PointItemCategory.EQUIPPABLE 단일 진실 원본으로 통합하고, 시드 40종을 즉시 사용 가능하도록 부팅 시 자동 INSERT 합니다. 등급이 올라가면 그에 어울리는 칭호 6종(NORMAL → BRONZE → SILVER → GOLD → PLATINUM → DIAMOND)이 자동으로 자기 인벤토리에 추가되어, 별도 교환 없이도 트로피처럼 표시할 수 있어요. 칭호는 사용자 교환을 차단하고 등급 달성 자동 지급 전용으로 운영해 등급의 상징성을 보호합니다.',
+    color: '#a78bfa',
+    stats: [
+      { value: '6', label: '카테고리' },
+      { value: '40', label: '시드 아이템' },
+      { value: '6', label: '등급 자동 칭호' },
+      { value: 'REQUIRES_NEW', label: '멱등 INSERT' },
+    ],
+    sections: [
+      {
+        title: '6 카테고리 (PointItemCategory.EQUIPPABLE)',
+        table: {
+          headers: ['슬롯', '예시', '시드'],
+          rows: [
+            ['아바타',  '클래퍼보드 / 몽글이 / 필름릴 / 팝콘박스 / 스타크리틱',  '6종'],
+            ['배지',    'early_bird / streak_30 / premium / cinephile',          '4종'],
+            ['프레임',  '네온 사이버 / 빈티지 스튜디오 / 다이아 럭셔리 / ...',    '10종'],
+            ['배경',    '느와르 시티 / 시네마 골드 / 우주 / 호러 포그 / ...',     '10종'],
+            ['칭호',    '강냉이 / 팝콘 / 카라멜팝콘 / 몽글팝콘 / 몽아일체',       '6종 자동'],
+            ['이펙트',  'sparkle / pulse_pink / pulse_gold / pulse_diamond / ...', '7종+'],
+          ],
+        },
+      },
+      {
+        title: '🏆 등급 자동 칭호 6종 (GradeTitleService)',
+        text: '6등급 팝콘 테마(알갱이/강냉이/팝콘/카라멜/몽글/몽아일체) 승격 시점에 GradeTitleService 가 GRADE_UP_* 이벤트를 받아 해당 등급 칭호를 사용자 인벤토리에 멱등 INSERT 합니다. @Transactional(propagation = REQUIRES_NEW) 로 부모 트랜잭션과 분리되어, 승격 처리 중 다른 작업이 실패해도 칭호 지급은 성공.',
+        note: '시드는 is_active=true 유지 (자동 지급 조회용). PointItemService.getActiveItems / getItemsByCategory / exchangeItem 에서 TITLE 카테고리는 화이트리스트 제외 — 사용자 교환 차단.',
+      },
+      {
+        title: '⚙️ 운영 적용',
+        list: [
+          'docs/migration_2026-04-28_avatar_decoration_seeds.sql — 운영 SQL 수동 실행',
+          '또는 부팅 시 PointItemInitializer.seedDecorationItems 자동 시드 (idempotent)',
+          'Backend 컴파일 OK · Client/Admin 빌드 OK',
+          'SVG 자산 placeholder URL 시드 — 운영 디자인 자산 업로드 후 imageUrl 갱신 (미완)',
+        ],
+      },
+      {
+        title: '🎨 Client UI',
+        text: '계정 허브 /account/profile 의 꾸미기 탭에서 6슬롯을 한 화면에 보여주고, 카테고리 별 인벤토리 → 슬롯 장착 → 미리보기 → 저장 흐름. 장착 결과는 헤더 아바타·커뮤니티 댓글·리뷰 등 사용자 표시 영역 전반에 즉시 반영.',
+      },
+    ],
+  },
 };
