@@ -644,6 +644,15 @@ export const UserAvatar = styled.span`
   color: white;
   font-weight: ${({ theme }) => theme.typography.fontSemibold};
   font-size: ${({ theme }) => theme.typography.textSm};
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
 `;
 
 /** 사용자 닉네임 */

@@ -1273,6 +1273,10 @@ export const AvatarPreviewRow = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing.md};
+
+  ${media.mobile} {
+    align-items: flex-start;
+  }
 `;
 
 export const AvatarPreviewImg = styled.div`
@@ -1291,6 +1295,18 @@ export const AvatarPreviewImg = styled.div`
   font-weight: ${({ theme }) => theme.typography.fontBold};
   flex-shrink: 0;
   border: 2px solid ${({ theme }) => theme.glass.border};
+`;
+
+export const AvatarFileControl = styled.div`
+  min-width: 0;
+  flex: 1;
+
+  input[type='file'] {
+    width: 100%;
+    max-width: 100%;
+    color: ${({ theme }) => theme.colors.textSecondary};
+    font-size: ${({ theme }) => theme.typography.textSm};
+  }
 `;
 
 export const ModalButtonRow = styled.div`
