@@ -19,6 +19,8 @@ import { useRewardToast } from '../../../shared/components/RewardToast';
 /* 영화 API — 같은 feature 내의 movieApi에서 가져옴 */
 import {
   getMovie,
+  getCollectionRelatedMovies,
+  getRelatedMovies,
   getMovieLikeCount,
   getMovieLikeStatus,
   toggleMovieLike,
@@ -73,6 +75,14 @@ export default function MovieDetailPage() {
   const [movie, setMovie] = useState(null);
   // 리뷰 목록 상태
   const [reviews, setReviews] = useState([]);
+  // 같은 컬렉션 작품 목록 상태 — 시리즈 전용 블록에 별도 노출한다.
+  const [collectionMovies, setCollectionMovies] = useState([]);
+  // 같은 컬렉션 작품 로딩 상태.
+  const [isCollectionMoviesLoading, setIsCollectionMoviesLoading] = useState(false);
+  // 연관 영화 목록 상태 — 컬렉션을 제외한 줄거리/메타데이터 기반 후보를 노출한다.
+  const [relatedMovies, setRelatedMovies] = useState([]);
+  // 연관 영화 로딩 상태 — 상세 본문과 분리해 늦게 도착해도 페이지는 먼저 렌더링한다.
+  const [isRelatedMoviesLoading, setIsRelatedMoviesLoading] = useState(false);
   // 위시리스트 포함 여부
   const [isWishlisted, setIsWishlisted] = useState(false);
   // 로딩 상태
@@ -131,6 +141,11 @@ export default function MovieDetailPage() {
       setIsLoading(true);
       setError(null);
       setIsNotFound(false);
+      setMovie(null);
+      setCollectionMovies([]);
+      setIsCollectionMoviesLoading(false);
+      setRelatedMovies([]);
+      setIsRelatedMoviesLoading(false);
 
       try {
         // 영화 상세 정보 조회
@@ -206,6 +221,90 @@ export default function MovieDetailPage() {
       loadMovieData();
     }
   }, [id, isAuthenticated]);
+
+  /**
+   * 연관 영화 목록을 비동기로 로드한다.
+   *
+   * 메인 상세 정보는 먼저 렌더링하고, 연관 영화는 별도 로딩 상태로 뒤이어 채운다.
+   */
+  useEffect(() => {
+    let isCancelled = false;
+
+    const isCollectionRelatedMovie = (targetMovie) => {
+      const relationSources = Array.isArray(targetMovie?.relationSources)
+        ? targetMovie.relationSources
+        : (Array.isArray(targetMovie?.relation_sources) ? targetMovie.relation_sources : []);
+      const relationReasons = Array.isArray(targetMovie?.relationReasons)
+        ? targetMovie.relationReasons
+        : (Array.isArray(targetMovie?.relation_reasons) ? targetMovie.relation_reasons : []);
+
+      return relationSources.includes('collection_priority')
+        || relationSources.includes('elasticsearch_collection')
+        || relationReasons.some((reason) => String(reason || '').startsWith('같은 컬렉션'));
+    };
+
+    async function loadRelatedMovieData() {
+      if (!movie) {
+        setCollectionMovies([]);
+        setIsCollectionMoviesLoading(false);
+        setRelatedMovies([]);
+        setIsRelatedMoviesLoading(false);
+        return;
+      }
+
+      const shouldLoadCollectionMovies = Boolean(movie.collection_name);
+      setIsCollectionMoviesLoading(shouldLoadCollectionMovies);
+      setIsRelatedMoviesLoading(true);
+
+      if (shouldLoadCollectionMovies) {
+        getCollectionRelatedMovies(movie)
+          .then((collectionMovieList) => {
+            if (!isCancelled) {
+              setCollectionMovies(collectionMovieList);
+            }
+          })
+          .catch(() => {
+            if (!isCancelled) {
+              setCollectionMovies([]);
+            }
+          })
+          .finally(() => {
+            if (!isCancelled) {
+              setIsCollectionMoviesLoading(false);
+            }
+          });
+      } else {
+        setCollectionMovies([]);
+        setIsCollectionMoviesLoading(false);
+      }
+
+      getRelatedMovies(movie)
+        .then((relatedMovieList) => {
+          const filteredRelatedMovieList = relatedMovieList.filter(
+            (relatedMovie) => !isCollectionRelatedMovie(relatedMovie)
+          );
+          if (!isCancelled) {
+            setRelatedMovies(filteredRelatedMovieList);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            setRelatedMovies([]);
+          }
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setIsRelatedMoviesLoading(false);
+          }
+        });
+    }
+
+    loadRelatedMovieData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [movie]);
 
   /**
    * 위시리스트 토글 핸들러.
@@ -417,6 +516,10 @@ export default function MovieDetailPage() {
         {/* 영화 상세 카드 */}
         <MovieDetailCard
           movie={movie}
+          collectionMovies={collectionMovies}
+          collectionMoviesLoading={isCollectionMoviesLoading}
+          relatedMovies={relatedMovies}
+          relatedMoviesLoading={isRelatedMoviesLoading}
           onWishlistToggle={handleWishlistToggle}
           isWishlisted={isWishlisted}
           wishlistLoading={isWishlistLoading}

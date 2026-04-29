@@ -86,6 +86,27 @@ function normalizeSearchMovie(movie) {
   };
 }
 
+function normalizeRelatedMovie(movie) {
+  const posterPath = movie.poster_path || extractTmdbPosterPath(movie.poster_url);
+
+  return {
+    ...movie,
+    id: movie.movie_id,
+    poster_path: posterPath,
+    posterUrl: movie.poster_url ?? null,
+    trailerUrl: movie.trailer_url ?? null,
+    releaseYear: movie.release_year,
+    release_date: movie.release_year ? `${movie.release_year}-01-01` : null,
+    relationScore: movie.relation_score ?? movie.relationScore ?? 0,
+    relationReasons: movie.relation_reasons || movie.relationReasons || [],
+    relationSources: movie.relation_sources || movie.relationSources || [],
+  };
+}
+
+function hasRelatedMoviePoster(movie) {
+  return Boolean(movie?.poster_path || movie?.posterUrl || movie?.poster_url);
+}
+
 /**
  * 검색 페이지에서 사용할 장르 선택 옵션을 조회한다.
  *
@@ -195,6 +216,300 @@ export async function searchMovies({
     relatedQueries: data?.related_queries || [],
     searchSource: data?.search_source || null,
   };
+}
+
+function getMovieId(movie) {
+  return movie?.movie_id || movie?.movieId || movie?.id || null;
+}
+
+function getMovieYear(movie) {
+  const explicitYear = movie?.releaseYear ?? movie?.release_year ?? null;
+  if (explicitYear !== null && explicitYear !== undefined && explicitYear !== '') {
+    const parsedYear = Number(explicitYear);
+    if (Number.isFinite(parsedYear)) {
+      return parsedYear;
+    }
+  }
+
+  if (typeof movie?.release_date === 'string' && movie.release_date.length >= 4) {
+    const parsedYear = Number(movie.release_date.slice(0, 4));
+    if (Number.isFinite(parsedYear)) {
+      return parsedYear;
+    }
+  }
+
+  return null;
+}
+
+function normalizeGenreName(genre) {
+  if (!genre) return null;
+  if (typeof genre === 'string') {
+    const normalized = genre.trim();
+    return normalized || null;
+  }
+
+  if (typeof genre === 'object') {
+    const normalized = String(genre.name || '').trim();
+    return normalized || null;
+  }
+
+  return null;
+}
+
+function parseGenreNames(genres) {
+  if (Array.isArray(genres)) {
+    return [...new Set(genres.map(normalizeGenreName).filter(Boolean))];
+  }
+
+  if (typeof genres !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(genres);
+    if (Array.isArray(parsed)) {
+      return [...new Set(parsed.map(normalizeGenreName).filter(Boolean))];
+    }
+  } catch {
+    // JSON 문자열이 아니면 콤마 구분 문자열로 처리한다.
+  }
+
+  return [...new Set(
+    genres
+      .split(',')
+      .map((genre) => genre.trim())
+      .filter(Boolean)
+  )];
+}
+
+function parseCastNames(cast) {
+  if (!Array.isArray(cast)) return [];
+
+  return [...new Set(
+    cast
+      .map((actor) => (typeof actor === 'string' ? actor : actor?.name))
+      .map((actorName) => String(actorName || '').trim())
+      .filter(Boolean)
+  )];
+}
+
+function buildSharedGenreReason(baseGenreNames, candidateGenres) {
+  const candidateGenreNames = parseGenreNames(candidateGenres);
+  const sharedGenreNames = candidateGenreNames.filter((genre) => baseGenreNames.includes(genre));
+
+  if (sharedGenreNames.length === 0) {
+    return null;
+  }
+
+  return `공통 장르: ${sharedGenreNames.slice(0, 2).join(', ')}`;
+}
+
+function computeReleaseWindowScore(sourceMovie, candidateMovie) {
+  const sourceYear = getMovieYear(sourceMovie);
+  const candidateYear = getMovieYear(candidateMovie);
+
+  if (!sourceYear || !candidateYear) {
+    return 0;
+  }
+
+  const yearGap = Math.abs(sourceYear - candidateYear);
+  if (yearGap <= 3) return 6;
+  if (yearGap <= 10) return 3;
+  return 0;
+}
+
+function mergeRelatedMovieCandidate({
+  relatedMovieMap,
+  sourceMovie,
+  candidateMovie,
+  currentMovieId,
+  baseScore,
+  reason,
+  baseGenreNames,
+}) {
+  const candidateMovieId = getMovieId(candidateMovie);
+  if (!candidateMovieId || String(candidateMovieId) === String(currentMovieId)) {
+    return;
+  }
+
+  const sharedGenreReason = buildSharedGenreReason(baseGenreNames, candidateMovie.genres);
+  const genreScore = sharedGenreReason ? 4 : 0;
+  const releaseWindowScore = computeReleaseWindowScore(sourceMovie, candidateMovie);
+  const totalScore = baseScore + genreScore + releaseWindowScore;
+
+  const existingMovie = relatedMovieMap.get(String(candidateMovieId));
+  if (existingMovie) {
+    existingMovie.relationScore += totalScore;
+    if (reason && !existingMovie.relationReasons.includes(reason)) {
+      existingMovie.relationReasons.push(reason);
+    }
+    if (sharedGenreReason && !existingMovie.relationReasons.includes(sharedGenreReason)) {
+      existingMovie.relationReasons.push(sharedGenreReason);
+    }
+    return;
+  }
+
+  relatedMovieMap.set(String(candidateMovieId), {
+    ...candidateMovie,
+    relationScore: totalScore,
+    relationReasons: [
+      ...new Set([reason, sharedGenreReason].filter(Boolean)),
+    ],
+  });
+}
+
+async function buildFallbackRelatedMovies(movie, { limit } = {}) {
+  if (!movie) return [];
+
+  const currentMovieId = getMovieId(movie);
+  const directorName = String(movie.director || '').trim();
+  const castNames = parseCastNames(movie.cast).slice(0, 2);
+  const genreNames = parseGenreNames(movie.genres).slice(0, 3);
+  const requestEntries = [];
+
+  if (directorName) {
+    requestEntries.push({
+      reason: '같은 감독',
+      baseScore: 12,
+      request: searchMovies({
+        query: directorName,
+        searchType: 'director',
+        sort: 'rating',
+        size: 20,
+      }),
+    });
+  }
+
+  castNames.forEach((actorName, index) => {
+    requestEntries.push({
+      reason: `같은 배우: ${actorName}`,
+      baseScore: index === 0 ? 28 : 22,
+      request: searchMovies({
+        query: actorName,
+        searchType: 'actor',
+        sort: 'rating',
+        size: 18,
+      }),
+    });
+  });
+
+  if (genreNames.length > 0) {
+    requestEntries.push({
+      reason: '비슷한 장르',
+      baseScore: 28,
+      request: searchMovies({
+        genres: genreNames,
+        sort: 'rating',
+        size: 24,
+      }),
+    });
+  }
+
+  if (requestEntries.length === 0) {
+    return [];
+  }
+
+  const settledEntries = await Promise.allSettled(
+    requestEntries.map(async ({ reason, baseScore, request }) => ({
+      reason,
+      baseScore,
+      movies: (await request).movies || [],
+    }))
+  );
+
+  const relatedMovieMap = new Map();
+
+  settledEntries.forEach((entry) => {
+    if (entry.status !== 'fulfilled') return;
+
+    entry.value.movies.forEach((candidateMovie) => {
+      if (!hasRelatedMoviePoster(candidateMovie)) {
+        return;
+      }
+      mergeRelatedMovieCandidate({
+        relatedMovieMap,
+        sourceMovie: movie,
+        candidateMovie,
+        currentMovieId,
+        baseScore: entry.value.baseScore,
+        reason: entry.value.reason,
+        baseGenreNames: genreNames,
+      });
+    });
+  });
+
+  return Array.from(relatedMovieMap.values())
+    .sort((left, right) => {
+      if (right.relationScore !== left.relationScore) {
+        return right.relationScore - left.relationScore;
+      }
+
+      const rightRating = Number(right.rating || 0);
+      const leftRating = Number(left.rating || 0);
+      if (rightRating !== leftRating) {
+        return rightRating - leftRating;
+      }
+
+      return (getMovieYear(right) || 0) - (getMovieYear(left) || 0);
+    })
+    .slice(0, Number.isFinite(limit) ? limit : undefined)
+    .map((relatedMovie) => ({
+      ...relatedMovie,
+      relationReasons: relatedMovie.relationReasons.slice(0, 2),
+    }));
+}
+
+/**
+ * 같은 컬렉션 작품만 빠르게 조회한다.
+ *
+ * @param {Object|string|number} movieOrMovieId - 기준 영화 객체 또는 영화 ID
+ * @returns {Promise<Array<Object>>} 같은 컬렉션 영화 목록
+ */
+export async function getCollectionRelatedMovies(movieOrMovieId) {
+  const movieId = getMovieId(movieOrMovieId) || movieOrMovieId;
+  if (!movieId) {
+    return [];
+  }
+
+  try {
+    const data = await recommendApi.get(RECOMMEND_MOVIE_ENDPOINTS.RELATED_COLLECTION(movieId));
+    return (data?.movies || [])
+      .map(normalizeRelatedMovie)
+      .filter(hasRelatedMoviePoster);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 영화 상세의 연관 영화를 조회한다.
+ *
+ * 1. Recommend v2 연관 영화 API(Qdrant 기반 + Redis 캐시)를 우선 호출한다.
+ * 2. API가 실패하면 기존 프런트 추정식(감독/배우/장르 기반)을 fallback으로 사용한다.
+ *
+ * @param {Object|string|number} movieOrMovieId - 기준 영화 객체 또는 영화 ID
+ * @param {Object} [options]
+ * @param {number} [options.limit] - 지정 시 최대 반환 개수, 미지정 시 서버 기본값 사용
+ * @returns {Promise<Array<Object>>} 연관 영화 목록
+ */
+export async function getRelatedMovies(movieOrMovieId, { limit } = {}) {
+  const movieId = getMovieId(movieOrMovieId) || movieOrMovieId;
+
+  if (movieId) {
+    try {
+      const params = Number.isFinite(limit) ? { limit } : undefined;
+      const data = await recommendApi.get(RECOMMEND_MOVIE_ENDPOINTS.RELATED(movieId), { params });
+      return (data?.movies || [])
+        .map(normalizeRelatedMovie)
+        .filter(hasRelatedMoviePoster);
+    } catch {
+      // 연관 영화 API 실패 시 프런트 fallback으로 내려간다.
+    }
+  }
+
+  if (!movieOrMovieId || typeof movieOrMovieId !== 'object') {
+    return [];
+  }
+
+  return buildFallbackRelatedMovies(movieOrMovieId, { limit });
 }
 
 /**

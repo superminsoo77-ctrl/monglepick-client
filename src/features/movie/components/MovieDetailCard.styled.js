@@ -10,6 +10,7 @@
  */
 
 import styled, { keyframes, css } from 'styled-components';
+import { Link } from 'react-router-dom';
 import { fadeInUp } from '../../../shared/styles/animations';
 import { gradientText } from '../../../shared/styles/mixins';
 import { media } from '../../../shared/styles/media';
@@ -396,6 +397,21 @@ export const SectionTitle = styled.h2`
   margin: 0 0 ${({ theme }) => theme.spacing.md} 0;
 `;
 
+export const SectionTab = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.md};
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  letter-spacing: 0.02em;
+`;
+
 /* ── 줄거리 ── */
 
 /*
@@ -444,6 +460,246 @@ export const Recommendation = styled.blockquote`
   border-left: 3px solid;
   border-image: ${({ theme }) => theme.gradients.primary} 1;
   font-style: italic;
+`;
+
+/* ── 연관 영화 ── */
+export const RelatedSectionDescription = styled.p`
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  margin: 0 0 ${({ theme }) => theme.spacing.lg} 0;
+`;
+
+export const RelatedStatusText = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  line-height: ${({ theme }) => theme.typography.leadingRelaxed};
+`;
+
+export const RelatedMovieGrid = styled.div`
+  display: flex;
+  overflow-x: auto;
+  gap: ${({ theme }) => theme.spacing.lg};
+  padding-bottom: ${({ theme }) => theme.spacing.sm};
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    border-radius: ${({ theme }) => theme.radius.full};
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.borderDefault};
+    border-radius: ${({ theme }) => theme.radius.full};
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${({ theme }) => theme.colors.primary};
+  }
+
+  ${media.mobile} {
+    gap: ${({ theme }) => theme.spacing.md};
+  }
+`;
+
+export const RelatedMovieCard = styled(Link)`
+  position: relative;
+  flex: 0 0 132px;
+  width: 132px;
+  text-decoration: none;
+  border-radius: ${({ theme }) => theme.radius.lg};
+  overflow: hidden;
+  scroll-snap-align: start;
+  outline: none;
+  transition: transform ${({ theme }) => theme.transitions.base},
+    box-shadow ${({ theme }) => theme.transitions.base},
+    filter ${({ theme }) => theme.transitions.base};
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-4px);
+    box-shadow: ${({ theme }) => theme.shadows.md},
+      ${({ theme }) => theme.shadows.glow};
+    filter: saturate(1.05);
+  }
+
+  ${media.mobile} {
+    flex-basis: 112px;
+    width: 112px;
+  }
+`;
+
+export const RelatedMovieSkeletonCard = styled.div`
+  flex: 0 0 132px;
+  width: 132px;
+  border-radius: ${({ theme }) => theme.radius.lg};
+  overflow: hidden;
+  scroll-snap-align: start;
+
+  ${media.mobile} {
+    flex-basis: 112px;
+    width: 112px;
+  }
+`;
+
+export const RelatedPoster = styled.div`
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background-color: ${({ theme }) => theme.colors.bgElevated};
+`;
+
+export const RelatedPosterSkeleton = styled.div`
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    ${({ theme }) => theme.colors.bgSecondary} 20%,
+    ${({ theme }) => theme.colors.bgTertiary} 50%,
+    ${({ theme }) => theme.colors.bgSecondary} 80%
+  );
+  background-size: 220% 100%;
+  animation: ${shimmerDetail} 1.4s ease-in-out infinite;
+`;
+
+export const RelatedPosterImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform ${({ theme }) => theme.transitions.slow};
+
+  ${RelatedMovieCard}:hover &,
+  ${RelatedMovieCard}:focus-visible & {
+    transform: scale(1.05);
+  }
+`;
+
+export const RelatedPosterPlaceholder = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  background: linear-gradient(
+    135deg,
+    ${({ theme }) => theme.colors.bgElevated},
+    ${({ theme }) => theme.colors.bgCard}
+  );
+`;
+
+export const RelatedPosterPlaceholderIcon = styled.span`
+  font-size: ${({ theme }) => theme.typography.text3xl};
+  opacity: 0.5;
+`;
+
+export const RelatedMovieBody = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: ${({ theme }) => theme.spacing.sm};
+  background: linear-gradient(
+    180deg,
+    rgba(10, 14, 24, 0.08) 0%,
+    rgba(10, 14, 24, 0.62) 45%,
+    rgba(10, 14, 24, 0.92) 100%
+  );
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity ${({ theme }) => theme.transitions.base},
+    transform ${({ theme }) => theme.transitions.base};
+  pointer-events: none;
+
+  ${RelatedMovieCard}:hover &,
+  ${RelatedMovieCard}:focus-visible & {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+export const RelatedMovieSkeletonBody = styled.div`
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: ${({ theme }) => theme.spacing.sm};
+  background: linear-gradient(
+    180deg,
+    rgba(10, 14, 24, 0.05) 0%,
+    rgba(10, 14, 24, 0.58) 45%,
+    rgba(10, 14, 24, 0.88) 100%
+  );
+`;
+
+export const RelatedSkeletonLine = styled.span`
+  display: block;
+  width: ${({ $width = '100%' }) => $width};
+  height: ${({ $height = '10px' }) => $height};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: rgba(255, 255, 255, 0.24);
+`;
+
+export const RelatedSkeletonTagRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.xs};
+  margin-top: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const RelatedSkeletonTag = styled(RelatedSkeletonLine)`
+  height: 18px;
+  background: rgba(255, 255, 255, 0.18);
+`;
+
+export const RelatedMovieTitle = styled.h3`
+  margin: 0;
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  line-height: ${({ theme }) => theme.typography.leadingTight};
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`;
+
+export const RelatedMovieMeta = styled.span`
+  color: rgba(255, 255, 255, 0.78);
+  font-size: ${({ theme }) => theme.typography.textXs};
+`;
+
+export const RelatedReasonList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.xs};
+`;
+
+export const RelatedReasonTag = styled.span`
+  padding: 2px 6px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  line-height: 1.2;
 `;
 
 /* ── 출연진 — 아바타 원형 + 가로 스크롤 ── */
