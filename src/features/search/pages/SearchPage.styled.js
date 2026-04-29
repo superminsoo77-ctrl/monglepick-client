@@ -320,6 +320,53 @@ export const SearchButton = styled.button`
   }
 `;
 
+/**
+ * 상세 검색 모달을 여는 보조 버튼.
+ * 검색 버튼 옆에 배치되며, 활성 필터 수를 함께 표시할 수 있다.
+ */
+export const FilterActionButton = styled.button`
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.spacing.xs};
+  padding: 0 ${({ theme }) => theme.spacing.lg};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
+  background: ${({ theme }) => theme.colors.bgCard};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              box-shadow ${({ theme }) => theme.transitions.fast},
+              background-color ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    background-color: ${({ theme }) => theme.colors.bgTertiary};
+    box-shadow: ${({ theme }) => theme.glows.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  ${mediaSmall} {
+    width: 100%;
+  }
+`;
+
+export const FilterActionCount = styled.span`
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
 export const RecentSection = styled.section`
   display: flex;
   flex-direction: column;
@@ -713,6 +760,95 @@ export const RecentStatus = styled.p`
   text-align: center;
 `;
 
+/**
+ * 상세 검색 모달 오버레이/컨테이너.
+ * 기존 아코디언 내용을 모달로 옮겨 검색창 주변 공간을 단순화한다.
+ */
+export const FilterModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.bgOverlay};
+  z-index: ${({ theme }) => theme.zIndex.modalBackdrop};
+`;
+
+export const FilterModalContainer = styled.div`
+  width: min(760px, 100%);
+  max-height: min(82vh, 860px);
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.xl};
+  overflow: hidden;
+  z-index: ${({ theme }) => theme.zIndex.modal};
+`;
+
+export const FilterModalHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+`;
+
+export const FilterModalHeading = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  min-width: 0;
+`;
+
+export const FilterModalTitle = styled.h2`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textPrimary};
+  font-size: ${({ theme }) => theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+`;
+
+export const FilterModalDescription = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+export const FilterModalCloseButton = styled.button`
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  cursor: pointer;
+  transition: border-color ${({ theme }) => theme.transitions.fast},
+              color ${({ theme }) => theme.transitions.fast},
+              background-color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    background: ${({ theme }) => theme.colors.bgTertiary};
+  }
+`;
+
+export const FilterModalBody = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding-right: ${({ theme }) => theme.spacing.xs};
+`;
+
 export const FilterAccordion = styled.section`
   display: flex;
   flex-direction: column;
@@ -875,6 +1011,7 @@ export const AdvancedFilterInput = styled.input`
 export const AdvancedFilterActions = styled.div`
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: ${({ theme }) => theme.spacing.sm};
   flex-wrap: wrap;
 `;
@@ -944,6 +1081,14 @@ export const SearchGenreSection = styled.section`
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
+export const SearchGenreHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.sm};
+  flex-wrap: wrap;
+`;
+
 /**
  * 장르 발견형 검색 섹션 제목.
  */
@@ -961,6 +1106,26 @@ export const SearchGenreDescription = styled.p`
   margin: 0;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.textSm};
+`;
+
+export const SearchGenreModeSwitch = styled.button`
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: opacity ${({ theme }) => theme.transitions.fast},
+              text-decoration-color ${({ theme }) => theme.transitions.fast};
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+
+  &:hover {
+    opacity: 0.85;
+    text-decoration-color: currentColor;
+  }
 `;
 
 /**

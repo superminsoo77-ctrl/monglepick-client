@@ -41,6 +41,10 @@ const RECENT_HISTORY_SCROLL_THRESHOLD = 80;
 const SEARCH_CACHE_STORAGE_KEY = 'monglepick_search_page_cache';
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 const AUTOCOMPLETE_LIMIT = 8;
+const MIN_RELEASE_YEAR = 1900;
+const MAX_RELEASE_YEAR = 2030;
+const MIN_RATING = 0.5;
+const MAX_RATING = 10;
 
 /** 장르 필터 옵션 */
 const GENRE_FILTERS = [
@@ -178,6 +182,10 @@ function parseOptionalFloatFilter(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function toFilterInputValue(value) {
   return value === null || value === undefined ? '' : String(value);
 }
@@ -188,11 +196,24 @@ function normalizeAdvancedFilters({
   ratingMin,
   ratingMax,
 }) {
+  const normalizedYearFrom = parseOptionalIntegerFilter(yearFrom);
+  const normalizedYearTo = parseOptionalIntegerFilter(yearTo);
+  const normalizedRatingMin = parseOptionalFloatFilter(ratingMin);
+  const normalizedRatingMax = parseOptionalFloatFilter(ratingMax);
+
   return {
-    yearFrom: parseOptionalIntegerFilter(yearFrom),
-    yearTo: parseOptionalIntegerFilter(yearTo),
-    ratingMin: parseOptionalFloatFilter(ratingMin),
-    ratingMax: parseOptionalFloatFilter(ratingMax),
+    yearFrom: normalizedYearFrom === null
+      ? null
+      : clampNumber(normalizedYearFrom, MIN_RELEASE_YEAR, MAX_RELEASE_YEAR),
+    yearTo: normalizedYearTo === null
+      ? null
+      : clampNumber(normalizedYearTo, MIN_RELEASE_YEAR, MAX_RELEASE_YEAR),
+    ratingMin: normalizedRatingMin === null
+      ? null
+      : clampNumber(normalizedRatingMin, MIN_RATING, MAX_RATING),
+    ratingMax: normalizedRatingMax === null
+      ? null
+      : clampNumber(normalizedRatingMax, MIN_RATING, MAX_RATING),
   };
 }
 
@@ -366,7 +387,7 @@ export default function SearchPage() {
   const [searchType, setSearchType] = useState(searchParams.get('searchType') || 'all');
   const [genre, setGenre]         = useState(searchParams.get('genre') || '전체');
   const [sort, setSort]           = useState(searchParams.get('sort') || 'relevance');
-  const [isFilterAccordionOpen, setIsFilterAccordionOpen] = useState(true);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [yearFromInput, setYearFromInput] = useState(searchParams.get('yearFrom') || '');
   const [yearToInput, setYearToInput] = useState(searchParams.get('yearTo') || '');
   const [ratingMinInput, setRatingMinInput] = useState(searchParams.get('ratingMin') || '');
@@ -418,9 +439,15 @@ export default function SearchPage() {
   const hasAdvancedFilters = hasActiveAdvancedFilters(normalizedAdvancedFilters);
   const hasInvalidAdvancedFilters = Boolean(advancedFilterError);
   const isKeywordSearchMode = Boolean(query.trim());
+  const isKeywordGenreFilterActive = isKeywordSearchMode && genre !== '전체';
   const activeGenreFilterCount = isKeywordSearchMode
     ? (genre !== '전체' ? 1 : 0)
     : selectedSearchGenres.length;
+  const activeAdvancedFilterCount = (
+    (normalizedAdvancedFilters.yearFrom !== null || normalizedAdvancedFilters.yearTo !== null ? 1 : 0)
+    + (normalizedAdvancedFilters.ratingMin !== null || normalizedAdvancedFilters.ratingMax !== null ? 1 : 0)
+  );
+  const totalActiveFilterCount = activeGenreFilterCount + activeAdvancedFilterCount;
   const filterSummaryParts = [];
   if (activeGenreFilterCount > 0) {
     filterSummaryParts.push(`장르 ${activeGenreFilterCount}개`);
@@ -448,15 +475,21 @@ export default function SearchPage() {
 
     const restoredContext = snapshot.lastSearchContext || null;
     const restoredDiscoveryGenres = restoredContext?.discoveryGenres || [];
+    const restoredAdvancedFilters = normalizeAdvancedFilters({
+      yearFrom: restoredContext?.yearFrom,
+      yearTo: restoredContext?.yearTo,
+      ratingMin: restoredContext?.ratingMin,
+      ratingMax: restoredContext?.ratingMax,
+    });
 
     setQuery(restoredContext?.query || '');
     setSearchType(restoredContext?.searchType || 'all');
     setGenre(restoredContext?.genre || '전체');
     setSort(restoredContext?.sort || 'relevance');
-    setYearFromInput(toFilterInputValue(restoredContext?.yearFrom));
-    setYearToInput(toFilterInputValue(restoredContext?.yearTo));
-    setRatingMinInput(toFilterInputValue(restoredContext?.ratingMin));
-    setRatingMaxInput(toFilterInputValue(restoredContext?.ratingMax));
+    setYearFromInput(toFilterInputValue(restoredAdvancedFilters.yearFrom));
+    setYearToInput(toFilterInputValue(restoredAdvancedFilters.yearTo));
+    setRatingMinInput(toFilterInputValue(restoredAdvancedFilters.ratingMin));
+    setRatingMaxInput(toFilterInputValue(restoredAdvancedFilters.ratingMax));
     setSelectedSearchGenres(restoredDiscoveryGenres);
     setIsDetailGenresExpanded(hasSelectedDetailGenres(restoredDiscoveryGenres));
     setMovies(snapshot.movies || []);
@@ -464,12 +497,26 @@ export default function SearchPage() {
     setCurrentPage(snapshot.currentPage || 1);
     setHasMore(Boolean(snapshot.hasMore));
     setHasSearched(Boolean(snapshot.hasSearched));
-    setLastSearchContext(restoredContext);
+    setLastSearchContext(
+      restoredContext
+        ? {
+          ...restoredContext,
+          ...restoredAdvancedFilters,
+        }
+        : null,
+    );
     setSearchDidYouMean(snapshot.searchDidYouMean || null);
     setRelatedQueries(snapshot.relatedQueries || []);
     setSearchSource(snapshot.searchSource || null);
     setIsLoading(false);
     setIsFetchingMore(false);
+  }, []);
+
+  const syncAdvancedFilterInputs = useCallback((filters) => {
+    setYearFromInput(toFilterInputValue(filters.yearFrom));
+    setYearToInput(toFilterInputValue(filters.yearTo));
+    setRatingMinInput(toFilterInputValue(filters.ratingMin));
+    setRatingMaxInput(toFilterInputValue(filters.ratingMax));
   }, []);
 
   /**
@@ -675,10 +722,10 @@ export default function SearchPage() {
     setSearchType(urlSearchType);
     setGenre(urlGenre);
     setSort(urlSort);
-    setYearFromInput(urlYearFrom);
-    setYearToInput(urlYearTo);
-    setRatingMinInput(urlRatingMin);
-    setRatingMaxInput(urlRatingMax);
+    setYearFromInput(toFilterInputValue(normalizedUrlFilters.yearFrom));
+    setYearToInput(toFilterInputValue(normalizedUrlFilters.yearTo));
+    setRatingMinInput(toFilterInputValue(normalizedUrlFilters.ratingMin));
+    setRatingMaxInput(toFilterInputValue(normalizedUrlFilters.ratingMax));
     setSelectedSearchGenres(urlSelectedGenres);
     setIsDetailGenresExpanded(hasSelectedDetailGenres(urlSelectedGenres));
 
@@ -710,10 +757,10 @@ export default function SearchPage() {
         page: 1,
         append: false,
         discoveryGenres: urlSelectedGenres,
-        yearFromValue: urlYearFrom,
-        yearToValue: urlYearTo,
-        ratingMinValue: urlRatingMin,
-        ratingMaxValue: urlRatingMax,
+        yearFromValue: normalizedUrlFilters.yearFrom,
+        yearToValue: normalizedUrlFilters.yearTo,
+        ratingMinValue: normalizedUrlFilters.ratingMin,
+        ratingMaxValue: normalizedUrlFilters.ratingMax,
       });
     }
   }, [executeSearch, restoreSearchSnapshot, searchParams]);
@@ -874,10 +921,10 @@ export default function SearchPage() {
   ]);
 
   /**
-   * 모달이 열려 있는 동안에는 ESC 닫기와 body 스크롤 잠금을 적용한다.
+   * 검색 기록/상세 검색 모달이 열려 있는 동안 ESC 닫기와 body 스크롤 잠금을 적용한다.
    */
   useEffect(() => {
-    if (!isRecentModalOpen) {
+    if (!isRecentModalOpen && !isFilterModalOpen) {
       return undefined;
     }
 
@@ -886,6 +933,10 @@ export default function SearchPage() {
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
+        if (isFilterModalOpen) {
+          setIsFilterModalOpen(false);
+          return;
+        }
         setIsRecentModalOpen(false);
       }
     };
@@ -895,7 +946,7 @@ export default function SearchPage() {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isRecentModalOpen]);
+  }, [isFilterModalOpen, isRecentModalOpen]);
 
   useEffect(() => {
     const hasCachedQuery = Boolean(lastSearchContext?.query?.trim());
@@ -1152,9 +1203,27 @@ export default function SearchPage() {
     setIsDetailGenresExpanded((prev) => !prev);
   }, []);
 
-  const handleToggleFilterAccordion = useCallback(() => {
-    setIsFilterAccordionOpen((prev) => !prev);
+  const handleOpenFilterModal = useCallback(() => {
+    closeAutocomplete();
+    setIsFilterModalOpen(true);
+  }, [closeAutocomplete]);
+
+  const handleCloseFilterModal = useCallback(() => {
+    setIsFilterModalOpen(false);
   }, []);
+
+  /**
+   * 키워드 + 단일 장르 필터 조합을 장르 발견형 검색으로 전환한다.
+   * 현재 선택된 장르를 다중 장르 검색의 초기 선택값으로 넘기고, 텍스트 입력은 비운다.
+   */
+  const handleSwitchToGenreDiscovery = useCallback(() => {
+    const nextSelectedGenres = genre !== '전체' ? [genre] : [];
+    setQuery('');
+    setGenre('전체');
+    setSelectedSearchGenres(nextSelectedGenres);
+    setIsDetailGenresExpanded(hasSelectedDetailGenres(nextSelectedGenres));
+    closeAutocomplete();
+  }, [closeAutocomplete, genre]);
 
   /**
    * 전체 검색 기록 모달을 연다.
@@ -1364,6 +1433,7 @@ export default function SearchPage() {
       return;
     }
 
+    syncAdvancedFilterInputs(normalizedAdvancedFilters);
     executeSearch({
       query,
       searchType,
@@ -1372,15 +1442,21 @@ export default function SearchPage() {
       page: 1,
       append: false,
       discoveryGenres: selectedSearchGenres,
+      yearFromValue: normalizedAdvancedFilters.yearFrom,
+      yearToValue: normalizedAdvancedFilters.yearTo,
+      ratingMinValue: normalizedAdvancedFilters.ratingMin,
+      ratingMaxValue: normalizedAdvancedFilters.ratingMax,
     });
   }, [
     executeSearch,
     genre,
     hasInvalidAdvancedFilters,
+    normalizedAdvancedFilters,
     query,
     searchType,
     selectedSearchGenres,
     sort,
+    syncAdvancedFilterInputs,
   ]);
 
   const handleResetAdvancedFilters = useCallback(() => {
@@ -1416,6 +1492,22 @@ export default function SearchPage() {
     selectedSearchGenres,
     sort,
   ]);
+
+  const handleYearFromBlur = useCallback(() => {
+    setYearFromInput(toFilterInputValue(normalizedAdvancedFilters.yearFrom));
+  }, [normalizedAdvancedFilters.yearFrom]);
+
+  const handleYearToBlur = useCallback(() => {
+    setYearToInput(toFilterInputValue(normalizedAdvancedFilters.yearTo));
+  }, [normalizedAdvancedFilters.yearTo]);
+
+  const handleRatingMinBlur = useCallback(() => {
+    setRatingMinInput(toFilterInputValue(normalizedAdvancedFilters.ratingMin));
+  }, [normalizedAdvancedFilters.ratingMin]);
+
+  const handleRatingMaxBlur = useCallback(() => {
+    setRatingMaxInput(toFilterInputValue(normalizedAdvancedFilters.ratingMax));
+  }, [normalizedAdvancedFilters.ratingMax]);
 
   /**
    * 정렬 옵션 변경 핸들러.
@@ -1635,6 +1727,19 @@ export default function SearchPage() {
             <S.SearchButton type="submit" disabled={isLoading}>
               검색
             </S.SearchButton>
+            <S.FilterActionButton
+              type="button"
+              onClick={handleOpenFilterModal}
+              disabled={isLoading}
+              aria-haspopup="dialog"
+              aria-expanded={isFilterModalOpen}
+              aria-controls="search-filter-modal"
+            >
+              <span>상세 검색</span>
+              {totalActiveFilterCount > 0 && (
+                <S.FilterActionCount>({totalActiveFilterCount})</S.FilterActionCount>
+              )}
+            </S.FilterActionButton>
           </S.InputWrap>
         </S.Form>
 
@@ -1677,189 +1782,216 @@ export default function SearchPage() {
           </S.RecentSection>
         )}
 
-        <S.FilterAccordion>
-          <S.FilterAccordionHeader>
-            <S.FilterAccordionHeading>
-              <S.FilterAccordionTitle>장르 / 상세 필터</S.FilterAccordionTitle>
-              <S.FilterAccordionSummary>{filterSummaryText}</S.FilterAccordionSummary>
-            </S.FilterAccordionHeading>
-            <S.FilterAccordionToggle
-              type="button"
-              onClick={handleToggleFilterAccordion}
-              aria-expanded={isFilterAccordionOpen}
-              aria-controls="search-filter-accordion"
+        {isFilterModalOpen && (
+          <S.FilterModalOverlay onClick={handleCloseFilterModal}>
+            <S.FilterModalContainer
+              id="search-filter-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="search-filter-modal-title"
+              onClick={(event) => event.stopPropagation()}
             >
-              {isFilterAccordionOpen ? '접기' : '펼치기'}
-              <S.FilterAccordionIcon $expanded={isFilterAccordionOpen} aria-hidden="true">
-                ▾
-              </S.FilterAccordionIcon>
-            </S.FilterAccordionToggle>
-          </S.FilterAccordionHeader>
+              <S.FilterModalHeader>
+                <S.FilterModalHeading>
+                  <S.FilterModalTitle id="search-filter-modal-title">장르 / 상세 필터</S.FilterModalTitle>
+                  <S.FilterModalDescription>{filterSummaryText}</S.FilterModalDescription>
+                </S.FilterModalHeading>
+                <S.FilterModalCloseButton
+                  type="button"
+                  onClick={handleCloseFilterModal}
+                  aria-label="상세 검색 모달 닫기"
+                >
+                  ✕
+                </S.FilterModalCloseButton>
+              </S.FilterModalHeader>
 
-          {isFilterAccordionOpen && (
-            <S.FilterAccordionContent id="search-filter-accordion">
-              <S.SearchGenreSection>
-                <S.SearchGenreTitle>
-                  {isKeywordSearchMode ? '장르 필터' : '장르로 찾기'}
-                </S.SearchGenreTitle>
-                <S.SearchGenreDescription>
-                  {isKeywordSearchMode
-                    ? '키워드 검색 결과를 장르별로 더 좁혀볼 수 있습니다.'
-                    : '관심있는 장르를 여러 개 선택해 검색할 수 있습니다.'}
-                </S.SearchGenreDescription>
-
-                {isKeywordSearchMode ? (
-                  <S.Genres>
-                    {GENRE_FILTERS.map((g) => (
-                      <S.GenreButton
-                        key={g}
-                        $active={genre === g}
-                        onClick={() => handleGenreChange(g)}
+              <S.FilterModalBody>
+                <S.SearchGenreSection>
+                  <S.SearchGenreHeader>
+                    <S.SearchGenreTitle>
+                      {isKeywordSearchMode ? '장르 필터' : '장르로 찾기'}
+                    </S.SearchGenreTitle>
+                    {isKeywordGenreFilterActive && (
+                      <S.SearchGenreModeSwitch
+                        type="button"
+                        onClick={handleSwitchToGenreDiscovery}
                       >
-                        {g}
-                      </S.GenreButton>
-                    ))}
-                  </S.Genres>
-                ) : (
-                  <>
-                    {isSearchGenreOptionsLoading && (
-                      <S.SearchGenreEmpty>장르 목록을 불러오는 중입니다.</S.SearchGenreEmpty>
+                        장르로 찾기
+                      </S.SearchGenreModeSwitch>
                     )}
+                  </S.SearchGenreHeader>
+                  <S.SearchGenreDescription>
+                    {isKeywordSearchMode
+                      ? '키워드 검색 결과를 장르별로 더 좁혀볼 수 있습니다.'
+                      : '관심있는 장르를 여러 개 선택해 검색할 수 있습니다.'}
+                  </S.SearchGenreDescription>
 
-                    {!isSearchGenreOptionsLoading && searchGenreOptions.length === 0 && (
-                      <S.SearchGenreEmpty>표시할 장르가 없습니다.</S.SearchGenreEmpty>
-                    )}
+                  {isKeywordSearchMode ? (
+                    <S.Genres>
+                      {GENRE_FILTERS.map((g) => (
+                        <S.GenreButton
+                          key={g}
+                          type="button"
+                          $active={genre === g}
+                          onClick={() => handleGenreChange(g)}
+                        >
+                          {g}
+                        </S.GenreButton>
+                      ))}
+                    </S.Genres>
+                  ) : (
+                    <>
+                      {isSearchGenreOptionsLoading && (
+                        <S.SearchGenreEmpty>장르 목록을 불러오는 중입니다.</S.SearchGenreEmpty>
+                      )}
 
-                    {!isSearchGenreOptionsLoading && searchGenreOptions.length > 0 && (
-                      <S.SearchGenreGroups>
-                        <S.SearchGenreGrid>
-                          {primarySearchGenreOptions.map((item) => (
-                            <S.SearchGenreToggle
-                              key={item.label}
-                              type="button"
-                              $active={selectedSearchGenres.includes(item.label)}
-                              onClick={() => handleSearchGenreToggle(item.label)}
-                            >
-                              {item.label}
-                            </S.SearchGenreToggle>
-                          ))}
-                        </S.SearchGenreGrid>
+                      {!isSearchGenreOptionsLoading && searchGenreOptions.length === 0 && (
+                        <S.SearchGenreEmpty>표시할 장르가 없습니다.</S.SearchGenreEmpty>
+                      )}
 
-                        {detailSearchGenreOptions.length > 0 && (
-                          <S.SearchGenreDetailSection>
-                            <S.SearchGenreDetailToggle
-                              type="button"
-                              onClick={handleToggleDetailGenres}
-                            >
-                              {isDetailGenresExpanded ? '세부 장르 닫기' : '세부 장르 펼치기'}
-                            </S.SearchGenreDetailToggle>
+                      {!isSearchGenreOptionsLoading && searchGenreOptions.length > 0 && (
+                        <S.SearchGenreGroups>
+                          <S.SearchGenreGrid>
+                            {primarySearchGenreOptions.map((item) => (
+                              <S.SearchGenreToggle
+                                key={item.label}
+                                type="button"
+                                $active={selectedSearchGenres.includes(item.label)}
+                                onClick={() => handleSearchGenreToggle(item.label)}
+                              >
+                                {item.label}
+                              </S.SearchGenreToggle>
+                            ))}
+                          </S.SearchGenreGrid>
 
-                            {isDetailGenresExpanded && (
-                              <S.SearchGenreGrid>
-                                {detailSearchGenreOptions.map((item) => (
-                                  <S.SearchGenreToggle
-                                    key={item.label}
-                                    type="button"
-                                    $active={selectedSearchGenres.includes(item.label)}
-                                    onClick={() => handleSearchGenreToggle(item.label)}
-                                  >
-                                    {item.label}
-                                  </S.SearchGenreToggle>
-                                ))}
-                              </S.SearchGenreGrid>
-                            )}
-                          </S.SearchGenreDetailSection>
-                        )}
-                      </S.SearchGenreGroups>
-                    )}
-                  </>
-                )}
-              </S.SearchGenreSection>
+                          {detailSearchGenreOptions.length > 0 && (
+                            <S.SearchGenreDetailSection>
+                              <S.SearchGenreDetailToggle
+                                type="button"
+                                onClick={handleToggleDetailGenres}
+                              >
+                                {isDetailGenresExpanded ? '세부 장르 닫기' : '세부 장르 펼치기'}
+                              </S.SearchGenreDetailToggle>
 
-              <S.FilterSectionDivider />
+                              {isDetailGenresExpanded && (
+                                <S.SearchGenreGrid>
+                                  {detailSearchGenreOptions.map((item) => (
+                                    <S.SearchGenreToggle
+                                      key={item.label}
+                                      type="button"
+                                      $active={selectedSearchGenres.includes(item.label)}
+                                      onClick={() => handleSearchGenreToggle(item.label)}
+                                    >
+                                      {item.label}
+                                    </S.SearchGenreToggle>
+                                  ))}
+                                </S.SearchGenreGrid>
+                              )}
+                            </S.SearchGenreDetailSection>
+                          )}
+                        </S.SearchGenreGroups>
+                      )}
+                    </>
+                  )}
+                </S.SearchGenreSection>
 
-              <S.AdvancedFilterSection>
-                <S.AdvancedFilterHeader>
-                  <S.AdvancedFilterTitle>상세 필터</S.AdvancedFilterTitle>
-                  <S.AdvancedFilterDescription>
-                    개봉 연도와 평점 범위를 지정하면 해당 조건으로 다시 검색합니다.
-                  </S.AdvancedFilterDescription>
-                </S.AdvancedFilterHeader>
+                <S.FilterSectionDivider />
 
-                <S.AdvancedFilterGrid>
-                  <S.AdvancedFilterGroup>
-                    <S.AdvancedFilterLabel htmlFor="search-year-from">개봉 연도</S.AdvancedFilterLabel>
-                    <S.AdvancedFilterRange>
-                      <S.AdvancedFilterInput
-                        id="search-year-from"
-                        type="number"
-                        inputMode="numeric"
-                        placeholder="시작 연도"
-                        value={yearFromInput}
-                        onChange={(e) => setYearFromInput(e.target.value)}
-                      />
-                      <S.AdvancedFilterDivider aria-hidden="true">-</S.AdvancedFilterDivider>
-                      <S.AdvancedFilterInput
-                        id="search-year-to"
-                        type="number"
-                        inputMode="numeric"
-                        placeholder="종료 연도"
-                        value={yearToInput}
-                        onChange={(e) => setYearToInput(e.target.value)}
-                      />
-                    </S.AdvancedFilterRange>
-                  </S.AdvancedFilterGroup>
+                <S.AdvancedFilterSection>
+                  <S.AdvancedFilterHeader>
+                    <S.AdvancedFilterTitle>상세 필터</S.AdvancedFilterTitle>
+                    <S.AdvancedFilterDescription>
+                      개봉 연도와 평점 범위를 지정하면 해당 조건으로 다시 검색합니다.
+                    </S.AdvancedFilterDescription>
+                  </S.AdvancedFilterHeader>
 
-                  <S.AdvancedFilterGroup>
-                    <S.AdvancedFilterLabel htmlFor="search-rating-min">평점</S.AdvancedFilterLabel>
-                    <S.AdvancedFilterRange>
-                      <S.AdvancedFilterInput
-                        id="search-rating-min"
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        placeholder="최소 평점"
-                        value={ratingMinInput}
-                        onChange={(e) => setRatingMinInput(e.target.value)}
-                      />
-                      <S.AdvancedFilterDivider aria-hidden="true">-</S.AdvancedFilterDivider>
-                      <S.AdvancedFilterInput
-                        id="search-rating-max"
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        placeholder="최대 평점"
-                        value={ratingMaxInput}
-                        onChange={(e) => setRatingMaxInput(e.target.value)}
-                      />
-                    </S.AdvancedFilterRange>
-                  </S.AdvancedFilterGroup>
-                </S.AdvancedFilterGrid>
+                  <S.AdvancedFilterGrid>
+                    <S.AdvancedFilterGroup>
+                      <S.AdvancedFilterLabel htmlFor="search-year-from">개봉 연도</S.AdvancedFilterLabel>
+                      <S.AdvancedFilterRange>
+                        <S.AdvancedFilterInput
+                          id="search-year-from"
+                          type="number"
+                          inputMode="numeric"
+                          min={MIN_RELEASE_YEAR}
+                          max={MAX_RELEASE_YEAR}
+                          placeholder="시작 연도"
+                          value={yearFromInput}
+                          onChange={(e) => setYearFromInput(e.target.value)}
+                          onBlur={handleYearFromBlur}
+                        />
+                        <S.AdvancedFilterDivider aria-hidden="true">-</S.AdvancedFilterDivider>
+                        <S.AdvancedFilterInput
+                          id="search-year-to"
+                          type="number"
+                          inputMode="numeric"
+                          min={MIN_RELEASE_YEAR}
+                          max={MAX_RELEASE_YEAR}
+                          placeholder="종료 연도"
+                          value={yearToInput}
+                          onChange={(e) => setYearToInput(e.target.value)}
+                          onBlur={handleYearToBlur}
+                        />
+                      </S.AdvancedFilterRange>
+                    </S.AdvancedFilterGroup>
 
-                <S.AdvancedFilterActions>
-                  <S.AdvancedFilterApplyButton
-                    type="button"
-                    onClick={handleApplyAdvancedFilters}
-                    disabled={isLoading || hasInvalidAdvancedFilters}
-                  >
-                    적용
-                  </S.AdvancedFilterApplyButton>
-                  <S.AdvancedFilterResetButton
-                    type="button"
-                    onClick={handleResetAdvancedFilters}
-                    disabled={isLoading || (!hasAdvancedFilters && !hasSearched)}
-                  >
-                    초기화
-                  </S.AdvancedFilterResetButton>
-                </S.AdvancedFilterActions>
+                    <S.AdvancedFilterGroup>
+                      <S.AdvancedFilterLabel htmlFor="search-rating-min">평점</S.AdvancedFilterLabel>
+                      <S.AdvancedFilterRange>
+                        <S.AdvancedFilterInput
+                          id="search-rating-min"
+                          type="number"
+                          inputMode="decimal"
+                          min={MIN_RATING}
+                          max={MAX_RATING}
+                          step="0.1"
+                          placeholder="최소 평점"
+                          value={ratingMinInput}
+                          onChange={(e) => setRatingMinInput(e.target.value)}
+                          onBlur={handleRatingMinBlur}
+                        />
+                        <S.AdvancedFilterDivider aria-hidden="true">-</S.AdvancedFilterDivider>
+                        <S.AdvancedFilterInput
+                          id="search-rating-max"
+                          type="number"
+                          inputMode="decimal"
+                          min={MIN_RATING}
+                          max={MAX_RATING}
+                          step="0.1"
+                          placeholder="최대 평점"
+                          value={ratingMaxInput}
+                          onChange={(e) => setRatingMaxInput(e.target.value)}
+                          onBlur={handleRatingMaxBlur}
+                        />
+                      </S.AdvancedFilterRange>
+                    </S.AdvancedFilterGroup>
+                  </S.AdvancedFilterGrid>
 
-                {advancedFilterError && (
-                  <S.AdvancedFilterError>{advancedFilterError}</S.AdvancedFilterError>
-                )}
-              </S.AdvancedFilterSection>
-            </S.FilterAccordionContent>
-          )}
-        </S.FilterAccordion>
+                  <S.AdvancedFilterActions>
+                    <S.AdvancedFilterApplyButton
+                      type="button"
+                      onClick={handleApplyAdvancedFilters}
+                      disabled={isLoading || hasInvalidAdvancedFilters}
+                    >
+                      적용
+                    </S.AdvancedFilterApplyButton>
+                    <S.AdvancedFilterResetButton
+                      type="button"
+                      onClick={handleResetAdvancedFilters}
+                      disabled={isLoading || (!hasAdvancedFilters && !hasSearched)}
+                    >
+                      초기화
+                    </S.AdvancedFilterResetButton>
+                  </S.AdvancedFilterActions>
+
+                  {advancedFilterError && (
+                    <S.AdvancedFilterError>{advancedFilterError}</S.AdvancedFilterError>
+                  )}
+                </S.AdvancedFilterSection>
+              </S.FilterModalBody>
+            </S.FilterModalContainer>
+          </S.FilterModalOverlay>
+        )}
 
         {isAuthenticated && isRecentModalOpen && (
           <S.RecentModalOverlay onClick={handleCloseRecentModal}>
@@ -1945,26 +2077,30 @@ export default function SearchPage() {
           </S.RecentModalOverlay>
         )}
 
-        {/* 장르 필터 + 정렬 */}
-        <S.Filters>
-          <S.FilterSpacer aria-hidden="true" />
+        {hasSearched && (
+          <>
+            {/* 장르 필터 + 정렬 */}
+            <S.Filters>
+              <S.FilterSpacer aria-hidden="true" />
 
-          {/* 정렬 옵션 — 커스텀 셀렉트 래퍼 */}
-          <S.SortWrap>
-            <S.SortSelect
-              value={sort}
-              onChange={(e) => handleSortChange(e.target.value)}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </S.SortSelect>
-            {/* 커스텀 화살표 아이콘 */}
-            <S.SortArrow aria-hidden="true">▾</S.SortArrow>
-          </S.SortWrap>
-        </S.Filters>
+              {/* 정렬 옵션 — 커스텀 셀렉트 래퍼 */}
+              <S.SortWrap>
+                <S.SortSelect
+                  value={sort}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </S.SortSelect>
+                {/* 커스텀 화살표 아이콘 */}
+                <S.SortArrow aria-hidden="true">▾</S.SortArrow>
+              </S.SortWrap>
+            </S.Filters>
+          </>
+        )}
 
         {/* 검색 결과 */}
         <S.Results>
