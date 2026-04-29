@@ -34,6 +34,10 @@ const CATEGORY_ICONS = {
   CHALLENGE: '&#x1F3C6;',
 };
 
+function isImageIcon(iconUrl) {
+  return typeof iconUrl === 'string' && /^(https?:\/\/|\/|data:image\/)/.test(iconUrl);
+}
+
 /** 달성일 포맷 (ISO → 한국어 날짜) */
 function formatDate(isoStr) {
   if (!isoStr) return null;
@@ -132,10 +136,13 @@ export default function AchievementDetailPage() {
 
       {/* 헤더 카드 */}
       <S.Header $achieved={achievement.achieved}>
-        <S.IconBox
-          $achieved={achievement.achieved}
-          dangerouslySetInnerHTML={{ __html: icon }}
-        />
+        <S.IconBox $achieved={achievement.achieved}>
+          {isImageIcon(achievement.iconUrl) ? (
+            <S.IconImage src={achievement.iconUrl} alt="" aria-hidden="true" />
+          ) : (
+            <span dangerouslySetInnerHTML={{ __html: icon }} />
+          )}
+        </S.IconBox>
         <S.HeaderContent>
           <S.Title>{achievement.achievementName || achievement.name}</S.Title>
           <S.BadgeRow>

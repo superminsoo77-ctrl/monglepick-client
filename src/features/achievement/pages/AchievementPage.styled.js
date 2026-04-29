@@ -147,6 +147,13 @@ export const AchievementIcon = styled.div`
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
+  overflow: hidden;
+`;
+
+export const AchievementIconImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 /** 이름 + 달성 배지 묶음 */
