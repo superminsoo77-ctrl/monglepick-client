@@ -177,21 +177,23 @@ export default function PostDetailPage() {
               </S.CategoryBadge>
             )}
             <S.Time>{formatRelativeTime(post.createdAt)}</S.Time>
-            {user && !isOwner && (
-              <S.ReportButton onClick={() => setReportOpen(true)}>
-                신고
-              </S.ReportButton>
-            )}
-            {isOwner && !isEditing && (
-              <>
-                <S.EditButton onClick={() => setIsEditing(true)}>
-                  수정
-                </S.EditButton>
-                <S.DeleteButton onClick={() => setDeleteConfirm(true)} disabled={isDeleting}>
-                  {isDeleting ? '삭제 중...' : '삭제'}
-                </S.DeleteButton>
-              </>
-            )}
+            <S.ActionGroup>
+              {user && !isOwner && (
+                <S.ReportButton onClick={() => setReportOpen(true)}>
+                  신고
+                </S.ReportButton>
+              )}
+              {isOwner && !isEditing && (
+                <>
+                  <S.EditButton onClick={() => setIsEditing(true)}>
+                    수정
+                  </S.EditButton>
+                  <S.DeleteButton onClick={() => setDeleteConfirm(true)} disabled={isDeleting}>
+                    {isDeleting ? '삭제 중...' : '삭제'}
+                  </S.DeleteButton>
+                </>
+              )}
+            </S.ActionGroup>
           </S.Header>
 
           {isEditing ? (
