@@ -148,18 +148,27 @@ export default function MyQuizStatsCard({ refreshKey }) {
 
 /* ── styled-components ────────────────────────────────────── */
 
+/* 주의: 이 프로젝트의 디자인 시스템 토큰은 다음 키 모양을 사용한다.
+ *   - 폰트 크기: theme.typography.text{Xs,Sm,Base,Lg,Xl,2xl,...}
+ *   - 폰트 두께: theme.typography.font{Normal,Medium,Semibold,Bold}
+ *   - 테두리 색: theme.colors.borderDefault
+ *   - 라운딩  : theme.radius.{sm,md,lg,xl,full}
+ * `theme.fontSizes.*` / `theme.fontWeights.*` / `theme.colors.border` /
+ * `theme.layout.cardRadius` 등은 이 프로젝트에 존재하지 않으며, 참조하면
+ * undefined → "Cannot read properties of undefined" 로 화면 전체가 흰색이 된다.
+ */
 const Wrapper = styled.section`
-  background: ${({ theme }) => theme.colors.bgCard ?? theme.colors.bgBase ?? '#fff'};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.layout?.cardRadius ?? '12px'};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
   padding: ${({ theme }) => theme.spacing.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
 `;
 
 const Title = styled.h3`
   margin: 0 0 ${({ theme }) => theme.spacing.md};
-  font-size: ${({ theme }) => theme.fontSizes.md};
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
@@ -169,36 +178,36 @@ const Grid = styled.div`
   gap: ${({ theme }) => theme.spacing.md};
 `;
 
-/* 셀 — 카드의 KPI 1개 박스 */
+/* 셀 — 카드의 KPI 1개 박스. bgHover 토큰이 없어 bgSecondary 로 대체 */
 const Cell = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
-  background: ${({ theme }) => theme.colors.bgHover ?? '#f8fafc'};
-  border-radius: 8px;
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  border-radius: ${({ theme }) => theme.radius.md};
 `;
 
 const Label = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
-  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
 `;
 
 const Value = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xl};
-  font-weight: ${({ theme }) => theme.fontWeights.bold};
+  font-size: ${({ theme }) => theme.typography.textXl};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
   color: ${({ theme }) => theme.colors.primary};
 `;
 
 /* 마지막 응시는 길어질 수 있어 폰트를 살짝 줄인다 */
 const ValueSm = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.md};
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
 const Sub = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
 `;
