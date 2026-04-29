@@ -145,7 +145,6 @@ function EditProfileModal({ profile, onClose, onSaved }) {
   const user = useAuthStore((s) => s.user);
 
   const [nickname, setNickname] = useState(profile?.nickname || user?.nickname || '');
-  const [profileImageUrl, setProfileImageUrl] = useState(profile?.profileImageUrl || '');
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(profile?.profileImageUrl || null);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -177,10 +176,6 @@ function EditProfileModal({ profile, onClose, onSaved }) {
     if (nickname && (nickname.length < 2 || nickname.length > 20)) {
       errors.nickname = '닉네임은 2자 이상 20자 이하여야 합니다';
     }
-    // validate URL length only when URL is used (no file selected)
-    if (!profileImageFile && profileImageUrl && profileImageUrl.length > 500) {
-      errors.profileImageUrl = '이미지 URL은 500자를 초과할 수 없습니다';
-    }
     const isChangingPassword = newPassword || currentPassword;
     if (isChangingPassword) {
       if (!currentPassword) errors.currentPassword = '현재 비밀번호를 입력해주세요';
@@ -206,12 +201,10 @@ function EditProfileModal({ profile, onClose, onSaved }) {
     }
     setFieldErrors({});
 
-    /* 변경된 필드만 포함 (null 필드는 백엔드에서 무시) */
-    // If a file is selected, send FormData (multipart). Otherwise send JSON.
+    /* 변경된 필드만 포함 (이미지는 파일 선택 시에만 전송) */
     let payload = {};
-    const useFile = !!profileImageFile;
 
-    if (useFile) {
+    if (profileImageFile) {
       payload = new FormData();
       // append file under 'profileImage' field (backend should accept multipart)
       payload.append('profileImage', profileImageFile);
@@ -226,9 +219,6 @@ function EditProfileModal({ profile, onClose, onSaved }) {
     } else {
       if (nickname !== (profile?.nickname || user?.nickname || '')) {
         payload.nickname = nickname || null;
-      }
-      if (profileImageUrl !== (profile?.profileImageUrl || '')) {
-        payload.profileImageUrl = profileImageUrl || null;
       }
       if (newPassword && currentPassword) {
         payload.currentPassword = currentPassword;
@@ -296,7 +286,7 @@ function EditProfileModal({ profile, onClose, onSaved }) {
                 <S.AvatarPreviewImg $src={imagePreviewUrl || null}>
                   {!imagePreviewUrl && displayInitial}
                 </S.AvatarPreviewImg>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <S.AvatarFileControl>
                   <input
                     id="edit-image-file"
                     type="file"
@@ -305,7 +295,7 @@ function EditProfileModal({ profile, onClose, onSaved }) {
                       const f = e.target.files && e.target.files[0];
                       if (!f) {
                         setProfileImageFile(null);
-                        setImagePreviewUrl(profileImageUrl || null);
+                        setImagePreviewUrl(profile?.profileImageUrl || null);
                         return;
                       }
 
@@ -329,31 +319,14 @@ function EditProfileModal({ profile, onClose, onSaved }) {
                       setProfileImageFile(f);
                       const url = URL.createObjectURL(f);
                       setImagePreviewUrl(url);
-                      // clear profileImageUrl string since file takes precedence
-                      setProfileImageUrl('');
                     }}
                   />
-
-                  <S.FormInput
-                    id="edit-image-url"
-                    type="url"
-                    value={profileImageUrl}
-                    onChange={(e) => {
-                      setProfileImageUrl(e.target.value);
-                      setProfileImageFile(null);
-                      // show preview from URL if possible
-                      setImagePreviewUrl(e.target.value || null);
-                    }}
-                    placeholder="또는 이미지 URL 입력 (https://...)"
-                    $error={!!fieldErrors.profileImageUrl}
-                    style={{ width: '100%' }}
-                  />
-                </div>
+                </S.AvatarFileControl>
               </S.AvatarPreviewRow>
               {fieldErrors.profileImageUrl ? (
                 <S.FormHelperText $error>{fieldErrors.profileImageUrl}</S.FormHelperText>
               ) : (
-                <S.FormHelperText>JPG/JPEG/PNG 파일 업로드 또는 이미지 URL 입력</S.FormHelperText>
+                <S.FormHelperText>JPG/JPEG/PNG 파일만 업로드할 수 있습니다</S.FormHelperText>
               )}
             </S.FormField>
           </S.ModalSection>

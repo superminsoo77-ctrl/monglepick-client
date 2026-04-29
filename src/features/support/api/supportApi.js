@@ -125,14 +125,20 @@ export async function sendChatbotMessage({ message, sessionId }) {
  * (고객센터 챗봇은 요청당 수명이 짧아 재시도 가치가 낮고, 네트워크 실패는 즉시
  *  onError 로 끌어올려 '상담원 연결' 배너를 띄우는 편이 UX 상 자연스럽다).
  *
- * 이벤트 (7종):
- *  - session     : {session_id}
- *  - status      : {phase, message, keepalive?}
- *  - matched_faq : {items: [{faq_id, category, question, score}]}
- *  - token       : {delta} — 최종 응답 텍스트 (현재 MVP 는 1회 전송)
- *  - needs_human : {value: boolean}
- *  - done        : {}
- *  - error       : {message}
+ * 이벤트 (10종 — v3 7종 + v4 신규 3종):
+ *  - session            : {session_id}
+ *  - status             : {phase, message, keepalive?}
+ *  - matched_faq        : {items: [{faq_id, category, question, score}]}
+ *  - token              : {delta} — 최종 응답 텍스트 (현재 MVP 는 1회 전송)
+ *  - needs_human        : {value: boolean}
+ *  - done               : {}
+ *  - error              : {message}
+ *  - policy_chunk       : (v4) {items: [{doc_id, section, headings, policy_topic, text, score}]}
+ *  - navigation         : (v4) {target_path, label, candidates: []}
+ *  - personal_data_card : (v4, Phase 2) {kind, summary, items[]}
+ *
+ * v4 콜백은 미지정 시 이벤트를 파싱만 하고 조용히 무시한다 (graceful degradation).
+ * 이 함수를 호출하는 구 코드(콜백 3개 미지정)는 v4 이벤트 수신 시에도 정상 동작한다.
  *
  * @param {Object} params
  * @param {string} params.message - 사용자 입력 (1~1500자)
@@ -145,6 +151,12 @@ export async function sendChatbotMessage({ message, sessionId }) {
  * @param {(data: {value: boolean}) => void} [callbacks.onNeedsHuman]
  * @param {() => void} [callbacks.onDone]
  * @param {(data: {message: string}) => void} [callbacks.onError]
+ * @param {(data: {items: Array<{doc_id: string, section: string, headings: string[], policy_topic: string, text: string, score: number}>}) => void} [callbacks.onPolicyChunk]
+ *   v4 신규 — narrator 가 lookup_policy 결과를 인용할 때 발행. 미지정 시 무시.
+ * @param {(data: {target_path: string, label: string, candidates: Array}) => void} [callbacks.onNavigation]
+ *   v4 신규 — redirect 의도 또는 화면 이동 안내 시 발행. 미지정 시 무시.
+ * @param {(data: {kind: string, summary: string, items: Array}) => void} [callbacks.onPersonalDataCard]
+ *   v4 Phase 2 후속 — Read tool 결과 시각화. 현재 Agent 미발행. 미지정 시 무시.
  * @param {AbortSignal} [signal] - 요청 취소용 AbortSignal (UI 언마운트/재질문 시 호출)
  * @returns {Promise<void>}
  */
@@ -158,6 +170,10 @@ export async function sendSupportChatSse(
     onNeedsHuman,
     onDone,
     onError,
+    /* v4 신규 콜백 — 미지정 시 undefined, 파서에서 optional chaining 으로 안전 호출 */
+    onPolicyChunk,
+    onNavigation,
+    onPersonalDataCard,
   } = {},
   signal,
 ) {
@@ -200,13 +216,19 @@ export async function sendSupportChatSse(
       buffer = blocks.pop() || '';
       for (const block of blocks) {
         if (!block.trim()) continue;
-        _parseSupportSseBlock(block, { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError });
+        _parseSupportSseBlock(block, {
+          onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError,
+          onPolicyChunk, onNavigation, onPersonalDataCard,
+        });
       }
     }
 
     // 스트림 종료 후 잔여 버퍼 (네트워크 flush 경계상 드물게 발생)
     if (buffer.trim()) {
-      _parseSupportSseBlock(buffer, { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError });
+      _parseSupportSseBlock(buffer, {
+        onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError,
+        onPolicyChunk, onNavigation, onPersonalDataCard,
+      });
     }
   } finally {
     // 예외가 나도 reader 를 반드시 해제해 스트림 리소스 누수 방지
@@ -217,10 +239,12 @@ export async function sendSupportChatSse(
 /**
  * 단일 SSE 블록을 파싱하여 대응 콜백을 호출한다.
  *
- * chatApi 의 parseSSEBlock 과 구조는 동일하되 고객센터 전용 7종만 디스패치한다.
+ * chatApi 의 parseSSEBlock 과 구조는 동일하되 고객센터 전용 10종(v3 7종 + v4 3종)을 디스패치한다.
+ * v4 콜백(onPolicyChunk / onNavigation / onPersonalDataCard)은 미지정 시 optional chaining 으로
+ * 안전하게 무시되므로, 이 함수를 호출하는 구 코드는 수정 없이 그대로 동작한다 (graceful degradation).
  *
  * @param {string} block - "event: xxx\ndata: {...}" 형태 블록
- * @param {Object} callbacks - 콜백 모음
+ * @param {Object} callbacks - 콜백 모음 (v3 7종 + v4 3종)
  * @private
  */
 function _parseSupportSseBlock(block, callbacks) {
@@ -247,8 +271,15 @@ function _parseSupportSseBlock(block, callbacks) {
     return;
   }
 
-  const { onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError } = callbacks;
+  const {
+    /* v3 기존 7종 */
+    onSession, onStatus, onMatchedFaq, onToken, onNeedsHuman, onDone, onError,
+    /* v4 신규 3종 — 미지정 시 undefined, optional chaining 으로 안전 무시 */
+    onPolicyChunk, onNavigation, onPersonalDataCard,
+  } = callbacks;
+
   switch (eventType) {
+    /* ── v3 기존 이벤트 (변경 없음) ── */
     case 'session':
       onSession?.(data);
       break;
@@ -270,6 +301,36 @@ function _parseSupportSseBlock(block, callbacks) {
     case 'error':
       onError?.(data);
       break;
+
+    /* ── v4 신규 이벤트 ── */
+
+    /**
+     * policy_chunk: narrator 가 lookup_policy 결과를 답변에 인용할 때 발행.
+     * 페이로드: {items: [{doc_id, section, headings, policy_topic, text, score}]}
+     * onPolicyChunk 미지정 시 무시.
+     */
+    case 'policy_chunk':
+      onPolicyChunk?.(data);
+      break;
+
+    /**
+     * navigation: redirect 의도 또는 narrator 가 화면 이동을 안내할 때 발행.
+     * 페이로드: {target_path, label, candidates: []}
+     * onNavigation 미지정 시 무시.
+     */
+    case 'navigation':
+      onNavigation?.(data);
+      break;
+
+    /**
+     * personal_data_card: Read tool 결과를 표/카드로 시각화 (Phase 2 후속).
+     * 페이로드: {kind, summary, items[]}
+     * 현재 Agent 미발행. onPersonalDataCard 미지정 시 무시.
+     */
+    case 'personal_data_card':
+      onPersonalDataCard?.(data);
+      break;
+
     default:
       /* 알 수 없는 이벤트는 조용히 무시 (forward-compat) */
       break;

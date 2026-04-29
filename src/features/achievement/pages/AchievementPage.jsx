@@ -29,6 +29,10 @@ const CATEGORY_ICONS = {
   CHALLENGE: '&#x1F3C6;',
 };
 
+function isImageIcon(iconUrl) {
+  return typeof iconUrl === 'string' && /^(https?:\/\/|\/|data:image\/)/.test(iconUrl);
+}
+
 export default function AchievementPage() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -119,13 +123,23 @@ export default function AchievementPage() {
                 )}
               >
                 <S.AchievementHeaderRow>
-                  <S.AchievementIcon
-                    dangerouslySetInnerHTML={{
-                      __html: ach.iconUrl || CATEGORY_ICONS[ach.category] || '&#x1F3C5;',
-                    }}
-                  />
+                  <S.AchievementIcon>
+                    {isImageIcon(ach.iconUrl) ? (
+                      <S.AchievementIconImage
+                        src={ach.iconUrl}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: ach.iconUrl || CATEGORY_ICONS[ach.category] || '&#x1F3C5;',
+                        }}
+                      />
+                    )}
+                  </S.AchievementIcon>
                   <S.AchievementNameRow>
-                    <S.AchievementName>{ach.name}</S.AchievementName>
+                    <S.AchievementName>{ach.achievementName || ach.name}</S.AchievementName>
                     {ach.achieved && <S.AchievedBadge>✓ 달성</S.AchievedBadge>}
                   </S.AchievementNameRow>
                 </S.AchievementHeaderRow>

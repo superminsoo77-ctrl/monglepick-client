@@ -79,3 +79,52 @@ export async function submitQuizAnswer(quizId, answer) {
   requireAuth();
   return backendApi.post(QUIZ_ENDPOINTS.SUBMIT(quizId), { answer });
 }
+
+/**
+ * 로그인 사용자 본인의 퀴즈 응시 통계를 조회한다 (2026-04-29 신규).
+ *
+ * QuizPage 상단 "내 응시 현황" 카드가 4 KPI (총응시·정답률·획득포인트·마지막응시일) 로 렌더한다.
+ *
+ * JWT 인증 필수 — 미인증 시 즉시 Error('로그인이 필요합니다.') throw.
+ *
+ * @returns {Promise<{
+ *   totalAttempts: number,
+ *   correctCount: number,
+ *   accuracyRate: number,
+ *   totalEarnedPoints: number,
+ *   lastAttemptedAt: string|null
+ * }>} 응시 통계 응답
+ *
+ * @throws {Error} 로그인되지 않은 경우 ('로그인이 필요합니다.')
+ *
+ * @example
+ * const stats = await getMyQuizStats();
+ * // { totalAttempts: 12, correctCount: 9, accuracyRate: 0.75, totalEarnedPoints: 90, lastAttemptedAt: '2026-04-29T...' }
+ */
+export async function getMyQuizStats() {
+  requireAuth();
+  return backendApi.get(QUIZ_ENDPOINTS.MY_STATS);
+}
+
+/**
+ * 로그인 사용자 본인의 퀴즈 응시 이력을 페이징으로 조회한다 (2026-04-29 신규).
+ *
+ * QuizPage 의 "내 응시 이력" 리스트가 호출. submittedAt DESC 로 정렬되어
+ * 가장 최근 응시가 먼저 나온다. 본인 row 만 노출되므로 정답·해설을 동봉한다.
+ *
+ * @param {Object} [params]
+ * @param {number} [params.page=0] 0-based 페이지 번호
+ * @param {number} [params.size=10] 페이지 크기 (1~50 권장)
+ * @returns {Promise<{content: Array, totalElements: number, totalPages: number, number: number, size: number}>}
+ *   백엔드 Page<MyHistoryItem> 응답
+ *
+ * @throws {Error} 로그인되지 않은 경우 ('로그인이 필요합니다.')
+ *
+ * @example
+ * const page = await getMyQuizHistory({ page: 0, size: 5 });
+ * page.content.forEach(item => console.log(item.question, item.isCorrect));
+ */
+export async function getMyQuizHistory({ page = 0, size = 10 } = {}) {
+  requireAuth();
+  return backendApi.get(QUIZ_ENDPOINTS.MY_HISTORY, { params: { page, size } });
+}

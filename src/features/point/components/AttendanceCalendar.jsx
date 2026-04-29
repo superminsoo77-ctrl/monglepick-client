@@ -94,8 +94,8 @@ export default function AttendanceCalendar({
           {/* 보너스 안내 */}
           <S.BonusInfo>
             <S.BonusTag>기본 10P</S.BonusTag>
-            <S.BonusTag $variant="highlight">7일 연속 30P</S.BonusTag>
-            <S.BonusTag $variant="premium">30일 연속 60P</S.BonusTag>
+            <S.BonusTag $variant="highlight">7일 연속 50P</S.BonusTag>
+            <S.BonusTag $variant="premium">30일 연속 300P</S.BonusTag>
           </S.BonusInfo>
 
           {/* 달력 그리드 */}

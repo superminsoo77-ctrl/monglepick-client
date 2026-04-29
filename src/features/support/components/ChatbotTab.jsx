@@ -13,6 +13,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { sendSupportChatSse } from '../api/supportApi';
 /* 2026-04-23: 추천 질문 칩 동적 조회 (chat_suggestions.surface='faq_chatbot') */
 import useChatbotSuggestions from '../hooks/useChatbotSuggestions';
+/* v4 신규 카드 컴포넌트 */
+import PolicyChunkCard from './PolicyChunkCard';
+import NavigationCard from './NavigationCard';
+/* PersonalDataCard 는 Phase 2 후속 활성화 대기 — import 준비만 해둠 */
+// import PersonalDataCard from './PersonalDataCard';
 import * as S from './ChatbotTab.styled';
 
 /* 추천 질문 목록은 더 이상 하드코딩하지 않는다 — Backend 에서 surface=faq_chatbot 으로 조회 */
@@ -57,11 +62,23 @@ export default function ChatbotTab({ onSwitchToTicket }) {
     const message = (text || input).trim();
     if (!message || isLoading) return;
 
-    /* 사용자 + 봇 자리표시자를 동시 삽입 */
+    /* 사용자 + 봇 자리표시자를 동시 삽입.
+       v4 신규 필드(policyChunks / navigation / personalData)를 초기값으로 포함한다.
+       기존 v3 필드(matchedFaqs / needsHumanAgent)는 그대로 유지. */
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: message },
-      { role: 'bot', content: '', matchedFaqs: [], needsHumanAgent: false, pending: true },
+      {
+        role: 'bot',
+        content: '',
+        matchedFaqs: [],
+        needsHumanAgent: false,
+        pending: true,
+        /* v4 신규 */
+        policyChunks: [],
+        navigation: null,
+        personalData: null,
+      },
     ]);
     setInput('');
     setIsLoading(true);
@@ -95,6 +112,7 @@ export default function ChatbotTab({ onSwitchToTicket }) {
       await sendSupportChatSse(
         { message, sessionId: sessionId || '' },
         {
+          /* ── v3 기존 콜백 (변경 없음) ── */
           onSession: (data) => {
             if (data?.session_id) setSessionId(data.session_id);
           },
@@ -115,6 +133,50 @@ export default function ChatbotTab({ onSwitchToTicket }) {
           },
           onDone: () => {
             updateLastBot({ pending: false });
+          },
+
+          /* ── v4 신규 콜백 ── */
+
+          /**
+           * policy_chunk: 정책 RAG 청크 인용 이벤트.
+           * 페이로드: {items: [{doc_id, section, headings, policy_topic, text, score}]}
+           * policyChunks 배열에 누적한다 (복수 이벤트 발행 가능성 대비).
+           * updateLastBot 은 객체 패치만 지원하므로 setMessages 로 직접 누적한다.
+           */
+          onPolicyChunk: (data) => {
+            if (!Array.isArray(data?.items) || data.items.length === 0) return;
+            setMessages((prev) => {
+              const next = [...prev];
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i].role === 'bot' && next[i].pending) {
+                  next[i] = {
+                    ...next[i],
+                    policyChunks: [...(next[i].policyChunks || []), ...data.items],
+                  };
+                  break;
+                }
+              }
+              return next;
+            });
+          },
+
+          /**
+           * navigation: 화면 이동 안내 이벤트.
+           * 페이로드: {target_path, label, candidates: []}
+           * 마지막으로 수신한 navigation 데이터를 그대로 보관한다.
+           */
+          onNavigation: (data) => {
+            updateLastBot({ navigation: data || null });
+          },
+
+          /**
+           * personal_data_card: Read tool 결과 시각화 (Phase 2 후속).
+           * 현재 Agent 미발행 — 수신 시 personalData 필드에 보관만 한다.
+           * ChatbotTab 렌더에서 PersonalDataCard 는 주석 처리 상태이므로
+           * 이벤트가 오더라도 화면에 노출되지 않는다.
+           */
+          onPersonalDataCard: (data) => {
+            updateLastBot({ personalData: data || null });
           },
         },
       );
@@ -207,6 +269,30 @@ export default function ChatbotTab({ onSwitchToTicket }) {
                 ))}
               </S.FaqMatches>
             )}
+
+            {/* v4 신규: 정책 RAG 청크 카드 — 자리표시자 단계에서는 숨김 */}
+            {msg.role === 'bot' && !msg.pending && msg.policyChunks?.length > 0 && (
+              <PolicyChunkCard items={msg.policyChunks} />
+            )}
+
+            {/* v4 신규: 화면 이동 CTA 카드 — 자리표시자 단계에서는 숨김 */}
+            {msg.role === 'bot' && !msg.pending && msg.navigation && (
+              <NavigationCard
+                target_path={msg.navigation.target_path}
+                label={msg.navigation.label}
+                candidates={msg.navigation.candidates}
+              />
+            )}
+
+            {/* Phase 2 후속: PersonalDataCard — Agent 가 personal_data_card 이벤트 발행 시 활성화
+            {msg.role === 'bot' && !msg.pending && msg.personalData && (
+              <PersonalDataCard
+                kind={msg.personalData.kind}
+                summary={msg.personalData.summary}
+                items={msg.personalData.items}
+              />
+            )}
+            */}
 
             {/* 상담원 이관 배너 — 자리표시자 단계에서는 숨김 */}
             {msg.role === 'bot' && msg.needsHumanAgent && msg.content && (

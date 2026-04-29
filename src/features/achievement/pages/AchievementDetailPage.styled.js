@@ -85,6 +85,13 @@ export const IconBox = styled.div`
   font-size: 40px;
   flex-shrink: 0;
   opacity: ${({ $achieved }) => ($achieved ? 1 : 0.6)};
+  overflow: hidden;
+`;
+
+export const IconImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 /** 헤더 오른쪽 컨텐츠 블록 */

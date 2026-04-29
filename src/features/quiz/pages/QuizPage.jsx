@@ -33,6 +33,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getTodayQuizzes } from '../api/quizApi';
 import QuizCard from '../components/QuizCard';
+import MyQuizStatsCard from '../components/MyQuizStatsCard';
+import MyQuizHistoryList from '../components/MyQuizHistoryList';
 import * as S from './QuizPage.styled';
 
 export default function QuizPage({ embedded = false }) {
@@ -42,6 +44,20 @@ export default function QuizPage({ embedded = false }) {
   const [isLoading, setIsLoading] = useState(true);
   /** 로드 실패 메시지 */
   const [loadError, setLoadError] = useState(null);
+  /**
+   * 내 응시 현황 카드 강제 리페치용 키 — 2026-04-29.
+   * 자식 QuizCard 가 정답을 제출하고 onSubmitted 콜백을 호출하면 +1 → useEffect 재실행.
+   * 자기 자신의 응시 통계가 즉시 반영되도록 한다.
+   */
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+
+  /**
+   * QuizCard 가 채점 응답을 받은 직후 호출하는 콜백.
+   * 새 응시(첫 정답 → 포인트 변동) 가 발생했을 때 카드 통계를 즉시 갱신한다.
+   */
+  const handleQuizSubmitted = useCallback(() => {
+    setStatsRefreshKey((k) => k + 1);
+  }, []);
 
   /**
    * 오늘의 퀴즈 목록을 API 로 불러온다.
@@ -82,7 +98,13 @@ export default function QuizPage({ embedded = false }) {
    */
   const body = (
     <>
-      {/* ── 상단 통계 요약 ── */}
+      {/* ── 내 응시 현황 카드 (로그인 시만 노출) — 2026-04-29 ── */}
+      <MyQuizStatsCard refreshKey={statsRefreshKey} />
+
+      {/* ── 내 응시 이력 (펼치기 토글) — 2026-04-29 ── */}
+      <MyQuizHistoryList refreshKey={statsRefreshKey} />
+
+      {/* ── 오늘의 퀴즈 통계 요약 (전체 사용자 공통) ── */}
       <S.StatsBar>
         <S.StatItem>
           <S.StatValue>{quizzes.length}</S.StatValue>
@@ -130,7 +152,12 @@ export default function QuizPage({ embedded = false }) {
         <S.QuizList>
           {quizzes.map((quiz, idx) => (
             /* quizId 는 고유값이라 key 로 사용. 안전 폴백으로 idx 포함 */
-            <QuizCard key={quiz.quizId ?? `quiz-${idx}`} quiz={quiz} index={idx} />
+            <QuizCard
+              key={quiz.quizId ?? `quiz-${idx}`}
+              quiz={quiz}
+              index={idx}
+              onSubmitted={handleQuizSubmitted}
+            />
           ))}
         </S.QuizList>
       )}

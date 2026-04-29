@@ -191,7 +191,7 @@ export const COMMUNITY_ENDPOINTS = {
    * 바디: { imageUrl }
    * 반환: { extractedMovieName, extractedWatchDate, extractedHeadcount, ocrConfidence }
    */
-  OCR_ANALYZE: `${API_VERSION}/ocr-events/analyze`,
+  OCR_ANALYZE: (eventId) => `${API_VERSION}/ocr-events/${eventId}/analyze`,
   /**
    * 2026-04-14 신규: OCR 실관람 인증 제출 - POST (JWT 필수).
    * 바디: { imageUrl, extractedMovieName?, extractedWatchDate?, extractedHeadcount?, ocrConfidence? }
@@ -580,6 +580,10 @@ export const QUIZ_ENDPOINTS = {
   TODAY: `${API_VERSION}/quizzes/today`,
   /** 정답 제출 및 채점 - POST (JWT 필수, body: { answer }) */
   SUBMIT: (quizId) => `${API_VERSION}/quizzes/${quizId}/submit`,
+  /** 내 응시 통계 - GET (JWT 필수, 2026-04-29 신규) */
+  MY_STATS: `${API_VERSION}/quizzes/me/stats`,
+  /** 내 응시 이력 페이징 - GET (JWT 필수, 2026-04-29 신규) */
+  MY_HISTORY: `${API_VERSION}/quizzes/me/history`,
 };
 
 /**

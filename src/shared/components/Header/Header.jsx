@@ -17,6 +17,10 @@ import { ROUTES, NAV_ITEMS, USER_MENU_ITEMS } from '../../constants/routes';
 import ThemeToggle from './ThemeToggle';
 import * as S from './Header.styled';
 
+function resolveUserProfileImage(user) {
+  return user?.profileImageUrl || user?.profileImage || user?.profile_image || null;
+}
+
 /**
  * @param {Object} props
  * @param {'default' | 'compact'} [props.variant='default']
@@ -34,6 +38,7 @@ export default function Header({ variant = 'default' }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const userProfileImage = resolveUserProfileImage(user);
   // 모바일 메뉴 열림/닫힘 상태
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   /*
@@ -397,7 +402,11 @@ export default function Header({ variant = 'default' }) {
                 aria-label="사용자 메뉴 열기"
               >
                 <S.UserAvatar>
-                  {user?.nickname?.charAt(0) || 'U'}
+                  {userProfileImage ? (
+                    <img src={userProfileImage} alt={`${user?.nickname || '사용자'} 프로필 이미지`} />
+                  ) : (
+                    user?.nickname?.charAt(0) || 'U'
+                  )}
                 </S.UserAvatar>
                 <S.UserName>{user?.nickname || '사용자'}</S.UserName>
                 <S.UserMenuCaret $open={isUserMenuOpen} aria-hidden="true">

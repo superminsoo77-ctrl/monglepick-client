@@ -30,8 +30,10 @@ import * as S from './QuizCard.styled';
  * @param {Object} props
  * @param {Object} props.quiz  - 백엔드 QuizResponse (quizId/movieId/question/options/rewardPoint)
  * @param {number} [props.index] - 카드 순번 (번호 표시용)
+ * @param {(result: Object) => void} [props.onSubmitted] - 채점 응답을 받은 직후 호출되는 콜백.
+ *   QuizPage 가 "내 응시 현황" 카드를 즉시 리페치하기 위한 hook (2026-04-29).
  */
-export default function QuizCard({ quiz, index = 0 }) {
+export default function QuizCard({ quiz, index = 0, onSubmitted }) {
   /** 사용자가 고른 선택지 텍스트 */
   const [selected, setSelected] = useState(null);
   /** 제출 API 호출 중 플래그 */
@@ -58,6 +60,10 @@ export default function QuizCard({ quiz, index = 0 }) {
     try {
       const resp = await submitQuizAnswer(quiz.quizId, selected);
       setResult(resp);
+      /* 응시 현황 카드 즉시 갱신을 위해 부모에게 알림 (옵셔널) */
+      if (typeof onSubmitted === 'function') {
+        onSubmitted(resp);
+      }
     } catch (err) {
       /* 로그인 필요 에러를 친절한 문구로 변환 */
       const msg = err?.message?.includes('로그인')
@@ -67,7 +73,7 @@ export default function QuizCard({ quiz, index = 0 }) {
     } finally {
       setSubmitting(false);
     }
-  }, [quiz?.quizId, selected]);
+  }, [quiz?.quizId, selected, onSubmitted]);
 
   /**
    * "다시 풀기" — 채점 결과를 초기화하고 처음부터 다시 풀 수 있게 한다.
