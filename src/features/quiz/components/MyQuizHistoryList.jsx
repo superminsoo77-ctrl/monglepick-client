@@ -204,10 +204,16 @@ export default function MyQuizHistoryList({ refreshKey }) {
 
 /* ── styled-components ────────────────────────────────────── */
 
+/* 주의: 디자인 시스템 토큰은 typography.text(Xs/Sm/Base/Lg/Xl/...), typography.font(Medium/Semibold/Bold),
+ * colors.borderDefault, radius.* 형태를 쓴다.
+ * fontSizes.* / fontWeights.* / colors.border / layout.cardRadius / colors.bgHover 는
+ * 이 프로젝트에 정의되어 있지 않으므로 참조 시 undefined → 화면 흰색(런타임 TypeError) 사고가 난다.
+ * 모두 정상 토큰으로 대체한다.
+ */
 const Wrapper = styled.section`
-  background: ${({ theme }) => theme.colors.bgCard ?? '#fff'};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.layout?.cardRadius ?? '12px'};
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
   overflow: hidden;
 `;
@@ -220,14 +226,14 @@ const Header = styled.div`
   cursor: pointer;
   user-select: none;
   &:hover {
-    background: ${({ theme }) => theme.colors.bgHover};
+    background: ${({ theme }) => theme.colors.bgSecondary};
   }
 `;
 
 const Title = styled.h3`
   margin: 0;
-  font-size: ${({ theme }) => theme.fontSizes.md};
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
@@ -238,7 +244,7 @@ const RightSlot = styled.div`
 `;
 
 const Count = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
 `;
 
@@ -251,7 +257,7 @@ const Caret = styled.span`
 
 const Body = styled.div`
   padding: 0 ${({ theme }) => theme.spacing.lg} ${({ theme }) => theme.spacing.lg};
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
 `;
 
 const List = styled.div`
@@ -261,19 +267,21 @@ const List = styled.div`
   margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
+/* 정/오답 row 는 의미 색을 강조하기 위해 success/error 토큰의 Bg/본색을 사용한다.
+ * 라이트/다크 모두에서 자연스럽게 보이며, 이전의 하드코딩 hex(#ecfdf5 등)는 다크모드에서 가독성 문제. */
 const Row = styled.div`
   border: 1px solid
     ${({ theme, $correct, $wrong }) => {
-      if ($correct) return '#a7f3d0';
-      if ($wrong) return '#fecaca';
-      return theme.colors.border;
+      if ($correct) return theme.colors.success;
+      if ($wrong) return theme.colors.error;
+      return theme.colors.borderDefault;
     }};
-  background: ${({ $correct, $wrong }) => {
-    if ($correct) return '#ecfdf5';
-    if ($wrong) return '#fef2f2';
+  background: ${({ theme, $correct, $wrong }) => {
+    if ($correct) return theme.colors.successBg;
+    if ($wrong) return theme.colors.errorBg;
     return 'transparent';
   }};
-  border-radius: 8px;
+  border-radius: ${({ theme }) => theme.radius.md};
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
 `;
 
@@ -287,18 +295,18 @@ const RowHead = styled.div`
 
 const RowTitle = styled.div`
   flex: 1;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  font-weight: ${({ theme }) => theme.fontWeights.medium};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
 const RowBadge = styled.span`
   flex-shrink: 0;
-  font-size: ${({ theme }) => theme.fontSizes.xs};
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
   padding: 2px 8px;
-  border-radius: 12px;
-  background: ${({ $correct }) => ($correct ? '#10b981' : '#ef4444')};
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme, $correct }) => ($correct ? theme.colors.success : theme.colors.error)};
   color: #fff;
 `;
 
@@ -306,17 +314,17 @@ const RowMeta = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.spacing.md};
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
   strong {
     color: ${({ theme }) => theme.colors.textSecondary};
-    font-weight: ${({ theme }) => theme.fontWeights.medium};
+    font-weight: ${({ theme }) => theme.typography.fontMedium};
   }
 `;
 
 const Explanation = styled.div`
   margin-top: ${({ theme }) => theme.spacing.xs};
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textSecondary};
   line-height: 1.5;
 `;
@@ -324,14 +332,14 @@ const Explanation = styled.div`
 const Skeleton = styled.div`
   padding: ${({ theme }) => theme.spacing.md} 0;
   text-align: center;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textMuted};
 `;
 
 const Empty = styled.div`
   padding: ${({ theme }) => theme.spacing.lg} 0;
   text-align: center;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textMuted};
 `;
 
@@ -342,21 +350,21 @@ const ErrorRow = styled.div`
   gap: ${({ theme }) => theme.spacing.sm};
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
   margin-top: ${({ theme }) => theme.spacing.md};
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  color: #dc2626;
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid ${({ theme }) => theme.colors.error};
+  border-radius: ${({ theme }) => theme.radius.sm};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  color: ${({ theme }) => theme.colors.error};
 `;
 
 const RetryButton = styled.button`
   flex-shrink: 0;
   padding: 4px 10px;
-  background: #dc2626;
+  background: ${({ theme }) => theme.colors.error};
   color: #fff;
   border: none;
-  border-radius: 4px;
-  font-size: ${({ theme }) => theme.fontSizes.xs};
+  border-radius: ${({ theme }) => theme.radius.sm};
+  font-size: ${({ theme }) => theme.typography.textXs};
   cursor: pointer;
   &:hover { opacity: 0.9; }
 `;
@@ -365,15 +373,15 @@ const MoreButton = styled.button`
   width: 100%;
   margin-top: ${({ theme }) => theme.spacing.md};
   padding: ${({ theme }) => theme.spacing.sm};
-  background: ${({ theme }) => theme.colors.bgHover};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
+  background: ${({ theme }) => theme.colors.bgSecondary};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  border-radius: ${({ theme }) => theme.radius.sm};
+  font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.textSecondary};
   cursor: pointer;
   transition: background 0.15s;
   &:hover {
-    background: ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.bgTertiary};
   }
   &:disabled {
     opacity: 0.6;
