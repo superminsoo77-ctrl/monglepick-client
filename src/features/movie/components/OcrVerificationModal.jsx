@@ -157,9 +157,18 @@ export default function OcrVerificationModal({
     }
   };
 
+  const confidence = ocrResult?.ocrConfidence ?? null;
+  const confidencePct = confidence != null ? Math.round(confidence * 100) : null;
+  const isTooLow  = confidence != null && confidence < 0.5;
+  const isAutoApprove = confidence != null && confidence >= 1.0;
+
   const handleSubmit = async () => {
     if (!uploadedUrl) {
       setError('영수증 이미지를 먼저 업로드해주세요.');
+      return;
+    }
+    if (isTooLow) {
+      setError('신뢰도가 너무 낮습니다. 다른 영수증 이미지를 업로드해주세요.');
       return;
     }
     setSubmitting(true);
@@ -199,6 +208,7 @@ export default function OcrVerificationModal({
   };
 
   const busy = uploading || analyzing || submitting;
+  const submitDisabled = busy || isTooLow || !uploadedUrl;
 
   return createPortal(
     <Overlay onClick={handleOverlayClick} role="presentation">
@@ -289,18 +299,30 @@ export default function OcrVerificationModal({
                     </OcrValue>
                   </OcrRow>
                 ))}
-                {ocrResult.ocrConfidence != null && (
+                {confidencePct != null && (
                   <OcrRow>
                     <OcrStatusIcon $ok={null} />
                     <OcrLabel>신뢰도</OcrLabel>
-                    <OcrConfidence $pct={Math.round(ocrResult.ocrConfidence * 100)}>
-                      {Math.round(ocrResult.ocrConfidence * 100)}%
+                    <OcrConfidence $pct={confidencePct}>
+                      {confidencePct}%
                     </OcrConfidence>
                   </OcrRow>
                 )}
-                <OcrDisclaimer>
-                  OCR 검사가 부정확할 수 있습니다. 제출 후 관리자 검토가 한 번 더 이루어집니다.
-                </OcrDisclaimer>
+                {isTooLow && (
+                  <OcrDisclaimer $warn>
+                    ⚠️ 신뢰도가 50% 미만으로 제출할 수 없습니다. 더 선명한 영수증 이미지를 업로드해주세요.
+                  </OcrDisclaimer>
+                )}
+                {!isTooLow && isAutoApprove && (
+                  <OcrDisclaimer $success>
+                    🎉 신뢰도 100%! 제출 즉시 자동 인증되어 리워드가 지급됩니다.
+                  </OcrDisclaimer>
+                )}
+                {!isTooLow && !isAutoApprove && (
+                  <OcrDisclaimer>
+                    OCR 검사가 부정확할 수 있습니다. 제출 후 관리자 검토가 한 번 더 이루어집니다.
+                  </OcrDisclaimer>
+                )}
               </OcrResultBox>
             );
           })()}
@@ -308,7 +330,9 @@ export default function OcrVerificationModal({
           {error && <ErrorBox role="alert">{error}</ErrorBox>}
 
           <Notice>
-            ⓘ 제출된 영수증은 관리자 검토 후 정상 인증으로 처리되며, 검토 완료 시 리워드가 지급됩니다.
+            {isAutoApprove
+              ? 'ⓘ 신뢰도 100% — 제출 즉시 자동 인증되어 리워드가 지급됩니다.'
+              : 'ⓘ 제출된 영수증은 관리자 검토 후 정상 인증으로 처리되며, 검토 완료 시 리워드가 지급됩니다.'}
           </Notice>
         </Body>
 
@@ -319,7 +343,7 @@ export default function OcrVerificationModal({
           <PrimaryButton
             type="button"
             onClick={handleSubmit}
-            disabled={busy || !uploadedUrl}
+            disabled={submitDisabled}
           >
             {uploading ? '업로드 중...' : analyzing ? '분석 중...' : submitting ? '제출 중...' : '인증 제출'}
           </PrimaryButton>
@@ -637,9 +661,13 @@ const OcrDisclaimer = styled.div`
   padding-top: ${({ theme }) => theme.spacing.xs};
   border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
   font-size: ${({ theme }) => theme.typography.textXs};
-  color: ${({ theme }) => theme.colors.textMuted};
+  color: ${({ $warn, $success, theme }) =>
+    $warn    ? '#e53935' :
+    $success ? '#2e7d32' :
+    theme.colors.textMuted};
   font-style: italic;
   line-height: 1.5;
+  font-weight: ${({ $warn, $success }) => ($warn || $success) ? '600' : 'normal'};
 `;
 
 const Notice = styled.div`
