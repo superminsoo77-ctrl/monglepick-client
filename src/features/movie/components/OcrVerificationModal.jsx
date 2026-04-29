@@ -159,7 +159,7 @@ export default function OcrVerificationModal({
 
   const confidence = ocrResult?.ocrConfidence ?? null;
   const confidencePct = confidence != null ? Math.round(confidence * 100) : null;
-  const isTooLow  = confidence != null && confidence < 0.5;
+  const isTooLow  = ocrResult !== null && (confidence === null || confidence < 0.5);
   const isAutoApprove = confidence != null && confidence >= 1.0;
 
   const handleSubmit = async () => {
@@ -310,7 +310,9 @@ export default function OcrVerificationModal({
                 )}
                 {isTooLow && (
                   <OcrDisclaimer $warn>
-                    ⚠️ 신뢰도가 50% 미만으로 제출할 수 없습니다. 더 선명한 영수증 이미지를 업로드해주세요.
+                    {confidence === null
+                      ? '⚠️ 영수증에서 정보를 인식할 수 없습니다. 더 선명한 영수증 이미지를 업로드해주세요.'
+                      : '⚠️ 신뢰도가 50% 미만으로 제출할 수 없습니다. 더 선명한 영수증 이미지를 업로드해주세요.'}
                   </OcrDisclaimer>
                 )}
                 {!isTooLow && isAutoApprove && (
