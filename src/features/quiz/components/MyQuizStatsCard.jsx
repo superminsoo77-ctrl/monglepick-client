@@ -83,27 +83,27 @@ export default function MyQuizStatsCard({ refreshKey }) {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    /* 비로그인 사용자는 호출 자체를 하지 않는다 */
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
+    /* 비로그인 사용자는 호출 자체를 하지 않는다 — null 렌더 가드가 처리.
+       react-hooks/set-state-in-effect 규칙: effect body 의 직접 setState 금지.
+       모든 setState 는 async 함수 안에서 호출하여 lint 통과 + cascading render 방지. */
+    if (!isAuthenticated) return;
     let cancelled = false;
-    setLoading(true);
-    setHidden(false);
-    getMyQuizStats()
-      .then((res) => {
+    const run = async () => {
+      setLoading(true);
+      setHidden(false);
+      try {
+        const res = await getMyQuizStats();
         if (cancelled) return;
         const payload = res?.totalAttempts !== undefined ? res : (res?.data ?? EMPTY_STATS);
         setStats({ ...EMPTY_STATS, ...payload });
-      })
-      .catch(() => {
+      } catch {
         /* 인증 만료 등 — 카드 숨겨 사용자 흐름을 방해하지 않음 */
         if (!cancelled) setHidden(true);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+    run();
     return () => { cancelled = true; };
   }, [isAuthenticated, refreshKey]);
 
