@@ -210,6 +210,8 @@ export default function SignUpForm({ onSignupSuccess }) {
         setServerError('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.');
       } else if (err.code === 'A007') {
         setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
+      } else if (err.code === 'A013') {
+        setServerError('탈퇴 후 30일 동안 동일 계정으로 재가입할 수 없습니다.');
       } else {
         setServerError(err.message || '회원가입에 실패했습니다. 다시 시도해주세요.');
       }

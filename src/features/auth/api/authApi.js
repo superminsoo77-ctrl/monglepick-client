@@ -191,6 +191,7 @@ export async function exchangeToken() {
     // 서버 메시지가 있으면 우선 사용, 없으면 상태코드 기반 fallback
     const message = serverMessage || fallbackMessage;
     const exchangeError = new Error(message);
+    exchangeError.code = err.response?.data?.code || null;
     exchangeError.status = status || null;
     throw exchangeError;
   }

@@ -96,7 +96,11 @@ export default function OAuthCallbackPage() {
         /* 2026-04-23 PR-5: 복귀 경로 있으면 거기로, 없으면 홈 (replace 내장) */
         goAfterLogin();
       } catch (err) {
-        setError(err.message || '소셜 로그인에 실패했습니다.');
+        setError(
+          err.code === 'A013'
+            ? '탈퇴 후 30일 동안 동일 계정으로 재가입할 수 없습니다.'
+            : err.message || '소셜 로그인에 실패했습니다.',
+        );
         setIsProcessing(false);
       }
     };

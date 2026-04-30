@@ -214,6 +214,8 @@ export const MYPAGE_ENDPOINTS = {
   PROFILE: `${API_VERSION}/users/me/profile`,
   /** 프로필 수정 - PUT */
   UPDATE_PROFILE: `${API_VERSION}/users/me/profile`,
+  /** 회원 탈퇴 - DELETE */
+  DELETE_ME: `${API_VERSION}/users/me`,
   /** 위시리스트 조회 - GET */
   WISHLIST: `${API_VERSION}/users/me/wishlist`,
   /** 위시리스트 추가 - POST / 삭제 - DELETE (movieId 파라미터 필요) */

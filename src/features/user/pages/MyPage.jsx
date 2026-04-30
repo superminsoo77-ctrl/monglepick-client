@@ -6,6 +6,7 @@ import useAuthStore from '../../../shared/stores/useAuthStore';
 import useTabParam from '../../../shared/hooks/useTabParam';
 import useModalRoute from '../../../shared/hooks/useModalRoute';
 import {
+  deleteMyAccount,
   getFavoriteGenres,
   getFavoriteMovies,
   getProfile,
@@ -17,6 +18,7 @@ import {
   saveFavoriteMovies,
   updateProfile,
 } from '../api/userApi';
+import { clearAll } from '../../../shared/utils/storage';
 /* 착용 아이템 API — 2026-04-14 신설 (C 방향). 프로필 상단에 아바타·배지 표시용. */
 import { getEquippedItems, getMyItems, equipItem, unequipItem } from '../../point/api/userItemApi';
 /* 프로필 꾸미기 섹션 — 2026-04-27 신설. customize 탭 본체. */
@@ -398,6 +400,55 @@ function EditProfileModal({ profile, onClose, onSaved }) {
   return createPortal(modalContent, document.body);
 }
 
+/* ── 회원 탈퇴 확인 모달 ── */
+function DeleteAccountModal({ onClose, onConfirm, isSubmitting, error }) {
+  const modalContent = (
+    <>
+      <S.ModalOverlay onClick={isSubmitting ? undefined : onClose} />
+      <S.ModalContainer role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+        <S.ModalHeader>
+          <S.ModalTitle id="delete-account-title">회원 탈퇴</S.ModalTitle>
+          <S.ModalCloseBtn
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            disabled={isSubmitting}
+          >
+            ✕
+          </S.ModalCloseBtn>
+        </S.ModalHeader>
+
+        {error && <S.ModalErrorBar role="alert">{error}</S.ModalErrorBar>}
+
+        <S.DeleteWarningBox>
+          <S.DeleteWarningTitle>탈퇴 전 반드시 확인해주세요.</S.DeleteWarningTitle>
+          <S.DeleteWarningList>
+            <li>탈퇴 후 현재 계정으로 서비스를 이용할 수 없습니다.</li>
+            <li>탈퇴 직후 모든 로그인 세션이 만료됩니다.</li>
+            <li>탈퇴 후 30일 동안 동일 이메일/소셜 계정으로 재가입할 수 없습니다.</li>
+            <li>기존 작성글/리뷰 등 활동 데이터는 서비스 정책에 따라 "탈퇴한 계정"으로 표시될 수 있습니다.</li>
+          </S.DeleteWarningList>
+        </S.DeleteWarningBox>
+
+        <S.ModalButtonRow>
+          <S.ModalCancelBtn type="button" onClick={onClose} disabled={isSubmitting}>
+            취소
+          </S.ModalCancelBtn>
+          <S.ModalDangerBtn
+            type="button"
+            onClick={onConfirm}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? '탈퇴 처리 중...' : '회원 탈퇴'}
+          </S.ModalDangerBtn>
+        </S.ModalButtonRow>
+      </S.ModalContainer>
+    </>
+  );
+
+  return createPortal(modalContent, document.body);
+}
+
 /* ── 최애 영화 선택 모달 ── */
 function FavoriteMovieModal({ initialMovies = [], onClose, onSave }) {
   const { showAlert } = useModal();
@@ -736,6 +787,9 @@ export default function MyPagePage() {
   const [myPostsPagination, setMyPostsPagination] = useState({ totalPages: 0, totalElements: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState(null);
   /*
    * 2026-04-23 PR-3: "프로필 수정" 모달도 URL ?modal=editProfile 와 동기화.
    * 동시에 두 모달이 열리지는 않으므로 단일 ?modal 키로 충분하다 (useModalRoute 규약).
@@ -1153,6 +1207,33 @@ export default function MyPagePage() {
     }
   }
 
+  const openDeleteAccountModal = useCallback(() => {
+    setDeleteAccountError(null);
+    setIsDeleteAccountModalOpen(true);
+  }, []);
+
+  const closeDeleteAccountModal = useCallback(() => {
+    if (isDeletingAccount) return;
+    setIsDeleteAccountModalOpen(false);
+    setDeleteAccountError(null);
+  }, [isDeletingAccount]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setIsDeletingAccount(true);
+    setDeleteAccountError(null);
+
+    try {
+      await deleteMyAccount();
+      clearAll();
+      useAuthStore.setState({ token: null, user: null });
+      navigate(ROUTES.LOGIN, { replace: true });
+    } catch (err) {
+      setDeleteAccountError(err.message || '회원 탈퇴 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, [navigate]);
+
   const handleFavoriteMoviesSaved = useCallback(async (movieIds) => {
     const response = await saveFavoriteMovies(movieIds);
     applyFavoriteMovieResponse(response);
@@ -1404,6 +1485,17 @@ export default function MyPagePage() {
                     <S.ProfileLabel>가입일</S.ProfileLabel>
                     <S.ProfileValue>{profile?.createdAt || '-'}</S.ProfileValue>
                   </S.ProfileField>
+                  <S.DangerZone>
+                    <S.DangerTextGroup>
+                      <S.DangerTitle>회원 탈퇴</S.DangerTitle>
+                      <S.DangerDescription>
+                        계정 탈퇴 시 모든 로그인 세션이 만료되며, 30일 동안 동일 계정으로 재가입할 수 없습니다.
+                      </S.DangerDescription>
+                    </S.DangerTextGroup>
+                    <S.DeleteAccountBtn type="button" onClick={openDeleteAccountModal}>
+                      회원 탈퇴
+                    </S.DeleteAccountBtn>
+                  </S.DangerZone>
                 </S.ProfileCard>
               )}
             </div>
@@ -1793,6 +1885,15 @@ export default function MyPagePage() {
           }))}
           onClose={closeFavoriteMovieModal}
           onSave={handleFavoriteMoviesSaved}
+        />
+      )}
+
+      {isDeleteAccountModalOpen && (
+        <DeleteAccountModal
+          onClose={closeDeleteAccountModal}
+          onConfirm={handleDeleteAccount}
+          isSubmitting={isDeletingAccount}
+          error={deleteAccountError}
         />
       )}
     </S.Wrapper>

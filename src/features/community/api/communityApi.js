@@ -8,18 +8,21 @@
 
 import api from '../../../shared/api/axiosInstance';
 import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
+import { getDisplayNickname, isWithdrawnUser } from '../../../shared/utils/userDisplay';
 
 function normalizePost(post) {
   if (!post) return post;
-  const nickname =
-    (typeof post.author === 'string' ? post.author : post.author?.nickname) ||
-    post.authorNickname  ||
-    post.userNickname    ||
-    post.nickname        ||
-    null;
+  const authorSource = {
+    ...post,
+    ...(typeof post.author === 'object' ? post.author : {}),
+    nickname: typeof post.author === 'string' ? post.author : post.author?.nickname,
+  };
+  const withdrawn = isWithdrawnUser(authorSource);
   return {
     ...post,
-    author: { nickname },
+    author: { nickname: getDisplayNickname(authorSource, null), withdrawn },
+    authorEquippedAvatarUrl: withdrawn ? null : post.authorEquippedAvatarUrl,
+    authorEquippedBadgeUrl: withdrawn ? null : post.authorEquippedBadgeUrl,
   };
 }
 

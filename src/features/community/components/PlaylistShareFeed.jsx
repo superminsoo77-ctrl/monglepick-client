@@ -18,6 +18,7 @@ import { useModal } from '../../../shared/components/Modal';
 import { buildPath, ROUTES } from '../../../shared/constants/routes';
 
 import { formatRelativeTime } from '../../../shared/utils/formatters';
+import { getDisplayNickname } from '../../../shared/utils/userDisplay';
 
 /* ── 스타일 ── */
 
@@ -590,7 +591,10 @@ export default function PlaylistShareFeed() {
                 </Meta>
 
                 <AuthorRow>
-                  {post.author} · {formatRelativeTime(post.createdAt)}
+                  {getDisplayNickname({
+                    ...post,
+                    nickname: typeof post.author === 'string' ? post.author : post.author?.nickname,
+                  })} · {formatRelativeTime(post.createdAt)}
                 </AuthorRow>
 
                 <Actions>

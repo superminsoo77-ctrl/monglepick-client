@@ -434,6 +434,59 @@ export const ProfileValue = styled.span`
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
+export const DangerZone = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.lg};
+  padding-top: ${({ theme }) => theme.spacing.lg};
+  border-top: 1px solid rgba(248, 113, 113, 0.3);
+
+  ${mediaMobile} {
+    align-items: stretch;
+    flex-direction: column;
+  }
+`;
+
+export const DangerTextGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.xs};
+  min-width: 0;
+`;
+
+export const DangerTitle = styled.h3`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const DangerDescription = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  line-height: 1.6;
+`;
+
+export const DeleteAccountBtn = styled.button`
+  flex-shrink: 0;
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.error};
+    color: white;
+  }
+`;
+
 /* ── 선호 설정 카드 ── */
 
 /**
@@ -1357,6 +1410,49 @@ export const ModalSaveBtn = styled.button`
     opacity: 0.5;
     cursor: not-allowed;
   }
+`;
+
+export const ModalDangerBtn = styled.button`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.error};
+  border: 1px solid ${({ theme }) => theme.colors.error};
+  border-radius: ${({ theme }) => theme.radius.md};
+  color: white;
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+export const DeleteWarningBox = styled.div`
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.errorBg};
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: ${({ theme }) => theme.radius.lg};
+`;
+
+export const DeleteWarningTitle = styled.p`
+  margin: 0 0 ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+`;
+
+export const DeleteWarningList = styled.ul`
+  margin: 0;
+  padding-left: 1.2rem;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  line-height: 1.7;
 `;
 
 export const ModalErrorBar = styled.p`

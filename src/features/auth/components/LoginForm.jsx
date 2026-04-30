@@ -89,6 +89,8 @@ export default function LoginForm() {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
       } else if (err.code === 'A007') {
         setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
+      } else if (err.code === 'A012') {
+        setServerError('탈퇴한 계정입니다.');
       } else {
         setServerError(err.message || '로그인에 실패했습니다. 다시 시도해주세요.');
       }
@@ -116,6 +118,8 @@ export default function LoginForm() {
     } catch (err) {
       if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
+      } else if (err.code === 'A012') {
+        setServerError('탈퇴한 계정입니다.');
       } else {
         setServerError(err.message || '테스트 유저 로그인에 실패했습니다.');
       }

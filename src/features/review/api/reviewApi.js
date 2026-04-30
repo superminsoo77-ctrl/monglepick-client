@@ -9,6 +9,7 @@
 import { recommendApi, requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
 import { RECOMMEND_REVIEW_ENDPOINTS } from '../../../shared/constants/api';
+import { getDisplayNickname, isWithdrawnUser } from '../../../shared/utils/userDisplay';
 
 function normalizeReview(review) {
   if (!review) {
@@ -25,7 +26,8 @@ function normalizeReview(review) {
     rating: review.rating,
     content: review.content,
     author: {
-      nickname: review.author?.nickname || '익명',
+      nickname: getDisplayNickname({ ...review, ...review.author }, '익명'),
+      withdrawn: isWithdrawnUser({ ...review, ...review.author }),
     },
     isSpoiler: Boolean(review.is_spoiler ?? review.isSpoiler),
     isMine: Boolean(review.is_mine ?? review.isMine),

@@ -16,6 +16,7 @@ import {
   RECOMMEND_USER_ENDPOINTS,
   WATCH_HISTORY_ENDPOINTS,
 } from '../../../shared/constants/api';
+import { getDisplayNickname, isWithdrawnUser } from '../../../shared/utils/userDisplay';
 
 const MIN_VISIBLE_FAVORITE_GENRE_COUNT = 100;
 
@@ -45,7 +46,8 @@ function normalizeReview(review) {
     rating: review.rating,
     content: review.content,
     author: {
-      nickname: review.author?.nickname || '익명',
+      nickname: getDisplayNickname({ ...review, ...review.author }, '익명'),
+      withdrawn: isWithdrawnUser({ ...review, ...review.author }),
     },
     isSpoiler: Boolean(review.is_spoiler ?? review.isSpoiler),
     isMine: Boolean(review.is_mine ?? review.isMine),
@@ -144,6 +146,18 @@ export async function updateProfile(profileData) {
   }
 
   return api.patch(MYPAGE_ENDPOINTS.UPDATE_PROFILE, profileData);
+}
+
+/**
+ * 현재 로그인한 계정을 탈퇴 처리한다.
+ *
+ * Backend: DELETE /api/v1/users/me → 204 No Content
+ *
+ * @returns {Promise<void>}
+ */
+export async function deleteMyAccount() {
+  requireAuth();
+  return api.delete(MYPAGE_ENDPOINTS.DELETE_ME);
 }
 
 // ── 위시리스트 ──

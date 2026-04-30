@@ -14,6 +14,7 @@
 import api, { requireAuth } from '../../../shared/api/axiosInstance';
 /* API 상수 — shared/constants에서 가져옴 */
 import { COMMUNITY_ENDPOINTS } from '../../../shared/constants/api';
+import { getDisplayNickname, isWithdrawnUser } from '../../../shared/utils/userDisplay';
 
 /** 게시글 댓글 기본 경로 빌더 — /api/v1/posts/{postId}/comments */
 const commentsBase = (postId) => `/api/v1/posts/${postId}/comments`;
@@ -29,14 +30,11 @@ const commentsBase = (postId) => `/api/v1/posts/${postId}/comments`;
  */
 function normalizeComment(c) {
   if (!c) return c;
+  const withdrawn = isWithdrawnUser(c);
   return {
     ...c,
-    nickname:
-      c.nickname ||
-      c.authorNickname ||
-      c.userNickname ||
-      c.author?.nickname ||
-      null,
+    nickname: getDisplayNickname(c, null),
+    userId: withdrawn ? null : c.userId,
   };
 }
 

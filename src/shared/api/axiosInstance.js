@@ -33,7 +33,7 @@
  */
 
 import axios from 'axios';
-import { getToken, setToken, removeToken, clearAll, setSuspendedReason } from '../utils/storage';
+import { getToken, setToken, removeToken, clearAll, setSuspendedReason, setUser } from '../utils/storage';
 import { AUTH_ENDPOINTS } from '../constants/api';
 import { SERVICE_URLS } from './serviceUrls';
 /* Zustand 인증 스토어 — refresh 실패 시 인메모리 상태도 함께 초기화 */
@@ -137,6 +137,13 @@ function enqueueRefreshWaiter() {
   });
 }
 
+function forceLogoutWithNotice(message) {
+  setSuspendedReason(message);
+  clearAll();
+  useAuthStore.setState({ token: null, user: null });
+  window.location.href = '/login';
+}
+
 /**
  * 리프레시 토큰으로 새 액세스 토큰을 발급받는다.
  * Backend 서비스에 직접 요청한다 (인터셉터 우회를 위해 raw axios 사용).
@@ -154,8 +161,12 @@ async function refreshAccessToken() {
     },
   );
 
-  const { accessToken } = response.data;
+  const { accessToken, user } = response.data;
   if (accessToken) setToken(accessToken);
+  if (user?.id) {
+    setUser(user);
+    useAuthStore.setState({ token: accessToken, user });
+  }
   return accessToken;
 }
 
@@ -243,11 +254,14 @@ function attachAuthResponseInterceptor(instance) {
 
       // ── 계정 정지 (A011) — 유효한 토큰이어도 즉시 강제 로그아웃 ──
       if (status === 403 && data?.code === 'A011') {
-        setSuspendedReason(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
-        clearAll();
-        useAuthStore.setState({ token: null, user: null });
-        window.location.href = '/login';
+        forceLogoutWithNotice(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
         return Promise.reject(new Error(data.message));
+      }
+
+      // ── 회원 탈퇴 계정 (A012) — 남은 토큰/세션 상태를 즉시 제거 ──
+      if (data?.code === 'A012') {
+        forceLogoutWithNotice('탈퇴한 계정입니다.');
+        return Promise.reject(new Error('탈퇴한 계정입니다.'));
       }
 
       // refresh 요청 자체가 401 이면 재시도하지 않음 (무한 루프 방지)
@@ -396,11 +410,14 @@ backendApi.interceptors.response.use(
 
     // ── 계정 정지 (A011) — 유효한 토큰이어도 즉시 강제 로그아웃 ──
     if (status === 403 && data?.code === 'A011') {
-      setSuspendedReason(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
-      clearAll();
-      useAuthStore.setState({ token: null, user: null });
-      window.location.href = '/login';
+      forceLogoutWithNotice(data.message || '정지된 계정입니다. 관리자에게 문의하세요.');
       return Promise.reject(new Error(data.message));
+    }
+
+    // ── 회원 탈퇴 계정 (A012) — 남은 토큰/세션 상태를 즉시 제거 ──
+    if (data?.code === 'A012') {
+      forceLogoutWithNotice('탈퇴한 계정입니다.');
+      return Promise.reject(new Error('탈퇴한 계정입니다.'));
     }
 
     const isAuthRequest = originalRequest.url?.includes('/auth/');
