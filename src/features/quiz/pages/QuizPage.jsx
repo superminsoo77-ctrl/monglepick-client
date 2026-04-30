@@ -96,27 +96,33 @@ export default function QuizPage({ embedded = false }) {
    * 통계바·로딩·에러·빈 상태·카드 목록은 양쪽 모두 동일하게 렌더한다.
    * 변수로 추출하여 standalone Container 와 embedded Fragment 모두에서 재사용한다.
    */
+  const totalReward = quizzes.reduce((sum, q) => sum + (q.rewardPoint || 0), 0);
+  const solvedCount = quizzes.filter((q) => q.solved === true).length;
+
   const body = (
     <>
-      {/* ── 내 응시 현황 카드 (로그인 시만 노출) — 2026-04-29 ── */}
+      {/* ── 내 응시 현황 카드 (로그인 시만 노출) ── */}
       <MyQuizStatsCard refreshKey={statsRefreshKey} />
 
-      {/* ── 내 응시 이력 (펼치기 토글) — 2026-04-29 ── */}
+      {/* ── 내 응시 이력 ── */}
       <MyQuizHistoryList refreshKey={statsRefreshKey} />
 
-      {/* ── 오늘의 퀴즈 통계 요약 (전체 사용자 공통) ── */}
-      <S.StatsBar>
-        <S.StatItem>
-          <S.StatValue>{quizzes.length}</S.StatValue>
-          <S.StatLabel>오늘의 문제</S.StatLabel>
-        </S.StatItem>
-        <S.StatItem>
-          <S.StatValue>
-            {quizzes.reduce((sum, q) => sum + (q.rewardPoint || 0), 0)}
-          </S.StatValue>
-          <S.StatLabel>총 리워드(P)</S.StatLabel>
-        </S.StatItem>
-      </S.StatsBar>
+      {/* ── 오늘의 퀴즈 섹션 헤더 ── */}
+      <S.SectionHeader>
+        <S.SectionTitleRow>
+          <S.SectionTitle>오늘의 퀴즈</S.SectionTitle>
+          {!isLoading && quizzes.length > 0 && (
+            <S.QuizMeta>
+              <S.MetaBadge>{quizzes.length}문제</S.MetaBadge>
+              <S.MetaBadge $reward>+{totalReward}P</S.MetaBadge>
+              {solvedCount > 0 && (
+                <S.MetaBadge $solved>{solvedCount}개 완료</S.MetaBadge>
+              )}
+            </S.QuizMeta>
+          )}
+        </S.SectionTitleRow>
+        <S.SectionDesc>정답을 맞추면 최초 1회에 한해 리워드 포인트가 지급됩니다.</S.SectionDesc>
+      </S.SectionHeader>
 
       {/* ── 로딩 상태 ── */}
       {isLoading && (
@@ -151,7 +157,6 @@ export default function QuizPage({ embedded = false }) {
       {!isLoading && !loadError && quizzes.length > 0 && (
         <S.QuizList>
           {quizzes.map((quiz, idx) => (
-            /* quizId 는 고유값이라 key 로 사용. 안전 폴백으로 idx 포함 */
             <QuizCard
               key={quiz.quizId ?? `quiz-${idx}`}
               quiz={quiz}
