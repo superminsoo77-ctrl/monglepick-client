@@ -48,37 +48,69 @@ export const PageDesc = styled.p`
   margin: 0;
 `;
 
-/** 통계 요약 바 (AchievementPage 와 동일 톤) */
-export const StatsBar = styled.div`
+/** 오늘의 퀴즈 섹션 헤더 래퍼 */
+export const SectionHeader = styled.div`
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+  padding-bottom: ${({ theme }) => theme.spacing.sm};
+  border-bottom: 2px solid ${({ theme }) => theme.colors.borderDefault};
+`;
+
+/** 섹션 제목 행 (제목 + 배지 가로 정렬) */
+export const SectionTitleRow = styled.div`
   display: flex;
-  gap: 16px;
-  margin-bottom: ${({ theme }) => theme.spacing.lg};
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+`;
+
+/** 섹션 제목 */
+export const SectionTitle = styled.h2`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+/** 섹션 메타 배지 그룹 */
+export const QuizMeta = styled.div`
+  display: flex;
+  gap: 6px;
+  align-items: center;
   flex-wrap: wrap;
 `;
 
-/** 통계 개별 아이템 */
-export const StatItem = styled.div`
-  padding: 12px 20px;
-  border-radius: ${({ theme }) => theme.radius.lg};
-  background: ${({ theme }) => theme.colors.bgSecondary};
-  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  text-align: center;
-  flex: 1;
-  min-width: 120px;
+/** 메타 배지 (문제 수 / 리워드 / 완료 수) */
+export const MetaBadge = styled.span`
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  padding: 2px 9px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background: ${({ theme, $reward, $solved }) =>
+    $solved
+      ? (theme.colors.successBg ?? 'rgba(72,187,120,0.12)')
+      : $reward
+        ? (theme.colors.primaryLight ?? 'rgba(99,102,241,0.1)')
+        : theme.colors.bgSecondary};
+  color: ${({ theme, $reward, $solved }) =>
+    $solved
+      ? theme.colors.success
+      : $reward
+        ? theme.colors.primary
+        : theme.colors.textMuted};
+  border: 1px solid ${({ theme, $reward, $solved }) =>
+    $solved
+      ? theme.colors.success
+      : $reward
+        ? theme.colors.primary
+        : theme.colors.borderDefault};
 `;
 
-/** 통계 수치 */
-export const StatValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.textXl};
-  font-weight: ${({ theme }) => theme.typography.fontBold};
-  color: ${({ theme }) => theme.colors.primary};
-`;
-
-/** 통계 라벨 */
-export const StatLabel = styled.div`
+/** 섹션 설명 문구 */
+export const SectionDesc = styled.p`
+  margin: 0;
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
-  margin-top: 2px;
 `;
 
 /** 퀴즈 카드 세로 리스트 */

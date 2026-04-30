@@ -1,40 +1,8 @@
-/**
- * 내 퀴즈 응시 현황 카드 (2026-04-29 신규).
- *
- * <p>QuizPage 상단에 마운트되어 로그인 사용자의 응시 KPI 4종을 보여준다.</p>
- *
- * <h3>KPI</h3>
- * <ul>
- *   <li>총 응시</li>
- *   <li>정답률 (모수 0 시 '—')</li>
- *   <li>획득 포인트</li>
- *   <li>마지막 응시 (없으면 '—')</li>
- * </ul>
- *
- * <h3>비로그인 처리</h3>
- * <p>useAuthStore 의 isAuthenticated 가 false 면 컴포넌트 자체를 null 렌더 — 부모 페이지에
- * 영향 없이 자연스럽게 숨김. 로그인 후 페이지 재방문 시 자동 노출된다.</p>
- *
- * <h3>로딩/에러</h3>
- * <p>마운트 직후 1회 GET /api/v1/quizzes/me/stats 호출.
- * 로딩 중에는 placeholder('—'), 에러 발생 시에는 카드 자체를 숨겨 사용자 흐름을 방해하지 않는다.</p>
- *
- * <h3>refreshKey</h3>
- * <p>QuizPage 가 정답 제출 후 카드를 강제 갱신하고 싶다면 prop 으로 키를 변경하면 된다
- * (현재 단계에선 마운트 시 1회만 갱신).</p>
- *
- * @module features/quiz/components/MyQuizStatsCard
- *
- * @param {Object} [props]
- * @param {number|string} [props.refreshKey] 강제 리페치용 키 (변경 시 useEffect 재실행)
- */
-
 import { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 import { getMyQuizStats } from '../api/quizApi';
 
-/** 비로그인 / 로딩 / 에러 상태에서 사용할 fallback 값 */
 const EMPTY_STATS = {
   totalAttempts: 0,
   correctCount: 0,
@@ -43,49 +11,40 @@ const EMPTY_STATS = {
   lastAttemptedAt: null,
 };
 
-/**
- * 마지막 응시 시각을 친근한 한국어 포맷으로 변환한다.
- * - 없으면 '—'
- * - 오늘이면 'HH:mm'
- * - 그 외 'YYYY.MM.DD'
- */
-function formatLastAttemptedAt(iso) {
+function formatLastAt(iso) {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '—';
     const today = new Date();
     const sameDay =
-      d.getFullYear() === today.getFullYear()
-      && d.getMonth() === today.getMonth()
-      && d.getDate() === today.getDate();
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate();
     if (sameDay) {
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return `오늘 ${hh}:${mm}`;
+      return `오늘 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
-    const yyyy = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}.${mo}.${day}`;
+    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
   } catch {
     return '—';
   }
 }
 
-export default function MyQuizStatsCard({ refreshKey }) {
-  /* 인증 여부 — getter 형태이므로 selector 안에서 호출 */
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
+function getMotivationText(accuracyPct, totalAttempts) {
+  if (totalAttempts === 0) return '첫 퀴즈를 풀어보세요! 🎬';
+  if (accuracyPct >= 90) return '영화 마스터! 대단해요 🏆';
+  if (accuracyPct >= 70) return '꽤 잘 알고 있네요 🎯';
+  if (accuracyPct >= 50) return '계속 도전해보세요 💪';
+  return '퀴즈로 영화 지식을 쌓아가세요 📚';
+}
 
+export default function MyQuizStatsCard({ refreshKey }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const [stats, setStats] = useState(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
-  /* 에러 시 카드 자체를 숨기기 위한 플래그 */
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    /* 비로그인 사용자는 호출 자체를 하지 않는다 — null 렌더 가드가 처리.
-       react-hooks/set-state-in-effect 규칙: effect body 의 직접 setState 금지.
-       모든 setState 는 async 함수 안에서 호출하여 lint 통과 + cascading render 방지. */
     if (!isAuthenticated) return;
     let cancelled = false;
     const run = async () => {
@@ -97,7 +56,6 @@ export default function MyQuizStatsCard({ refreshKey }) {
         const payload = res?.totalAttempts !== undefined ? res : (res?.data ?? EMPTY_STATS);
         setStats({ ...EMPTY_STATS, ...payload });
       } catch {
-        /* 인증 만료 등 — 카드 숨겨 사용자 흐름을 방해하지 않음 */
         if (!cancelled) setHidden(true);
       } finally {
         if (!cancelled) setLoading(false);
@@ -107,107 +65,187 @@ export default function MyQuizStatsCard({ refreshKey }) {
     return () => { cancelled = true; };
   }, [isAuthenticated, refreshKey]);
 
-  /* 비로그인 또는 에러로 숨김 */
   if (!isAuthenticated || hidden) return null;
 
-  const accuracyPct = stats.totalAttempts === 0
-    ? null
-    : Math.round((stats.accuracyRate ?? 0) * 1000) / 10;
+  const accuracyPct =
+    stats.totalAttempts === 0
+      ? null
+      : Math.round((stats.accuracyRate ?? 0) * 1000) / 10;
+
+  const motivation = getMotivationText(accuracyPct, stats.totalAttempts);
 
   return (
     <Wrapper aria-label="내 퀴즈 응시 현황">
-      <Title>내 응시 현황</Title>
+      <CardTop>
+        <TopLeft>
+          <TopLabel>내 퀴즈 현황</TopLabel>
+          <Motivation>{loading ? '불러오는 중…' : motivation}</Motivation>
+        </TopLeft>
+        <TrophyIcon aria-hidden>🎬</TrophyIcon>
+      </CardTop>
+
+      <Divider />
+
       <Grid>
         <Cell>
-          <Label>총 응시</Label>
-          <Value>{loading ? '—' : stats.totalAttempts}</Value>
-          <Sub>회</Sub>
+          <CellIcon>📝</CellIcon>
+          <CellValue>{loading ? '—' : stats.totalAttempts}</CellValue>
+          <CellLabel>총 응시</CellLabel>
         </Cell>
-        <Cell>
-          <Label>정답률</Label>
-          <Value>{loading || accuracyPct === null ? '—' : `${accuracyPct}%`}</Value>
-          <Sub>
-            {accuracyPct === null
-              ? '응시 전'
-              : `${stats.correctCount}/${stats.totalAttempts}`}
-          </Sub>
+
+        <Cell $accent>
+          <CellIcon>✅</CellIcon>
+          <CellValue $accent>
+            {loading || accuracyPct === null ? '—' : `${accuracyPct}%`}
+          </CellValue>
+          <CellLabel>정답률</CellLabel>
+          {!loading && stats.totalAttempts > 0 && (
+            <ProgressBar>
+              <ProgressFill $pct={accuracyPct ?? 0} />
+            </ProgressBar>
+          )}
         </Cell>
+
         <Cell>
-          <Label>획득 포인트</Label>
-          <Value>{loading ? '—' : stats.totalEarnedPoints}</Value>
-          <Sub>P</Sub>
+          <CellIcon>⭐</CellIcon>
+          <CellValue>{loading ? '—' : stats.totalEarnedPoints}</CellValue>
+          <CellLabel>획득 P</CellLabel>
         </Cell>
+
         <Cell>
-          <Label>마지막 응시</Label>
-          <ValueSm>{loading ? '—' : formatLastAttemptedAt(stats.lastAttemptedAt)}</ValueSm>
+          <CellIcon>🕐</CellIcon>
+          <CellValue $sm>{loading ? '—' : formatLastAt(stats.lastAttemptedAt)}</CellValue>
+          <CellLabel>마지막 응시</CellLabel>
         </Cell>
       </Grid>
+
+      {!loading && stats.totalAttempts > 0 && (
+        <CorrectChip>
+          정답 {stats.correctCount}문제 / 오답 {stats.totalAttempts - stats.correctCount}문제
+        </CorrectChip>
+      )}
     </Wrapper>
   );
 }
 
-/* ── styled-components ────────────────────────────────────── */
+/* ── animations ─────────────────────────────────────── */
+const fillAnim = keyframes`
+  from { width: 0; }
+`;
 
-/* 주의: 이 프로젝트의 디자인 시스템 토큰은 다음 키 모양을 사용한다.
- *   - 폰트 크기: theme.typography.text{Xs,Sm,Base,Lg,Xl,2xl,...}
- *   - 폰트 두께: theme.typography.font{Normal,Medium,Semibold,Bold}
- *   - 테두리 색: theme.colors.borderDefault
- *   - 라운딩  : theme.radius.{sm,md,lg,xl,full}
- * `theme.fontSizes.*` / `theme.fontWeights.*` / `theme.colors.border` /
- * `theme.layout.cardRadius` 등은 이 프로젝트에 존재하지 않으며, 참조하면
- * undefined → "Cannot read properties of undefined" 로 화면 전체가 흰색이 된다.
- */
+/* ── styled ──────────────────────────────────────────── */
 const Wrapper = styled.section`
   background: ${({ theme }) => theme.colors.bgCard};
   border: 1px solid ${({ theme }) => theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.lg};
   padding: ${({ theme }) => theme.spacing.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
+  box-shadow: ${({ theme }) => theme.shadows?.sm || 'none'};
 `;
 
-const Title = styled.h3`
-  margin: 0 0 ${({ theme }) => theme.spacing.md};
-  font-size: ${({ theme }) => theme.typography.textBase};
+const CardTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+
+const TopLeft = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const TopLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.textSm};
   font-weight: ${({ theme }) => theme.typography.fontSemibold};
+  color: ${({ theme }) => theme.colors.textMuted};
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+`;
+
+const Motivation = styled.p`
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.textBase};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
   color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+const TrophyIcon = styled.span`
+  font-size: 32px;
+  line-height: 1;
+`;
+
+const Divider = styled.hr`
+  border: none;
+  border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  margin: 0 0 ${({ theme }) => theme.spacing.md};
 `;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: ${({ theme }) => theme.spacing.md};
+  grid-template-columns: repeat(4, 1fr);
+  gap: ${({ theme }) => theme.spacing.sm};
+
+  @media (max-width: 600px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `;
 
-/* 셀 — 카드의 KPI 1개 박스. bgHover 토큰이 없어 bgSecondary 로 대체 */
 const Cell = styled.div`
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
-  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
-  background: ${({ theme }) => theme.colors.bgSecondary};
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.xs};
+  background: ${({ theme, $accent }) =>
+    $accent ? theme.colors.primaryLight : theme.colors.bgSecondary};
+  border: 1px solid ${({ theme, $accent }) =>
+    $accent ? theme.colors.primary : theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.md};
+  text-align: center;
 `;
 
-const Label = styled.span`
+const CellIcon = styled.span`
+  font-size: 18px;
+  line-height: 1;
+`;
+
+const CellValue = styled.span`
+  font-size: ${({ $sm, theme }) =>
+    $sm ? theme.typography.textSm : theme.typography.textLg};
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  color: ${({ $accent, theme }) =>
+    $accent ? theme.colors.primary : theme.colors.textPrimary};
+  word-break: break-all;
+`;
+
+const CellLabel = styled.span`
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
-  font-weight: ${({ theme }) => theme.typography.fontMedium};
 `;
 
-const Value = styled.span`
-  font-size: ${({ theme }) => theme.typography.textXl};
-  font-weight: ${({ theme }) => theme.typography.fontBold};
-  color: ${({ theme }) => theme.colors.primary};
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 4px;
+  background: ${({ theme }) => theme.colors.borderDefault};
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 2px;
 `;
 
-/* 마지막 응시는 길어질 수 있어 폰트를 살짝 줄인다 */
-const ValueSm = styled.span`
-  font-size: ${({ theme }) => theme.typography.textBase};
-  font-weight: ${({ theme }) => theme.typography.fontSemibold};
-  color: ${({ theme }) => theme.colors.textPrimary};
+const ProgressFill = styled.div`
+  height: 100%;
+  width: ${({ $pct }) => Math.min($pct, 100)}%;
+  background: ${({ theme }) => theme.colors.primary};
+  border-radius: 99px;
+  animation: ${fillAnim} 0.8s ease;
 `;
 
-const Sub = styled.span`
+const CorrectChip = styled.div`
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  text-align: center;
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
 `;
