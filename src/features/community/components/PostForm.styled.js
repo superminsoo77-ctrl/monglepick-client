@@ -317,6 +317,19 @@ export const ImagePreviewItem = styled.div`
   }
 `;
 
+export const UploadingOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 500;
+`;
+
 export const ImageRemoveBtn = styled.button`
   position: absolute;
   top: 4px;

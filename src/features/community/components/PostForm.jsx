@@ -6,7 +6,7 @@
  * 임시저장:
  *   - 편집 모드(initialData 있음)에서는 비활성.
  *   - 입력 후 3초 디바운스로 localStorage에 자동 저장.
- *   - 이미지는 base64로 변환해 저장 (총 3MB 이하일 때만 포함).
+ *   - 이미지는 선택 즉시 서버에 업로드 → URL을 draft에 저장 (용량 제한 없음).
  *   - 폼 진입 시 기존 draft가 있으면 복원 배너를 표시한다.
  *   - 등록/수정 완료 시 draft를 삭제한다.
  */
@@ -25,8 +25,6 @@ const CATEGORY_OPTIONS = [
 
 const MAX_IMAGE_COUNT = 5;
 const DRAFT_KEY = 'community_post_draft';
-// base64 인코딩은 원본보다 ~33% 크므로 3MB 기준으로 설정
-const DRAFT_MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 function formatSavedAt(date) {
   if (!date) return '';
@@ -37,27 +35,6 @@ function formatSavedAt(date) {
   return `${mins}분 전 저장됨`;
 }
 
-/** File → base64 data URL */
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-/** base64 data URL → File */
-function base64ToFile(dataUrl, index) {
-  const [header, data] = dataUrl.split(',');
-  const mime = header.match(/:(.*?);/)[1];
-  const ext = mime.split('/')[1] || 'jpg';
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new File([bytes], `draft_image_${index}.${ext}`, { type: mime });
-}
-
 export default function PostForm({ onSubmit, initialData, isSubmitting = false, onCancel }) {
   const isEditMode = !!initialData;
 
@@ -66,9 +43,13 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
   const [category, setCategory] = useState(() => initialData?.category ?? 'FREE');
   const [errors, setErrors]     = useState({});
 
-  // 이미지: base64 data URL 배열 (신규 선택 및 draft 복원 모두 동일하게 관리)
-  const [imageBase64s, setImageBase64s] = useState([]);
-  const [isUploading, setIsUploading]   = useState(false);
+  /**
+   * images: { preview: string, url: string | null }[]
+   *   - preview : 즉시 표시용 (blob: URL 또는 복원 시 서버 URL)
+   *   - url     : 서버 업로드 완료된 URL (업로드 중이면 null)
+   */
+  const [images, setImages]       = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // 임시저장 관련 상태
   const [draftStatus, setDraftStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
@@ -84,16 +65,19 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (parsed.title?.trim() || parsed.content?.trim() || parsed.images?.length) {
+      if (parsed.title?.trim() || parsed.content?.trim() || parsed.imageUrls?.length) {
         setShowBanner(true);
       }
     } catch { /* localStorage 접근 불가 환경 — 무시 */ }
   }, [isEditMode]);
 
-  // 3초 디바운스 자동 저장 (이미지 포함)
+  // 업로드 완료된 URL만 추출
+  const uploadedUrls = images.map((img) => img.url).filter(Boolean);
+
+  // 3초 디바운스 자동 저장
   useEffect(() => {
     if (isEditMode) return;
-    if (!title && !content && imageBase64s.length === 0) return;
+    if (!title && !content && uploadedUrls.length === 0) return;
 
     clearTimeout(saveTimerRef.current);
     clearTimeout(idleTimerRef.current);
@@ -101,13 +85,15 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
 
     saveTimerRef.current = setTimeout(() => {
       try {
-        // base64 총 용량 계산 (base64 length * 0.75 ≈ 실제 바이트)
-        const totalBytes = imageBase64s.reduce((sum, b64) => sum + b64.length * 0.75, 0);
-        const images = totalBytes <= DRAFT_MAX_IMAGE_BYTES ? imageBase64s : [];
-
         localStorage.setItem(
           DRAFT_KEY,
-          JSON.stringify({ title, content, category, savedAt: new Date().toISOString(), images }),
+          JSON.stringify({
+            title,
+            content,
+            category,
+            imageUrls: uploadedUrls,
+            savedAt: new Date().toISOString(),
+          }),
         );
         setSavedAt(new Date());
         setDraftStatus('saved');
@@ -119,7 +105,9 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
       clearTimeout(saveTimerRef.current);
       clearTimeout(idleTimerRef.current);
     };
-  }, [title, content, category, imageBase64s, isEditMode]);
+  // uploadedUrls는 매 렌더마다 새 배열이므로 JSON 비교 대신 length+join으로 안정화
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, category, uploadedUrls.join(','), isEditMode]);
 
   const restoreDraft = () => {
     try {
@@ -129,7 +117,10 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
       if (parsed.title    !== undefined) setTitle(parsed.title);
       if (parsed.content  !== undefined) setContent(parsed.content);
       if (parsed.category !== undefined) setCategory(parsed.category);
-      if (parsed.images?.length)         setImageBase64s(parsed.images);
+      if (parsed.imageUrls?.length) {
+        // 서버 URL로 바로 복원 — preview와 url 모두 동일한 서버 URL 사용
+        setImages(parsed.imageUrls.map((url) => ({ preview: url, url })));
+      }
       if (parsed.savedAt) setSavedAt(new Date(parsed.savedAt));
     } catch { /* localStorage 접근 불가 환경 — 무시 */ }
     setShowBanner(false);
@@ -152,41 +143,53 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
 
   const handleImageChange = async (e) => {
     const selected = Array.from(e.target.files);
-    if (imageBase64s.length + selected.length > MAX_IMAGE_COUNT) {
+    if (images.length + selected.length > MAX_IMAGE_COUNT) {
       alert(`이미지는 최대 ${MAX_IMAGE_COUNT}장까지 첨부 가능합니다.`);
       return;
     }
-    try {
-      const newBase64s = await Promise.all(selected.map(readFileAsBase64));
-      setImageBase64s((prev) => [...prev, ...newBase64s]);
-    } catch {
-      alert('이미지를 읽는 중 오류가 발생했습니다.');
-    }
+
+    // 즉시 blob: URL로 미리보기 추가 (업로드 완료 전에도 화면에 표시)
+    const newEntries = selected.map((f) => ({ preview: URL.createObjectURL(f), url: null }));
+    const startIndex = images.length;
+    setImages((prev) => [...prev, ...newEntries]);
     e.target.value = '';
+
+    // 서버에 업로드
+    setIsUploading(true);
+    try {
+      const urls = await uploadImages(selected);
+      setImages((prev) => {
+        const updated = [...prev];
+        urls.forEach((url, i) => {
+          if (updated[startIndex + i]) {
+            updated[startIndex + i] = { ...updated[startIndex + i], url };
+          }
+        });
+        return updated;
+      });
+    } catch {
+      alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+      // 업로드 실패한 항목 제거
+      setImages((prev) => prev.filter((_, i) => i < startIndex || i >= startIndex + selected.length));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleImageRemove = (index) => {
-    setImageBase64s((prev) => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    let imageUrls = [];
-    if (imageBase64s.length > 0) {
-      setIsUploading(true);
-      try {
-        const files = imageBase64s.map((b64, i) => base64ToFile(b64, i));
-        imageUrls = await uploadImages(files);
-      } catch {
-        alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
-        setIsUploading(false);
-        return;
-      } finally {
-        setIsUploading(false);
-      }
+    if (isUploading) {
+      alert('이미지 업로드가 완료될 때까지 기다려주세요.');
+      return;
     }
+
+    // 이미지는 이미 서버에 올라간 URL만 사용
+    const imageUrls = images.map((img) => img.url).filter(Boolean);
 
     localStorage.removeItem(DRAFT_KEY);
     onSubmit({ title: title.trim(), content: content.trim(), category, imageUrls });
@@ -276,16 +279,18 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
 
       {/* 이미지 첨부 */}
       <S.Field>
-        <S.Label>이미지 첨부 ({imageBase64s.length}/{MAX_IMAGE_COUNT})</S.Label>
-        {imageBase64s.length > 0 && (
+        <S.Label>이미지 첨부 ({images.length}/{MAX_IMAGE_COUNT})</S.Label>
+        {images.length > 0 && (
           <S.ImagePreviewList>
-            {imageBase64s.map((src, i) => (
+            {images.map((img, i) => (
               <S.ImagePreviewItem key={i}>
-                <img src={src} alt={`첨부 이미지 ${i + 1}`} />
+                <img src={img.preview} alt={`첨부 이미지 ${i + 1}`} />
+                {/* 업로드 중인 항목은 오버레이 표시 */}
+                {!img.url && <S.UploadingOverlay>업로드 중...</S.UploadingOverlay>}
                 <S.ImageRemoveBtn
                   type="button"
                   onClick={() => handleImageRemove(i)}
-                  disabled={isSubmitting || isUploading}
+                  disabled={isSubmitting || !img.url}
                 >
                   ✕
                 </S.ImageRemoveBtn>
@@ -293,7 +298,7 @@ export default function PostForm({ onSubmit, initialData, isSubmitting = false, 
             ))}
           </S.ImagePreviewList>
         )}
-        {imageBase64s.length < MAX_IMAGE_COUNT && (
+        {images.length < MAX_IMAGE_COUNT && (
           <S.ImageUploadLabel>
             📷 이미지 추가
             <input
