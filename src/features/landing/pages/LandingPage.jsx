@@ -35,44 +35,87 @@ const PlanningModal = lazy(() => import('../components/PlanningModal'));
 const DiagramModal = lazy(() => import('../components/DiagramModal'));
 const AgentInfoModal = lazy(() => import('../components/AgentInfoModal'));
 
-/* ── AI Agent 심층 카드 데이터 ──
-   각 카드는 클릭 시 AgentInfoModal 을 연다. id 는 AGENT_MODAL_CONTENT 의 키와 일치. */
-const AGENT_DEEP_CARDS = [
-  /* ── 전체 흐름을 가장 앞에 ── */
-  { id: 'e2eJourney', icon: '🛤️', title: 'End-to-End Journey', sub: '가입 → 콜드스타트 → 추천 → 결제 → 관람 → 리뷰 → 리워드 한 루프', color: '#7c6cf0' },
-  { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 18노드 · 4분기 흐름 · SSE 10 이벤트',         color: '#ef476f' },
-  { id: 'ragPipeline', icon: '🔎', title: 'RAG Pipeline',      sub: 'Qdrant+ES+Neo4j 병렬 · RRF k=60 · 4단계 완화 · MMR λ=0.7', color: '#f97316' },
-  { id: 'matchAgent', icon: '🎬', title: 'Movie Match v3',     sub: '7노드 · LLM 리랭커 + Centroid + Co-watched CF',          color: '#a78bfa' },
-  { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 테마별 큐레이션 · 단계별 진행 · 완주 뱃지',          color: '#ffd166' },
-  { id: 'llmStack',   icon: '🧠', title: 'Hybrid LLM Stack',   sub: 'Solar API(분류·추출·설명) + EXAONE 1.2B vLLM(최종 응답)', color: '#7c6cf0' },
-  { id: 'sseEvents',  icon: '📡', title: 'SSE Streaming',      sub: '8개 이벤트 · point_update v3.4 · clarification 카드',     color: '#118ab2' },
-  { id: 'memoryArch', icon: '🧊', title: 'Memory Architecture', sub: 'Redis 핫 캐시 + MySQL 아카이브 (write-behind)',         color: '#06d6a0' },
-  { id: 'recoScoring', icon: '⚖️', title: 'Reco Scoring',       sub: 'CF+CBF 동적 가중치 + MMR λ=0.7 + RRF k=60',              color: '#ef476f' },
-  { id: 'paymentFlow', icon: '💳', title: 'Payment & Saga',     sub: 'Toss v2 · 2-Phase · Orchestration Saga · 3회 재시도 100ms',  color: '#06d6a0' },
-  { id: 'recommendArch', icon: '🧮', title: 'Recommend Service', sub: 'FastAPI · Like Redis write-behind(60s) · Co-watched CF 5min', color: '#06d6a0' },
-  { id: 'coldStart',   icon: '❄️', title: 'Cold Start & Onboarding', sub: '리뷰 0건도 추천 · 월드컵 온보딩 · Kaggle 26M CF 캐시 보완', color: '#a78bfa' },
-  { id: 'jwtAuth',     icon: '🔑', title: 'JWT & Refresh Rotation', sub: 'Access 1h · Refresh 7d · DB 화이트리스트 · OAuth2 exchange', color: '#118ab2' },
-  { id: 'ocrTicket',   icon: '🎫', title: 'OCR 티켓 인증',    sub: '영수증 업로드 · 관리자 검토 큐 · 도장깨기 가중 · 추첨 응모',  color: '#ef476f' },
-  { id: 'aiQuiz',      icon: '❓', title: 'AI 퀴즈 생성',     sub: 'Solar 구조화 출력 → 관리자 검수 → APPROVED → PUBLISHED',      color: '#ffd166' },
-  { id: 'aiReviewVerification', icon: '🧐', title: 'AI 리뷰 검증', sub: '도장깨기 실관람 판별 · 4-Stage 임베딩+키워드+LLM (⏳ 스텁)', color: '#7c6cf0' },
-  { id: 'community',   icon: '👥', title: 'Community & Social', sub: '커뮤니티 · 리뷰 · AI 퀴즈 · 이상형 월드컵 · 소울메이트', color: '#118ab2' },
-  { id: 'rewards',     icon: '🎁', title: 'Rewards & Achievements', sub: '55개 리워드 정책 · 6등급 · 업적 · 도장깨기 · 티켓 추첨', color: '#ffd166' },
-  { id: 'gitStrategy', icon: '🌿', title: 'Git Branching',      sub: 'Git Flow · main/develop · feature PR · 조직 레포 직접',   color: '#ef476f' },
-  { id: 'cicd',        icon: '⚙️', title: 'CI / CD',            sub: 'GitHub Actions · gradle test · Vite build · deploy-prod', color: '#7c6cf0' },
-  { id: 'staging',     icon: '🏭', title: 'Staging & Production', sub: 'MacBook Air 스테이징 + 카카오 클라우드 4-VM 운영',     color: '#a78bfa' },
-  { id: 'projectMgmt', icon: '📌', title: 'Jira + Confluence',  sub: 'WBS 261건 · Jira 이슈 · Confluence 문서화 · MCP 연동',    color: '#f97316' },
-  /* ── 인프라 · 데이터 · 운영 (신규) ── */
-  { id: 'cloudInfra',  icon: '🏔️', title: 'Cloud & VM Security', sub: 'Kakao Cloud VPC · SSH 배스천 · Linux 하드닝 · TLS · 로드맵', color: '#06d6a0' },
-  { id: 'dataPipeline',icon: '🏭', title: 'Data Pipeline',     sub: '910K편 · TMDB/KOBIS/KMDb/Kaggle · Solar 임베딩 · 5DB 동기', color: '#f97316' },
-  { id: 'adminConsole',icon: '👑', title: 'Admin Console',      sub: '10탭 · 96 API · 운영 11서브탭 · 통계 12탭 · 감사 로그',   color: '#ef476f' },
-  { id: 'observability', icon: '🔭', title: 'Monitoring & Observability', sub: 'Prometheus · Grafana · ELK · Alertmanager · LangSmith', color: '#118ab2' },
-  /* ── 2026-04 신규 4종 (랜딩 Recent Updates 섹션과 연동) ──
-     Support v4 / Admin v3 / 오늘의 퀴즈 / 꾸미기 6슬롯
-     각 ID 는 AGENT_MODAL_CONTENT 의 키와 1:1 매칭되어야 빈 모달이 안 뜸 */
-  { id: 'supportAgentV4', icon: '🛟', title: 'Support Agent v4', sub: '9노드 ReAct · Read tool 8개 · RedisSaver 멀티턴 · capability 가드',     color: '#118ab2' },
-  { id: 'adminAgentV3',   icon: '👑', title: 'Admin Agent v3',   sub: '11노드 ReAct · Tool 79개 (Read 54+Draft 11+Navigate 14) · MAX_HOPS=5', color: '#ef476f' },
-  { id: 'todayQuiz',      icon: '🎯', title: '오늘의 퀴즈',       sub: 'LangGraph 7노드 · 매일 00:00 KST 자동 발행 · QuizPublishScheduler',   color: '#ffd166' },
-  { id: 'avatarDeco6',    icon: '🎀', title: '꾸미기 6슬롯',      sub: '아바타·배지·프레임·배경·칭호·이펙트 · 시드 40종 · 등급 자동 칭호',     color: '#a78bfa' },
+/* ── AI Agent 심층 카드 데이터 (카테고리별 그룹) ──
+   각 카드는 클릭 시 AgentInfoModal 을 연다. id 는 AGENT_MODAL_CONTENT 의 키와 일치.
+   사용자 요청으로 28장 단일 grid → 5 카테고리 그룹핑(2026-04 변경):
+     1. AI 에이전트 (대화·매칭·로드맵·고객센터·관리자·E2E)
+     2. AI 핵심 기술 (RAG·LLM·스코어링·콜드스타트)
+     3. 사용자 경험·기능 (SSE·메모리·OCR·퀴즈·꾸미기·리뷰검증·커뮤니티·리워드)
+     4. 결제·인증·보안 (Toss Saga·JWT)
+     5. 인프라·데이터·운영 (데이터파이프·관리자콘솔·클라우드·관찰성·Git·CI/CD·스테이징·프로젝트관리) */
+const AGENT_DEEP_CATEGORIES = [
+  {
+    key: 'agents',
+    icon: '🤖',
+    title: 'AI 에이전트',
+    desc: '사용자와 직접 대화하고 추천을 만드는 그래프들',
+    cards: [
+      { id: 'e2eJourney', icon: '🛤️', title: 'End-to-End Journey', sub: '가입 → 콜드스타트 → 추천 → 결제 → 관람 → 리뷰 → 리워드 한 루프', color: '#7c6cf0' },
+      { id: 'chatAgent',  icon: '💬', title: 'Chat Agent',         sub: 'LangGraph 18노드 · 4분기 흐름 · SSE 10 이벤트',         color: '#ef476f' },
+      { id: 'matchAgent', icon: '🎬', title: 'Movie Match v3',     sub: '7노드 · LLM 리랭커 + Centroid + Co-watched CF',          color: '#a78bfa' },
+      { id: 'roadmapAgent', icon: '🗺️', title: 'Roadmap Agent',    sub: '15편 테마별 큐레이션 · 단계별 진행 · 완주 뱃지',          color: '#ffd166' },
+      { id: 'supportAgentV4', icon: '🛟', title: 'Support Agent v4', sub: '9노드 ReAct · Read tool 8개 · RedisSaver 멀티턴 · capability 가드', color: '#118ab2' },
+      { id: 'adminAgentV3',   icon: '👑', title: 'Admin Agent v3',   sub: '11노드 ReAct · Tool 79개 (Read 54+Draft 11+Navigate 14) · MAX_HOPS=5', color: '#ef476f' },
+    ],
+  },
+  {
+    key: 'aiTech',
+    icon: '🧠',
+    title: 'AI 핵심 기술',
+    desc: '추천을 가능하게 하는 검색·LLM·스코어링 기반',
+    cards: [
+      { id: 'ragPipeline', icon: '🔎', title: 'RAG Pipeline',      sub: 'Qdrant+ES+Neo4j 병렬 · RRF k=60 · 4단계 완화 · MMR λ=0.7', color: '#f97316' },
+      { id: 'llmStack',   icon: '🧠', title: 'Hybrid LLM Stack',   sub: 'Solar API(분류·추출·설명) + EXAONE 1.2B vLLM(최종 응답)', color: '#7c6cf0' },
+      { id: 'recoScoring', icon: '⚖️', title: 'Reco Scoring',       sub: 'CF+CBF 동적 가중치 + MMR λ=0.7 + RRF k=60',              color: '#ef476f' },
+      { id: 'coldStart',   icon: '❄️', title: 'Cold Start & Onboarding', sub: '리뷰 0건도 추천 · 월드컵 온보딩 · Kaggle 26M CF 캐시 보완', color: '#a78bfa' },
+    ],
+  },
+  {
+    key: 'ux',
+    icon: '🎨',
+    title: '사용자 경험·기능',
+    desc: '실시간 스트리밍·세션 메모리·게임화 기능들',
+    cards: [
+      { id: 'sseEvents',  icon: '📡', title: 'SSE Streaming',      sub: '10개 이벤트 · point_update v3.4 · clarification 카드',    color: '#118ab2' },
+      { id: 'memoryArch', icon: '🧊', title: 'Memory Architecture', sub: 'Redis 핫 캐시 + MySQL 아카이브 (write-behind)',         color: '#06d6a0' },
+      { id: 'recommendArch', icon: '🧮', title: 'Recommend Service', sub: 'FastAPI · Like Redis write-behind(60s) · Co-watched CF 5min', color: '#06d6a0' },
+      { id: 'ocrTicket',   icon: '🎫', title: 'OCR 티켓 인증',    sub: '영수증 업로드 · 관리자 검토 큐 · 도장깨기 가중 · 추첨 응모',  color: '#ef476f' },
+      { id: 'todayQuiz',      icon: '🎯', title: '오늘의 퀴즈',       sub: 'LangGraph 7노드 · 매일 00:00 KST 자동 발행 · QuizPublishScheduler', color: '#ffd166' },
+      { id: 'aiQuiz',      icon: '❓', title: 'AI 퀴즈 생성',     sub: 'Solar 구조화 출력 → 관리자 검수 → APPROVED → PUBLISHED',      color: '#ffd166' },
+      { id: 'avatarDeco6',    icon: '🎀', title: '꾸미기 6슬롯',      sub: '아바타·배지·프레임·배경·칭호·이펙트 · 시드 40종 · 등급 자동 칭호', color: '#a78bfa' },
+      { id: 'aiReviewVerification', icon: '🧐', title: 'AI 리뷰 검증', sub: '도장깨기 실관람 판별 · 4-Stage 임베딩+키워드+LLM (⏳ 스텁)', color: '#7c6cf0' },
+      { id: 'community',   icon: '👥', title: 'Community & Social', sub: '커뮤니티 · 리뷰 · AI 퀴즈 · 이상형 월드컵 · 소울메이트', color: '#118ab2' },
+      { id: 'rewards',     icon: '🎁', title: 'Rewards & Achievements', sub: '55개 리워드 정책 · 6등급 · 업적 · 도장깨기 · 티켓 추첨', color: '#ffd166' },
+    ],
+  },
+  {
+    key: 'paySec',
+    icon: '🔐',
+    title: '결제·인증·보안',
+    desc: '돈과 신원을 다루는 가장 신중한 영역',
+    cards: [
+      { id: 'paymentFlow', icon: '💳', title: 'Payment & Saga',     sub: 'Toss v2 · 2-Phase · Orchestration Saga · 3회 재시도 100ms',  color: '#06d6a0' },
+      { id: 'jwtAuth',     icon: '🔑', title: 'JWT & Refresh Rotation', sub: 'Access 1h · Refresh 7d · DB 화이트리스트 · OAuth2 exchange', color: '#118ab2' },
+    ],
+  },
+  {
+    key: 'infra',
+    icon: '🛠️',
+    title: '인프라·데이터·운영',
+    desc: 'DB 설계·클라우드·배포 자동화·관찰성·프로젝트 관리',
+    cards: [
+      /* DB 설계 — RDB(MySQL 88테이블) + Vector(Qdrant) + Graph(Neo4j) + Search(ES) + Cache(Redis) 5DB 하이브리드 */
+      { id: 'dbDesign',    icon: '🗂️', title: 'DB 설계 · 5DB 하이브리드', sub: 'MySQL 88테이블 ERD · Qdrant 4096D 벡터 · Neo4j 그래프 · ES Nori · Redis 캐시', color: '#06d6a0' },
+      { id: 'dataPipeline',icon: '🏭', title: 'Data Pipeline',     sub: '910K편 · TMDB/KOBIS/KMDb/Kaggle · Solar 임베딩 · 5DB 동기', color: '#f97316' },
+      { id: 'adminConsole',icon: '👑', title: 'Admin Console',      sub: '10탭 · 96 API · 운영 11서브탭 · 통계 12탭 · 감사 로그',   color: '#ef476f' },
+      { id: 'cloudInfra',  icon: '🏔️', title: 'Cloud & VM Security', sub: 'Kakao Cloud VPC · SSH 배스천 · Linux 하드닝 · TLS · 로드맵', color: '#06d6a0' },
+      { id: 'observability', icon: '🔭', title: 'Monitoring & Observability', sub: 'Prometheus · Grafana · ELK · Alertmanager · LangSmith', color: '#118ab2' },
+      { id: 'gitStrategy', icon: '🌿', title: 'Git Branching',      sub: 'Git Flow · main/develop · feature PR · 조직 레포 직접',   color: '#ef476f' },
+      { id: 'cicd',        icon: '⚙️', title: 'CI / CD',            sub: 'GitHub Actions · gradle test · Vite build · deploy-prod', color: '#7c6cf0' },
+      { id: 'staging',     icon: '🏭', title: 'Staging & Production', sub: 'MacBook Air 스테이징 + 카카오 클라우드 4-VM 운영',     color: '#a78bfa' },
+      { id: 'projectMgmt', icon: '📌', title: 'Jira + Confluence',  sub: 'WBS 261건 · Jira 이슈 · Confluence 문서화 · MCP 연동',    color: '#f97316' },
+    ],
+  },
 ];
 
 /* ── 피처 데이터 ──
@@ -595,35 +638,37 @@ export default function LandingPage() {
       <S.Recent id="lp-recent">
         <S.Container>
           <S.Reveal className="lp-reveal">
-            <S.SectionLabel>What&apos;s New &middot; 2026-04</S.SectionLabel>
+            <S.SectionLabel>What&apos;s New</S.SectionLabel>
             <S.SectionTitle>
               방금 도착한<br />
-              <S.GradientText>4월 업데이트</S.GradientText>
+              <S.GradientText>새 기능들</S.GradientText>
             </S.SectionTitle>
             <S.SectionSubtitle style={{ margin: '0 auto' }}>
-              지난 4주 사이 새로 추가된 기능들이에요
+              사용자 경험을 한층 더 풍부하게 만드는 신규 기능들을 만나보세요
             </S.SectionSubtitle>
           </S.Reveal>
           <S.Reveal className="lp-reveal" $delay="0.1s">
             <S.RecentGrid>
               {[
                 {
-                  icon: '🎯', title: '오늘의 퀴즈', date: '2026-04-29', color: '#ffd166',
+                  /* 카드별 메타 — 운영 일자(date) 표시는 사용자 요청으로 비노출. 향후 다시
+                     노출하려면 RecentDateChip 을 부활시키고 date 필드를 추가하면 된다. */
+                  icon: '🎯', title: '오늘의 퀴즈', color: '#ffd166',
                   desc: '매일 자정 새 영화 4지선다 퀴즈가 자동 출제 + 응시 기록 + 정답 해설',
                   to: ROUTES.QUIZ,
                 },
                 {
-                  icon: '🎀', title: '꾸미기 6슬롯', date: '2026-04-28', color: '#a78bfa',
+                  icon: '🎀', title: '꾸미기 6슬롯', color: '#a78bfa',
                   desc: '아바타·배지·프레임·배경·칭호·이펙트 40종 + 등급 자동 칭호',
                   to: ROUTES.ACCOUNT_PROFILE,
                 },
                 {
-                  icon: '🎫', title: '영화 티켓 추첨', date: '2026-04-28', color: '#ef476f',
+                  icon: '🎫', title: '영화 티켓 추첨', color: '#ef476f',
                   desc: '응모권으로 회차별 추첨 응모 + 관리자 수동 추첨 + 당첨 내역',
                   to: ROUTES.ACCOUNT_POINT,
                 },
                 {
-                  icon: '🛟', title: '몽글봇 v4.2', date: '2026-04-29', color: '#06d6a0',
+                  icon: '🛟', title: '몽글봇 v4.2', color: '#06d6a0',
                   desc: 'ReAct 9노드 + Read tool 8개 + 멀티턴(RedisSaver) + 나의 데이터 직접 조회',
                   to: ROUTES.SUPPORT,
                 },
@@ -634,7 +679,6 @@ export default function LandingPage() {
                   to={u.to}
                   $color={u.color}
                 >
-                  <S.RecentDateChip>{u.date}</S.RecentDateChip>
                   <S.RecentIcon $color={u.color}>{u.icon}</S.RecentIcon>
                   <S.RecentTitle>{u.title}</S.RecentTitle>
                   <S.RecentDesc>{u.desc}</S.RecentDesc>
@@ -952,20 +996,21 @@ export default function LandingPage() {
           <S.Reveal className="lp-reveal">
             <S.TimelineList>
               {[
-                /* 진행 현황 — CLAUDE.md 기준 (2026-04-29 업데이트)
-                   Phase 0~9 + R-0~R-6 + 관리자 + 활동 리워드 + 4월 신규 4종(둘이/계정허브/꾸미기/퀴즈/티켓/몽글봇v4) 모두 완료.
-                   현재 운영 환경 다국어 검색 재적재(ML-4)와 LoRA 파인튜닝이 남아있다 */
+                /* 진행 현황 — CLAUDE.md 기준
+                   Phase 0~9 + R-0~R-6 + 관리자 + 활동 리워드 + 4월 신규 4종(둘이/계정허브/꾸미기/퀴즈/티켓/몽글봇v4)
+                   + 다국어 검색 ML-4(운영 재적재) 모두 완료. 현재 몽글이 LoRA 파인튜닝만 남아있다 */
                 { dot: 'done', title: 'Phase 0~4 — 데이터 + RAG + Chat Agent + 추천 엔진', desc: '5DB 하이브리드 RAG, LangGraph 18노드 StateGraph(relation 포함), CF+CBF+MMR 추천 엔진', badge: 'done' },
                 { dot: 'done', title: 'Phase 5~8 — Movie Match + 콘텐츠 분석 + 로드맵', desc: 'Movie Match 6노드, 4기능 콘텐츠 분석(포스터/혐오/패턴), 개인화 로드맵 LangGraph, 332 tests pass', badge: 'done' },
                 { dot: 'done', title: 'Phase 9 + R-0~R-6 — 결제 + 인증 + 포인트', desc: 'Toss Payments 실연동, JWT/OAuth2, 6등급 팝콘 쿼터, 포인트 단일 재화(1P=10원), 55개 활동 리워드 정책', badge: 'done' },
                 { dot: 'done', title: '관리자 페이지 + 운영 도구 (10탭 + 운영 11서브탭)', desc: 'Backend 72 EP 충족, 운영 도구 통합 페이지(사용자 제재/포인트 조정/이용권/앱 공지)', badge: 'done' },
                 { dot: 'done', title: '910K건 5DB 적재 + 유저 활동 수집', desc: '910,140건 영화 데이터, 무드태그 보강, 다국어 검색 코드(ML-1~3), 유저 활동 수집 Phase 0~5', badge: 'done' },
                 { dot: 'done', title: 'Client 윤형주 영역 + 다크/라이트 모드', desc: '채팅+포인트+결제+고객센터+추천내역+플레이리스트+업적+월드컵+로드맵, 반응형 + 테마 시스템', badge: 'done' },
-                /* ── 4월 신규 3종 (2026-04-14 ~ 04-29) ── */
-                { dot: 'done', title: '둘이 영화 고르기 v3 (2026-04-14)', desc: '7노드 LangGraph + Solar LLM 리랭커 + Co-watched CF + 4단계 완화 → Top 5 추천 + Zustand persist 뒤로가기 복원', badge: 'done' },
-                { dot: 'done', title: '계정 허브 /account/* + 꾸미기 6슬롯 (2026-04-23 ~ 04-28)', desc: '마이페이지·포인트·결제·도장깨기·업적 통합 사이드바. 아바타·배지·프레임·배경·칭호·이펙트 6슬롯 + 시드 40종 + 등급 자동 칭호 6종(REQUIRES_NEW 멱등 INSERT)', badge: 'done' },
-                { dot: 'done', title: '오늘의 퀴즈 + 티켓 추첨 + 몽글봇 v4.2 (2026-04-28 ~ 04-29)', desc: '오늘의 퀴즈 (LangGraph 7노드 + QuizPublishScheduler 매일 00:00 KST 자동 발행), 영화 티켓 추첨 (응모권/회차/관리자 수동 추첨), 고객센터 v4.2 (ReAct 9노드 + Read tool 8개 + RedisSaver 멀티턴 + capability 가드)', badge: 'done' },
-                { dot: 'active', title: '다국어 검색 Phase ML-4 — 운영 재적재', desc: '운영 서버 Qdrant 임베딩 재적재 + Elasticsearch 인덱스 재생성 진행 중', badge: 'active' },
+                /* ── 4월 신규 3종 — Timeline 카드 제목의 (날짜) 표기는 사용자 요청으로 비노출 ── */
+                { dot: 'done', title: '둘이 영화 고르기 v3', desc: '7노드 LangGraph + Solar LLM 리랭커 + Co-watched CF + 4단계 완화 → Top 5 추천 + Zustand persist 뒤로가기 복원', badge: 'done' },
+                { dot: 'done', title: '계정 허브 /account/* + 꾸미기 6슬롯', desc: '마이페이지·포인트·결제·도장깨기·업적 통합 사이드바. 아바타·배지·프레임·배경·칭호·이펙트 6슬롯 + 시드 40종 + 등급 자동 칭호 6종(REQUIRES_NEW 멱등 INSERT)', badge: 'done' },
+                { dot: 'done', title: '오늘의 퀴즈 + 티켓 추첨 + 몽글봇 v4.2', desc: '오늘의 퀴즈 (LangGraph 7노드 + QuizPublishScheduler 매일 00:00 KST 자동 발행), 영화 티켓 추첨 (응모권/회차/관리자 수동 추첨), 고객센터 v4.2 (ReAct 9노드 + Read tool 8개 + RedisSaver 멀티턴 + capability 가드)', badge: 'done' },
+                /* 다국어 검색 Phase ML-4 — 운영 재적재 완료 (운영 Qdrant 임베딩 재적재 + Elasticsearch 인덱스 재생성 마침) */
+                { dot: 'done', title: '다국어 검색 Phase ML-4 — 운영 재적재', desc: '운영 서버 Qdrant 임베딩 재적재 + Elasticsearch 인덱스 재생성 완료', badge: 'done' },
                 { dot: '', title: '몽글이 LoRA 파인튜닝', desc: 'EXAONE 4.0 1.2B 페르소나 파인튜닝 → vLLM 서빙(Tesla T4)', badge: 'pending' },
               ].map((item) => (
                 <S.TimelineItem key={item.title}>
@@ -1099,21 +1144,42 @@ export default function LandingPage() {
               클릭하면 더 깊이 들어갑니다.
             </S.SectionSubtitle>
           </S.Reveal>
-          <S.Reveal className="lp-reveal" $delay="0.1s">
-            <S.DiagramCardGrid>
-              {AGENT_DEEP_CARDS.map((c) => (
-                <S.DiagramCard
-                  key={c.id}
-                  $color={c.color}
-                  onClick={() => setOpenAgentInfo(c.id)}
-                >
-                  <S.DiagramCardIcon $color={c.color}>{c.icon}</S.DiagramCardIcon>
-                  <S.DiagramCardTitle>{c.title}</S.DiagramCardTitle>
-                  <S.DiagramCardSub>{c.sub}</S.DiagramCardSub>
-                </S.DiagramCard>
-              ))}
-            </S.DiagramCardGrid>
-          </S.Reveal>
+          {/* ── 5 카테고리 그룹별 렌더 ──
+              각 카테고리: 헤더(아이콘+제목+카드 수+짧은 desc) + 그 아래 DiagramCardGrid.
+              카테고리 사이 spacing 은 AgentCategoryGroup styled 가 처리. */}
+          {AGENT_DEEP_CATEGORIES.map((cat, idx) => (
+            <S.Reveal
+              key={cat.key}
+              className="lp-reveal"
+              $delay={`${0.1 + idx * 0.05}s`}
+            >
+              <S.AgentCategoryGroup>
+                <S.AgentCategoryHeader>
+                  <S.AgentCategoryHeaderIcon>{cat.icon}</S.AgentCategoryHeaderIcon>
+                  <S.AgentCategoryHeaderText>
+                    <S.AgentCategoryHeaderTitle>
+                      {cat.title}
+                      <S.AgentCategoryHeaderCount>{cat.cards.length}</S.AgentCategoryHeaderCount>
+                    </S.AgentCategoryHeaderTitle>
+                    <S.AgentCategoryHeaderDesc>{cat.desc}</S.AgentCategoryHeaderDesc>
+                  </S.AgentCategoryHeaderText>
+                </S.AgentCategoryHeader>
+                <S.DiagramCardGrid>
+                  {cat.cards.map((c) => (
+                    <S.DiagramCard
+                      key={c.id}
+                      $color={c.color}
+                      onClick={() => setOpenAgentInfo(c.id)}
+                    >
+                      <S.DiagramCardIcon $color={c.color}>{c.icon}</S.DiagramCardIcon>
+                      <S.DiagramCardTitle>{c.title}</S.DiagramCardTitle>
+                      <S.DiagramCardSub>{c.sub}</S.DiagramCardSub>
+                    </S.DiagramCard>
+                  ))}
+                </S.DiagramCardGrid>
+              </S.AgentCategoryGroup>
+            </S.Reveal>
+          ))}
 
           {/* ── 팀원 GitHub ── */}
           <S.Reveal className="lp-reveal" $delay="0.1s">

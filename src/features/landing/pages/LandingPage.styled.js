@@ -1315,6 +1315,109 @@ export const RecentArrow = styled.span.attrs({ className: 'recent-arrow' })`
 `;
 
 /* ================================================================
+   AI Agent Deep Dive — 카테고리 그룹 (2026-04-30 신설)
+
+   28장 단일 grid → 5 카테고리 그룹핑(AI 에이전트/AI 핵심/UX/결제·보안/인프라).
+   각 그룹: 헤더(아이콘 박스 + 제목 + 카드 수 칩 + 한 줄 desc) + DiagramCardGrid.
+   ================================================================ */
+
+/** 한 카테고리의 wrapper — 카테고리 사이 spacing 36px */
+export const AgentCategoryGroup = styled.div`
+  margin-bottom: 36px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 600px) {
+    margin-bottom: 28px;
+  }
+`;
+
+/** 카테고리 헤더 (아이콘 + 텍스트 가로 배치) */
+export const AgentCategoryHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed ${({ theme }) => theme.landing.border};
+
+  @media (max-width: 600px) {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+`;
+
+/** 헤더 좌측 아이콘 박스 — 약간의 글로우 */
+export const AgentCategoryHeaderIcon = styled.div`
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  border-radius: 12px;
+  background: ${({ theme }) => theme.landing.bgGlass};
+  border: 1px solid ${({ theme }) => theme.landing.border};
+  backdrop-filter: blur(10px);
+
+  @media (max-width: 600px) {
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+  }
+`;
+
+/** 헤더 우측 텍스트 영역 (제목 + desc 세로 배치) */
+export const AgentCategoryHeaderText = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+/** 카테고리 제목 — 카드 수 칩과 함께 */
+export const AgentCategoryHeaderTitle = styled.h3`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: ${({ theme }) => theme.landing.textPrimary};
+  letter-spacing: -0.3px;
+
+  @media (max-width: 600px) {
+    font-size: 1.02rem;
+  }
+`;
+
+/** 카드 수 칩 (작은 보조 인디케이터) */
+export const AgentCategoryHeaderCount = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: ${({ theme }) => theme.landing.textMuted};
+  background: ${({ theme }) => theme.landing.bgCard};
+  border: 1px solid ${({ theme }) => theme.landing.border};
+  border-radius: 100px;
+`;
+
+/** 카테고리 설명 한 줄 */
+export const AgentCategoryHeaderDesc = styled.p`
+  margin: 0;
+  font-size: 0.82rem;
+  color: ${({ theme }) => theme.landing.textSecondary};
+  line-height: 1.4;
+`;
+
+/* ================================================================
    사용 방법 — .lp-howto
    ================================================================ */
 

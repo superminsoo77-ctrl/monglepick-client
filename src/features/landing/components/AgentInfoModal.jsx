@@ -930,14 +930,14 @@ while (true) {
       },
       {
         title: '포인트 차감 시점을 정확히 잡아요',
-        text: '영화 카드(movie_card 이벤트)가 실제로 화면에 표시되기 직전에만 이용 횟수를 차감합니다. "조건 확인 질문"만 주고받는 동안에는 차감하지 않는데, 이전 v3.3 설계에서는 "질문 시점에 소비"로 구현되어 영화 추천을 받지 않고 부가 질문만 해도 쿼터가 소진되는 문제가 있었습니다. v3.4(2026-04-15)에서 Agent의 consume_point 호출을 recommendation_ranker 노드의 movie_card yield 직전으로 이동해 수정했어요. 남은 횟수는 "오늘 무료 1/3회", "이용권 N회", "구독 보너스 N회" 형태로 소스별로 화면 하단 포인트 바에 정확하게 표시됩니다.',
+        text: '영화 카드(movie_card 이벤트)가 실제로 화면에 표시되기 직전에만 이용 횟수를 차감합니다. "조건 확인 질문"만 주고받는 동안에는 차감하지 않는데, 이전 v3.3 설계에서는 "질문 시점에 소비"로 구현되어 영화 추천을 받지 않고 부가 질문만 해도 쿼터가 소진되는 문제가 있었습니다. v3.4 에서 Agent의 consume_point 호출을 recommendation_ranker 노드의 movie_card yield 직전으로 이동해 수정했어요. 남은 횟수는 "오늘 무료 1/3회", "이용권 N회", "구독 보너스 N회" 형태로 소스별로 화면 하단 포인트 바에 정확하게 표시됩니다.',
       },
       {
         title: '앱이 끊기지 않는 이유',
         list: [
           '실시간 스트림 수신 중 로그인 토큰(JWT, 신분증)이 만료되어도 백그라운드에서 자동 갱신한 뒤 재연결합니다. 사용자는 스트림이 잠깐 멈췄다가 이어지는 것을 느낄 수 있지만, 완전히 끊기지는 않아요.',
           '선택지 카드(clarification) 이벤트가 도착하면 화면에 즉시 클릭 가능한 버튼 카드로 렌더링됩니다. 카드를 클릭하면 해당 텍스트가 채팅 입력창에 자동으로 전송돼 추가 타이핑 없이도 대화를 이어갈 수 있어요.',
-          'error 이벤트에서 잔액 값이 -1P로 오면 "포인트 서비스 일시 오류" 배너를 표시합니다. 이전에는 "-1P / 필요 0P 포인트 부족"처럼 의미 없는 폴백값이 그대로 노출되어 사용자가 혼란스러워하던 문제를 2026-04-15 수정했어요.',
+          'error 이벤트에서 잔액 값이 -1P로 오면 "포인트 서비스 일시 오류" 배너를 표시합니다. 이전에는 "-1P / 필요 0P 포인트 부족"처럼 의미 없는 폴백값이 그대로 노출되어 사용자가 혼란스러워하던 문제를 수정했어요.',
           '브라우저 기본 EventSource API는 Authorization 헤더를 붙일 수 없어서, fetch + ReadableStream + TextDecoder를 조합한 커스텀 파서를 직접 구현했습니다. 덕분에 JWT 토큰을 헤더로 전달하며 인증된 스트리밍이 가능해요.',
         ],
       },
@@ -972,7 +972,7 @@ while (true) {
         text: '로그인하지 않은 게스트 세션은 저장하지 않고 현재 탭에서만 유지됩니다. 브라우저를 닫으면 대화 내용이 사라져요. 로그인하면 그 시점부터의 대화가 저장되기 시작하며, 이전 게스트 대화는 소급해서 저장되지 않습니다. 비로그인 상태에서는 user_id가 빈 문자열("")로 처리되어 Redis와 MySQL 양쪽 저장을 모두 건너뜁니다.',
       },
       {
-        title: '채팅 이력이 저장 안 되던 버그 수정 (2026-04-15)',
+        title: '채팅 이력이 저장 안 되던 버그 수정',
         text: 'Backend(Spring Boot, jjwt 라이브러리)가 JWT 토큰에 서명할 때 비밀키가 64바이트 이상이면 자동으로 HS512 방식을 선택합니다. 그런데 AI Agent는 "HS256만 유효한 서명"으로 검증하도록 설정되어 있었어요. 결과적으로 모든 로그인 사용자의 토큰이 "위조된 신분증"처럼 거부되어 user_id가 빈 문자열("")로 처리됐고, 세션 저장이 완전히 스킵됐습니다. chat_session_archive에 저장된 건수가 0이었던 근본 원인이에요. 해결: Agent의 JWT 검증 설정을 algorithms=["HS256", "HS384", "HS512"]로 확장했습니다.',
         note: 'HMAC 방식만 사용하므로 알고리즘 범위를 넓혀도 "알고리즘 혼동 공격(algorithm confusion attack)"이 불가능하며 보안 위협이 없습니다. 기존 사용자의 토큰을 재발급할 필요도 없어요.',
       },
@@ -1215,7 +1215,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
           ],
         },
         text: '이전에는 "AI에게 질문하는 순간" 횟수가 차감됐는데, 실제로 영화 카드를 받지 않고 추가 질문만 해도 차감되는 문제가 있었습니다. 지금은 영화 카드가 화면에 표시되는 순간에만 차감합니다.',
-        note: '2026-04-15 버그 수정: 잔액 확인 로직이 읽기 전용 트랜잭션을 물려받아 MySQL에서 쓰기 오류가 발생했습니다. 해당 메서드에 쓰기 허용 트랜잭션을 명시해 해결했습니다.',
+        note: '버그 수정: 잔액 확인 로직이 읽기 전용 트랜잭션을 물려받아 MySQL에서 쓰기 오류가 발생했습니다. 해당 메서드에 쓰기 허용 트랜잭션을 명시해 해결했습니다.',
       },
 
       /* ── J. 구독 트랜잭션 ── */
@@ -1298,7 +1298,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
         list: [
           '관리자가 Solar AI로 퀴즈를 자동 생성해 매일 새 문제를 출제해요. AI가 줄거리·출연진 기반으로 OX·객관식 문항을 만들고, 관리자가 검수·승인하면 배포됩니다.',
           '영화 스틸컷 한 장만 보고 제목을 맞추는 씬 맞추기도 있어요. 제목과 포스터를 숨기고 힌트만 제공해 편견 없이 영화를 접하는 "뜻밖의 명작" 경험을 설계했습니다.',
-          '도장깨기 코스(15편)를 진행하면서 리뷰를 남기면 인증 도장이 쌓입니다. "OCR 인증 필수" 도장은 영수증 업로드를 통과해야만 인정돼요 (2026-04-14 기능 추가).',
+          '도장깨기 코스(15편)를 진행하면서 리뷰를 남기면 인증 도장이 쌓입니다. "OCR 인증 필수" 도장은 영수증 업로드를 통과해야만 인정돼요.',
           '퀴즈 정답, 도장 완주, 코스 완료 때마다 포인트와 업적이 자동으로 기록됩니다. 업적은 프로필에 표시되어 다른 사용자가 볼 수 있어요.',
         ],
       },
@@ -1322,7 +1322,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
         title: '고객센터와 공지도 한 곳에서 해결해요',
         list: [
           'AI 챗봇이 자주 묻는 질문(FAQ)에 바로 답해줘요. 화면 어디서든 접근할 수 있는 플로팅 위젯으로 제공되어 페이지를 이동하지 않아도 됩니다. 챗봇이 해결 못 하면 관리자에게 문의 티켓을 생성할 수 있어요.',
-          '공지사항 UX 개편(2026-04-15): displayType에 따라 BANNER(상단 카드)·POPUP(배경 클릭으로 닫기)·MODAL(확인 버튼만) 세 가지로 보여줘요. "다시 보지 않기"는 localStorage에 영구 기록해 재방문해도 표시되지 않고, "닫기"는 24시간 억제됩니다. 관리자가 pinned=true로 설정한 공지만 홈에 표시돼요.',
+          '공지사항 UX 개편: displayType에 따라 BANNER(상단 카드)·POPUP(배경 클릭으로 닫기)·MODAL(확인 버튼만) 세 가지로 보여줘요. "다시 보지 않기"는 localStorage에 영구 기록해 재방문해도 표시되지 않고, "닫기"는 24시간 억제됩니다. 관리자가 pinned=true로 설정한 공지만 홈에 표시돼요.',
         ],
       },
     ],
@@ -1397,7 +1397,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
 
       {
         title: '내 포인트 현황을 한눈에 볼 수 있어요',
-        text: '포인트 페이지에서 리워드 지급 기준 55가지, 내 누적 포인트, 다음 등급까지 남은 포인트, 이번 달 받은 포인트 타임라인을 모두 볼 수 있어요. 2026-04-15 재개편에서 "어떤 활동을 하면 얼마를 받는지"를 실시간으로 가시화해 포인트 적립 동기를 높였습니다. 관리자는 사용자별 포인트 수동 조정, 이용권 직접 지급, 감사 로그 조회가 가능하며 모든 조작 이력이 감사 로그에 남아요.',
+        text: '포인트 페이지에서 리워드 지급 기준 55가지, 내 누적 포인트, 다음 등급까지 남은 포인트, 이번 달 받은 포인트 타임라인을 모두 볼 수 있어요. 최근 재개편에서 "어떤 활동을 하면 얼마를 받는지"를 실시간으로 가시화해 포인트 적립 동기를 높였습니다. 관리자는 사용자별 포인트 수동 조정, 이용권 직접 지급, 감사 로그 조회가 가능하며 모든 조작 이력이 감사 로그에 남아요.',
       },
     ],
   },
@@ -1546,7 +1546,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
         title: '비밀 정보(API 키, 비밀번호)는 안전하게 관리해요',
         list: [
           '카드 결제 키(Toss), 로그인 서명 키(JWT_SECRET), 소셜 로그인 정보(OAuth) 등은 GitHub Secrets에 암호화해서 보관합니다. Actions 워크플로우 안에서만 접근 가능해요.',
-          '각 운영 서버에는 .env.prod 파일을 직접 주입하고 Git에는 올리지 않습니다. 2026-04-15 전면 정비로 누락되어 있던 결제·인증·CORS 관련 키들이 모두 주입 완료됐어요.',
+          '각 운영 서버에는 .env.prod 파일을 직접 주입하고 Git에는 올리지 않습니다. 전면 정비로 누락되어 있던 결제·인증·CORS 관련 키들이 모두 주입 완료됐어요.',
           '어떤 키가 필요한지는 .env.prod.example 예시 파일로만 공유하고 실제 값은 비공개입니다. 신규 팀원이 환경 구성을 놓치지 않도록 예시 파일에 설명 주석이 달려있어요.',
         ],
       },
@@ -1616,7 +1616,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
         title: '서버 상태는 4가지 도구로 실시간 확인해요',
         list: [
           'Prometheus — 응답 속도(p50·p95·p99), 오류율, DB 연결 수 등 수치 데이터를 15초마다 수집합니다. 커스텀 메트릭으로 AI 추천 요청 수·LLM 리랭커 호출 수도 추적해요.',
-          'Grafana — 수집된 수치를 대시보드로 시각화합니다. monglepick-logs 대시보드(12패널, 2026-04-15 신설)에서 Backend·Agent·Recommend·Nginx 로그를 실시간 스트림으로 확인할 수 있어요.',
+          'Grafana — 수집된 수치를 대시보드로 시각화합니다. monglepick-logs 대시보드(12패널)에서 Backend·Agent·Recommend·Nginx 로그를 실시간 스트림으로 확인할 수 있어요.',
           'Alertmanager — 이상 징후 11개 조건(5xx 급증·vLLM 헬스 실패·DB 연결 풀 90% 초과 등) 감지 시 즉시 알림을 발송합니다. 야간에도 놓치지 않아요.',
           'ELK(Elasticsearch·Logstash·Kibana) — 전체 서비스 로그를 한 곳에서 검색하고 분석합니다. Kibana에 36개 saved object(Data View 5·Saved Search 4·Visualization 22·Dashboard 4)가 자동 프로비저닝돼 있어요.',
         ],
@@ -1640,7 +1640,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
     sections: [
 
       {
-        title: '전체 작업 현황 (2026-03-31 기준)',
+        title: '전체 작업 현황',
         table: {
           headers: ['상태', '건수', '비율', '의미'],
           rows: [
@@ -1881,7 +1881,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
           { label: '신분증 (Access Token)', value: '유효기간 1시간. JSON 응답으로 전달되고 앱 메모리(React Context)에만 보관합니다. localStorage나 sessionStorage에 넣지 않아 XSS(크로스 사이트 스크립팅) 공격으로 탈취되지 않아요.' },
           { label: '갱신권 (Refresh Token)', value: '유효기간 7일. 브라우저의 HttpOnly 쿠키(JavaScript에서 document.cookie로 접근 불가)로 저장됩니다. 쿠키는 Same-Site 설정으로 CSRF(사이트 간 요청 위조) 공격도 방어해요.' },
           { label: '서명 방식 자동 선택', value: '비밀키 길이에 따라 HS256(32바이트 미만)·HS384(48바이트 미만)·HS512(64바이트 이상) 중 자동 선택됩니다. 운영 서버는 67바이트 키로 HS512가 자동 선택돼요.' },
-          { label: 'AI 에이전트 호환 (2026-04-15 수정)', value: '에이전트가 세 가지 서명 방식을 모두 인식하도록 algorithms=["HS256","HS384","HS512"]로 확장했습니다. 이전에는 HS256만 허용해 운영 서버의 HS512 토큰이 전부 거부되어 채팅 이력이 저장되지 않던 버그의 근본 원인이었어요.' },
+          { label: 'AI 에이전트 호환', value: '에이전트가 세 가지 서명 방식을 모두 인식하도록 algorithms=["HS256","HS384","HS512"]로 확장했습니다. 이전에는 HS256만 허용해 운영 서버의 HS512 토큰이 전부 거부되어 채팅 이력이 저장되지 않던 버그의 근본 원인이었어요.' },
         ],
       },
 
@@ -1958,7 +1958,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
             ['사용자 앱',     '영화 상세 인증 배너 (OcrEventBanner)',     '완료'],
             ['사용자 앱',     '영수증 제출 모달 (OcrVerificationModal)',  '완료'],
             ['관리자 앱',     'OCR 이벤트 승인·거절 큐',                 '완료'],
-            ['관리자 앱',     '영화 제목 검색으로 이벤트 등록 (공통화)',  '완료 (2026-04-14)'],
+            ['관리자 앱',     '영화 제목 검색으로 이벤트 등록 (공통화)',  '완료'],
             ['AI 에이전트',   '이미지에서 영화명·상영관·일시 자동 추출', '미구현 (후속)'],
             ['AI 에이전트',   '자동 검증 API',                            '미구현 (후속)'],
           ],
@@ -2189,7 +2189,7 @@ private boolean attemptCancelWithRetry(String paymentKey, String orderId) {
             ['VM4', 'SSH (VM1 경유만)', 'DB 포트 · AI 모델 포트 18000/18001 (내부만)'],
           ],
         },
-        note: 'AI 모델 포트(18000/18001)는 내부 통신을 위한 보안 그룹 허용이 아직 미등록 상태입니다 (2026-04-15 기준)',
+        note: 'AI 모델 포트(18000/18001)는 내부 통신을 위한 보안 그룹 허용이 아직 미등록 상태입니다',
       },
 
       {
@@ -2265,7 +2265,7 @@ limit_req zone=api burst=40 nodelay;`,
           { label: '주입 방식',  value: '도커 실행 시 env_file로 주입해요. 이미지 파일 안에 비밀 정보가 포함되지 않습니다' },
           { label: '교체 예정',  value: '운영 서버의 JWT 서명 키, OAuth 클라이언트 비밀키를 실제 값으로 교체하는 작업이 남아있어요' },
         ],
-        note: '2026-04-15 환경변수 전면 정비 — 누락되어 있던 결제·인증·CORS 관련 키들이 모두 주입 완료됐습니다',
+        note: '환경변수 전면 정비 — 누락되어 있던 결제·인증·CORS 관련 키들이 모두 주입 완료됐습니다',
       },
 
       {
@@ -2455,7 +2455,7 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
         list: [
           '업적·로드맵 코스·퀴즈·영화·장르 데이터를 직접 추가하고 수정할 수 있어요',
           'OCR 실관람 인증 이벤트·인기 검색어·월드컵 후보·포인트 상품·리워드 정책·공지사항 관리',
-          '영화 선택이 필요한 모든 화면에서 영화 제목으로 검색해 선택할 수 있어요 (2026-04-14 공통화)',
+          '영화 선택이 필요한 모든 화면에서 영화 제목으로 검색해 선택할 수 있어요',
           '포인트 지급 기준과 내 누적 현황을 실시간으로 가시화한 포인트 페이지',
         ],
       },
@@ -2511,7 +2511,7 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
         table: {
           headers: ['대시보드',              '패널 수', '핵심 패널'],
           rows: [
-            ['monglepick-logs (2026-04-15)', '12',    'Backend/Agent/Recommend/Nginx 실시간 로그 스트림 2'],
+            ['monglepick-logs', '12',    'Backend/Agent/Recommend/Nginx 실시간 로그 스트림 2'],
             ['infra-overview',               '—',     'CPU/MEM/Disk/Net per VM'],
             ['agent-quality',                '—',     'Retrieval quality, rerank latency, MMR distribution'],
             ['payment',                      '—',     '결제 성공률 / 보상 실패 / COMPENSATION_FAILED 패턴 알람'],
@@ -2525,7 +2525,7 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
           'COMPENSATION_FAILED 로그 패턴 · 결제 실패율 급증',
           'vLLM /health 3회 연속 실패 · Ollama 모델 미로드',
           'DB 커넥션 풀 90% 초과 · Qdrant 점유율 · Disk 85% 초과',
-          'Admin 시스템 탭 모니터링 접속 가이드(2026-04-15) 에 요약 노출',
+          'Admin 시스템 탭 모니터링 접속 가이드에 요약 노출',
         ],
       },
       {
@@ -2547,7 +2547,7 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
       },
       {
         title: '🪟 운영 관찰 접속',
-        text: '관리자 시스템 탭 "모니터링 접속 가이드"(2026-04-15, MonitoringGuide.jsx)에 Grafana/Kibana/Prometheus/Alertmanager URL + Basic Auth 계정 + 주요 알림 룰 요약이 한 화면에 노출. URL/계정 복사 버튼 제공.',
+        text: '관리자 시스템 탭 "모니터링 접속 가이드"(MonitoringGuide.jsx)에 Grafana/Kibana/Prometheus/Alertmanager URL + Basic Auth 계정 + 주요 알림 룰 요약이 한 화면에 노출. URL/계정 복사 버튼 제공.',
       },
     ],
   },
@@ -2721,11 +2721,11 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
         steps: [
           { title: 'GET /api/v1/quizzes/today', desc: '오늘 PUBLISHED 퀴즈 1건 반환. 비로그인 가능 — SecurityConfig 화이트리스트.' },
           { title: 'POST /api/v1/quizzes/{id}/submit', desc: 'JWT 필수. 정답이면 +10 포인트 적립 (오답은 0). 같은 날 재제출 차단.' },
-          { title: 'GET /me/stats · /me/history', desc: '내 통계(응시·정답·연속정답·획득포인트) + 최근 30일 응시 이력. JPA 멀티 SELECT 회귀 픽스(2026-04-29) 로 안정.' },
+          { title: 'GET /me/stats · /me/history', desc: '내 통계(응시·정답·연속정답·획득포인트) + 최근 30일 응시 이력. JPA 멀티 SELECT 회귀 픽스 적용으로 안정.' },
         ],
       },
       {
-        title: '🐛 v1 회귀 픽스 (2026-04-29)',
+        title: '🐛 v1 회귀 픽스',
         list: [
           'GET /quizzes/today 401 → SecurityConfig.apiFilterChain 에 공개 EP 명시 화이트리스트 추가 (/today + /movie/**)',
           'GET /me/stats 500 → JPA 멀티 SELECT 매핑 회귀 (Object[] → List<Object[]>) 픽스 + H2 통합 테스트 2건 추가',
@@ -2783,6 +2783,104 @@ PYTHONPATH=src uv run --with pytest --with pytest-asyncio --with httpx \\
       {
         title: '🎨 Client UI',
         text: '계정 허브 /account/profile 의 꾸미기 탭에서 6슬롯을 한 화면에 보여주고, 카테고리 별 인벤토리 → 슬롯 장착 → 미리보기 → 저장 흐름. 장착 결과는 헤더 아바타·커뮤니티 댓글·리뷰 등 사용자 표시 영역 전반에 즉시 반영.',
+      },
+    ],
+  },
+
+  /* ─────────── 31. DB 설계 · 5DB 하이브리드 ───────────
+     출처: docs/RDB_스키마_정의서_v2.md · docs/v5_t2_09_15_개발문서 통합.xlsx · CLAUDE.md
+     5DB 하이브리드: MySQL(88 테이블 · 단일 진실 원본) + Qdrant(4096D 벡터) +
+                    Neo4j(그래프) + Elasticsearch(Nori) + Redis(캐시·세션)
+     설계 원칙: JPA @Entity ddl-auto=update / Flyway 미도입 / VARCHAR(50) PK / Surrogate BIGINT */
+  dbDesign: {
+    icon: '🗂️',
+    tag: 'DB DESIGN',
+    title: 'DB 설계 · 5DB 하이브리드 — 영화 1편이 5곳에 모두 있어요',
+    desc: '하나의 영화 데이터를 다섯 가지 데이터베이스에 동시에 저장합니다. MySQL 은 "공식 진실 원본" 으로 영화 메타데이터·사용자·결제·리워드 등 모든 도메인을 88 테이블에 보관하고, Qdrant 는 영화의 의미를 4096차원 벡터로 표현해 "느낌이 비슷한 영화" 를 찾습니다. Neo4j 는 감독-배우-영화 연결망을 멀티홉으로 탐색하고, Elasticsearch 는 한국어 형태소 분석(Nori)으로 제목·줄거리 키워드 검색을 빠르게 처리하며, Redis 는 자주 찾는 결과를 핫 캐시로 두어 응답 속도를 보장합니다. 한 가지 DB 만으로는 못 풀 검색·추천 문제를 5개 DB 의 조합으로 해결하는 구조입니다.',
+    color: '#06d6a0',
+    stats: [
+      { value: '88', label: 'MySQL 테이블' },
+      { value: '5', label: 'DB 종류' },
+      { value: '4096D', label: '벡터 차원' },
+      { value: '단일 SoT', label: 'MySQL 권위' },
+    ],
+    sections: [
+      {
+        title: '5DB 의 역할 분담',
+        table: {
+          headers: ['DB',          '역할',                                  '대표 데이터'],
+          rows: [
+            ['MySQL 8.0',          '단일 진실 원본 (모든 영구 상태)',       '영화 메타 · 유저 · 결제 · 리워드 · 리뷰 · 쿼터 (88 테이블)'],
+            ['Qdrant',             '의미 기반 검색 (4096D 벡터)',           '영화 임베딩 · 사용자 취향 임베딩 · Cosine 유사도'],
+            ['Neo4j 5',            '관계 그래프 멀티홉 탐색',               'Movie · Person(감독·배우) · Genre · MoodTag · DIRECTED/ACTED_IN'],
+            ['Elasticsearch 8.17', '한국어 키워드 검색 (Nori)',             '제목 / 줄거리 / 감독 / 배우 형태소 분석 인덱스'],
+            ['Redis 7',            '핫 캐시 + 세션 + Like write-behind',    '채팅 세션 · 인기 영화 · 추천 캐시 · Like 60초 flush'],
+          ],
+        },
+      },
+      {
+        title: '🏗️ MySQL 88 테이블 — 도메인 그룹',
+        list: [
+          { label: '영화·메타',     value: 'movies / movie_genres / movie_persons / movie_mood_tags / movie_overview_translations 등 17 테이블' },
+          { label: '사용자·인증',   value: 'users / refresh_tokens / oauth_accounts / user_grades / user_ai_quota / mongle_guest 등 12 테이블' },
+          { label: '추천·기록',     value: 'reviews / user_watch_history / likes / user_wishlist / recommendation_log / recommendation_impact 등 10 테이블' },
+          { label: '결제·리워드',   value: 'payment_orders / payment_transactions / point_history / point_items / user_items / lottery_rounds / lottery_entries 등 18 테이블' },
+          { label: '커뮤니티',      value: 'community_posts / comments / post_likes / report_logs / playlists / playlist_items 등 9 테이블' },
+          { label: '도장깨기·로드맵', value: 'roadmap_courses / roadmap_movies / stamps / final_reviews 등 6 테이블' },
+          { label: '관리자·운영',   value: 'admins / admin_audit_logs / notices / faqs / banners / point_packs / quizzes / quiz_participation / support_chat_log 등 16 테이블' },
+        ],
+      },
+      {
+        title: '🔑 PK 타입 정책',
+        list: [
+          'movie_id / user_id 는 VARCHAR(50) — 외부 ID(TMDB ID, OAuth subject 등)를 그대로 사용해 시스템 간 정합성 확보',
+          '나머지 모든 테이블은 BIGINT AUTO_INCREMENT 서로게이트 PK — 자연 키 변경에 영향받지 않음',
+          '복합 UNIQUE 제약은 운영 테이블에서 지양 — 서비스 레이어 검증으로 충분 (운영 원칙)',
+        ],
+      },
+      {
+        title: '🧠 Qdrant 벡터 컬렉션',
+        steps: [
+          { title: 'movie_v2 (4096D, Cosine)',  desc: '910K 편 영화 임베딩. 제목·줄거리·장르·감독·무드 결합 텍스트를 Upstage Solar 임베딩(4096차원)으로 변환해 저장. payload 에 title/year/genres/poster_path 등 메타 동봉.' },
+          { title: 'user_taste (4096D)',        desc: '리뷰·시청이력·좋아요·찜 신호로 만든 사용자 취향 벡터. Cold Start 시 월드컵 결과로 초기화, Warm 시 weighted 업데이트.' },
+          { title: 'support_policy_v1 (4096D)', desc: '고객센터 정책 문서 RAG — 환불정책/약관/운영정책 문단을 임베딩해 lookup_policy tool 이 검색.' },
+          { title: 'movie_review (대기)',       desc: '리뷰 검증 에이전트(도장깨기) 용 리뷰 임베딩. 4-Stage 임베딩+키워드+LLM 판별.' },
+        ],
+      },
+      {
+        title: '🕸️ Neo4j 그래프 모델',
+        text: '노드 라벨: Movie, Person(감독·배우), Genre, MoodTag. 관계: DIRECTED, ACTED_IN, HAS_GENRE, HAS_MOOD. 봉준호 감독 네트워크 같은 멀티홉 쿼리(`(director)-[:DIRECTED]->(movie)<-[:ACTED_IN]-(actor)`)로 "이 배우가 함께 출연한 영화" 탐색을 한 번의 Cypher 쿼리로 처리. 랜딩페이지에 vis-network 시각화 임베드(126 노드 · 176 엣지).',
+      },
+      {
+        title: '🔍 Elasticsearch 인덱스',
+        list: [
+          'movies_v2 — 한국어 형태소(Nori) tokenizer + 동의어 사전. 제목/줄거리/감독/배우 다중 필드 가중 검색.',
+          '다국어 검색 ML-1~4 (운영 재적재 완료) — 영어·일본어·중국어 분리 색인으로 다국어 사용자 지원.',
+          '하이브리드 RRF 융합 — Qdrant + Elasticsearch + Neo4j 결과를 Reciprocal Rank Fusion(k=60)으로 통합.',
+        ],
+      },
+      {
+        title: '⚡ Redis 캐시 정책',
+        list: [
+          'chat:session:{sessionId} — 채팅 핫 캐시 (write-behind 로 MySQL 아카이브)',
+          'mongle_guest:{deviceFingerprint} — 게스트 365일 TTL (HMAC 쿠키 + IP 이중 방어)',
+          'like:movie:{movieId} — Like write-behind (60초 batch flush, Recommend 서비스 전담)',
+          'recommend:popular:* — 인기 영화 캐시 (CF 캐시 975MB · 586K 키)',
+          'cowatched:{movieId} — Movie Match Co-watched CF (5분 TTL)',
+        ],
+      },
+      {
+        title: '🛠️ DDL 운영 원칙',
+        list: [
+          'JPA @Entity + ddl-auto=update — Backend 엔티티가 DDL 진실 원본. Flyway 미도입.',
+          'recommend FastAPI 는 R/W 만 (DDL 권한 없음) — DataSource 공유, PlatformTransactionManager 공유.',
+          'JPA / MyBatis 하이브리드 — 윤형주=JPA 단독, 김민규·이민수=JPA(DDL)+MyBatis(R/W), 정한나=Recommend FastAPI.',
+          '운영 마이그레이션 SQL — 수동 실행 (docs/migration_*.sql), 코드와 교차 검증 필수.',
+        ],
+      },
+      {
+        title: '📐 권위 문서',
+        text: 'docs/RDB_스키마_정의서_v2.md (88 테이블 정의서) + docs/v5_t2_09_15_개발문서 통합.xlsx 첫 시트 (필드/PK/외래키/인덱스 권위 원본). 코드와 교차 검증 필수 — 운영 원칙 §1.',
       },
     ],
   },
