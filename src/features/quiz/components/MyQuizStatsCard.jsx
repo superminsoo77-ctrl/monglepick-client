@@ -31,11 +31,11 @@ function formatLastAt(iso) {
 }
 
 function getMotivationText(accuracyPct, totalAttempts) {
-  if (totalAttempts === 0) return '첫 퀴즈를 풀어보세요! 🎬';
-  if (accuracyPct >= 90) return '영화 마스터! 대단해요 🏆';
-  if (accuracyPct >= 70) return '꽤 잘 알고 있네요 🎯';
-  if (accuracyPct >= 50) return '계속 도전해보세요 💪';
-  return '퀴즈로 영화 지식을 쌓아가세요 📚';
+  if (totalAttempts === 0) return '첫 퀴즈를 풀어보세요!';
+  if (accuracyPct >= 90) return '영화 마스터! 대단해요';
+  if (accuracyPct >= 70) return '꽤 잘 알고 있네요';
+  if (accuracyPct >= 50) return '계속 도전해보세요';
+  return '퀴즈로 영화 지식을 쌓아가세요';
 }
 
 export default function MyQuizStatsCard({ refreshKey }) {
@@ -43,6 +43,7 @@ export default function MyQuizStatsCard({ refreshKey }) {
   const [stats, setStats] = useState(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -79,50 +80,58 @@ export default function MyQuizStatsCard({ refreshKey }) {
       <CardTop>
         <TopLeft>
           <TopLabel>내 퀴즈 현황</TopLabel>
-          <Motivation>{loading ? '불러오는 중…' : motivation}</Motivation>
+          {!collapsed && (
+            <Motivation>{loading ? '불러오는 중…' : motivation}</Motivation>
+          )}
         </TopLeft>
-        <TrophyIcon aria-hidden>🎬</TrophyIcon>
+        <ToggleBtn
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? '펼치기' : '접기'}
+          <Chevron $open={!collapsed}>›</Chevron>
+        </ToggleBtn>
       </CardTop>
 
-      <Divider />
+      {!collapsed && (
+        <>
+          <Divider />
+          <Grid>
+            <Cell>
+              <CellLabel>총 응시</CellLabel>
+              <CellValue>{loading ? '—' : stats.totalAttempts}</CellValue>
+            </Cell>
 
-      <Grid>
-        <Cell>
-          <CellIcon>📝</CellIcon>
-          <CellValue>{loading ? '—' : stats.totalAttempts}</CellValue>
-          <CellLabel>총 응시</CellLabel>
-        </Cell>
+            <Cell $accent>
+              <CellLabel>정답률</CellLabel>
+              <CellValue $accent>
+                {loading || accuracyPct === null ? '—' : `${accuracyPct}%`}
+              </CellValue>
+              {!loading && stats.totalAttempts > 0 && (
+                <ProgressBar>
+                  <ProgressFill $pct={accuracyPct ?? 0} />
+                </ProgressBar>
+              )}
+            </Cell>
 
-        <Cell $accent>
-          <CellIcon>✅</CellIcon>
-          <CellValue $accent>
-            {loading || accuracyPct === null ? '—' : `${accuracyPct}%`}
-          </CellValue>
-          <CellLabel>정답률</CellLabel>
+            <Cell>
+              <CellLabel>획득 포인트</CellLabel>
+              <CellValue>{loading ? '—' : stats.totalEarnedPoints}</CellValue>
+            </Cell>
+
+            <Cell>
+              <CellLabel>마지막 응시</CellLabel>
+              <CellValue $sm>{loading ? '—' : formatLastAt(stats.lastAttemptedAt)}</CellValue>
+            </Cell>
+          </Grid>
+
           {!loading && stats.totalAttempts > 0 && (
-            <ProgressBar>
-              <ProgressFill $pct={accuracyPct ?? 0} />
-            </ProgressBar>
+            <CorrectChip>
+              정답 {stats.correctCount}문제 · 오답 {stats.totalAttempts - stats.correctCount}문제
+            </CorrectChip>
           )}
-        </Cell>
-
-        <Cell>
-          <CellIcon>⭐</CellIcon>
-          <CellValue>{loading ? '—' : stats.totalEarnedPoints}</CellValue>
-          <CellLabel>획득 P</CellLabel>
-        </Cell>
-
-        <Cell>
-          <CellIcon>🕐</CellIcon>
-          <CellValue $sm>{loading ? '—' : formatLastAt(stats.lastAttemptedAt)}</CellValue>
-          <CellLabel>마지막 응시</CellLabel>
-        </Cell>
-      </Grid>
-
-      {!loading && stats.totalAttempts > 0 && (
-        <CorrectChip>
-          정답 {stats.correctCount}문제 / 오답 {stats.totalAttempts - stats.correctCount}문제
-        </CorrectChip>
+        </>
       )}
     </Wrapper>
   );
@@ -145,10 +154,9 @@ const Wrapper = styled.section`
 
 const CardTop = styled.div`
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.spacing.sm};
-  margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
 
 const TopLeft = styled.div`
@@ -172,15 +180,39 @@ const Motivation = styled.p`
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
-const TrophyIcon = styled.span`
-  font-size: 32px;
+const ToggleBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: transparent;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const Chevron = styled.span`
+  display: inline-block;
+  font-size: 14px;
+  transform: rotate(${({ $open }) => ($open ? '-90deg' : '90deg')});
+  transition: transform 0.2s;
   line-height: 1;
 `;
 
 const Divider = styled.hr`
   border: none;
   border-top: 1px solid ${({ theme }) => theme.colors.borderDefault};
-  margin: 0 0 ${({ theme }) => theme.spacing.md};
+  margin: ${({ theme }) => theme.spacing.md} 0;
 `;
 
 const Grid = styled.div`
@@ -205,11 +237,6 @@ const Cell = styled.div`
     $accent ? theme.colors.primary : theme.colors.borderDefault};
   border-radius: ${({ theme }) => theme.radius.md};
   text-align: center;
-`;
-
-const CellIcon = styled.span`
-  font-size: 18px;
-  line-height: 1;
 `;
 
 const CellValue = styled.span`

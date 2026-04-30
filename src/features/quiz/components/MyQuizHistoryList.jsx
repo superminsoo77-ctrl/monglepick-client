@@ -24,7 +24,6 @@ function formatSubmittedAt(iso) {
   }
 }
 
-/** 페이지네이션에 표시할 페이지 번호 배열 생성 (최대 5개 슬롯) */
 function buildPageRange(currentPage, totalPages) {
   if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i);
   const half = 2;
@@ -46,6 +45,7 @@ export default function MyQuizHistoryList({ refreshKey }) {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [collapsed, setCollapsed] = useState(true);
 
   const fetchPage = useCallback(async (targetPage) => {
     setLoading(true);
@@ -80,102 +80,115 @@ export default function MyQuizHistoryList({ refreshKey }) {
   return (
     <Wrapper aria-label="내 퀴즈 응시 이력">
       <SectionHeader>
-        <SectionTitle>응시 이력</SectionTitle>
-        {totalElements > 0 && (
-          <TotalBadge>총 {totalElements}건</TotalBadge>
-        )}
+        <HeaderLeft>
+          <SectionTitle>응시 이력</SectionTitle>
+          {totalElements > 0 && (
+            <TotalBadge>총 {totalElements}건</TotalBadge>
+          )}
+        </HeaderLeft>
+        <ToggleBtn
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? '펼치기' : '접기'}
+          <Chevron $open={!collapsed}>›</Chevron>
+        </ToggleBtn>
       </SectionHeader>
 
-      {/* 로딩 스켈레톤 */}
-      {loading && (
-        <SkeletonList>
-          {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
-        </SkeletonList>
-      )}
+      {!collapsed && (
+        <>
+          {/* 로딩 스켈레톤 */}
+          {loading && (
+            <SkeletonList>
+              {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
+            </SkeletonList>
+          )}
 
-      {/* 에러 */}
-      {!loading && error && (
-        <ErrorRow>
-          {error}
-          <RetryBtn type="button" onClick={() => fetchPage(page)}>
-            다시 시도
-          </RetryBtn>
-        </ErrorRow>
-      )}
+          {/* 에러 */}
+          {!loading && error && (
+            <ErrorRow>
+              {error}
+              <RetryBtn type="button" onClick={() => fetchPage(page)}>
+                다시 시도
+              </RetryBtn>
+            </ErrorRow>
+          )}
 
-      {/* 빈 상태 */}
-      {!loading && !error && items.length === 0 && (
-        <Empty>
-          <EmptyIcon>📋</EmptyIcon>
-          <EmptyText>아직 응시한 퀴즈가 없어요.</EmptyText>
-          <EmptyText>위에서 첫 퀴즈를 풀어보세요!</EmptyText>
-        </Empty>
-      )}
+          {/* 빈 상태 */}
+          {!loading && !error && items.length === 0 && (
+            <Empty>
+              <EmptyText>아직 응시한 퀴즈가 없어요.</EmptyText>
+              <EmptyText>위에서 첫 퀴즈를 풀어보세요!</EmptyText>
+            </Empty>
+          )}
 
-      {/* 이력 목록 */}
-      {!loading && items.length > 0 && (
-        <List>
-          {items.map((it, i) => (
-            <Row key={`${it.quizId}-${i}`} $correct={it.isCorrect === true}>
-              <RowLeft>
-                <ResultBadge $correct={it.isCorrect}>
-                  {it.isCorrect ? '✓ 정답' : '✗ 오답'}
-                </ResultBadge>
-                <QuestionText>{it.question || '문제 정보 없음'}</QuestionText>
-                {it.explanation && (
-                  <Explanation>💡 {it.explanation}</Explanation>
-                )}
-              </RowLeft>
-              <RowRight>
-                <AnswerBox $correct={it.isCorrect}>
-                  <AnswerLabel>내 답</AnswerLabel>
-                  <AnswerValue>{it.selectedOption ?? '—'}</AnswerValue>
-                </AnswerBox>
-                {!it.isCorrect && it.correctAnswer && (
-                  <AnswerBox $isCorrectAnswer>
-                    <AnswerLabel>정답</AnswerLabel>
-                    <AnswerValue $highlight>{it.correctAnswer}</AnswerValue>
-                  </AnswerBox>
-                )}
-                <TimeStamp>{formatSubmittedAt(it.submittedAt)}</TimeStamp>
-              </RowRight>
-            </Row>
-          ))}
-        </List>
-      )}
+          {/* 이력 목록 */}
+          {!loading && items.length > 0 && (
+            <List>
+              {items.map((it, i) => (
+                <Row key={`${it.quizId}-${i}`} $correct={it.isCorrect === true}>
+                  <RowLeft>
+                    <ResultBadge $correct={it.isCorrect}>
+                      {it.isCorrect ? '정답' : '오답'}
+                    </ResultBadge>
+                    <QuestionText>{it.question || '문제 정보 없음'}</QuestionText>
+                    {it.explanation && (
+                      <Explanation>{it.explanation}</Explanation>
+                    )}
+                  </RowLeft>
+                  <RowRight>
+                    <AnswerBox $correct={it.isCorrect}>
+                      <AnswerLabel>내 답</AnswerLabel>
+                      <AnswerValue>{it.selectedOption ?? '—'}</AnswerValue>
+                    </AnswerBox>
+                    {!it.isCorrect && it.correctAnswer && (
+                      <AnswerBox $isCorrectAnswer>
+                        <AnswerLabel>정답</AnswerLabel>
+                        <AnswerValue $highlight>{it.correctAnswer}</AnswerValue>
+                      </AnswerBox>
+                    )}
+                    <TimeStamp>{formatSubmittedAt(it.submittedAt)}</TimeStamp>
+                  </RowRight>
+                </Row>
+              ))}
+            </List>
+          )}
 
-      {/* 페이지네이션 */}
-      {!loading && !error && totalPages > 1 && (
-        <Pagination>
-          <PageBtn
-            type="button"
-            onClick={() => fetchPage(page - 1)}
-            disabled={page === 0}
-            aria-label="이전 페이지"
-          >
-            ‹
-          </PageBtn>
+          {/* 페이지네이션 */}
+          {!loading && !error && totalPages > 1 && (
+            <Pagination>
+              <PageBtn
+                type="button"
+                onClick={() => fetchPage(page - 1)}
+                disabled={page === 0}
+                aria-label="이전 페이지"
+              >
+                ‹
+              </PageBtn>
 
-          {pageRange.map((p) => (
-            <PageBtn
-              key={p}
-              type="button"
-              $active={p === page}
-              onClick={() => fetchPage(p)}
-            >
-              {p + 1}
-            </PageBtn>
-          ))}
+              {pageRange.map((p) => (
+                <PageBtn
+                  key={p}
+                  type="button"
+                  $active={p === page}
+                  onClick={() => fetchPage(p)}
+                >
+                  {p + 1}
+                </PageBtn>
+              ))}
 
-          <PageBtn
-            type="button"
-            onClick={() => fetchPage(page + 1)}
-            disabled={page >= totalPages - 1}
-            aria-label="다음 페이지"
-          >
-            ›
-          </PageBtn>
-        </Pagination>
+              <PageBtn
+                type="button"
+                onClick={() => fetchPage(page + 1)}
+                disabled={page >= totalPages - 1}
+                aria-label="다음 페이지"
+              >
+                ›
+              </PageBtn>
+            </Pagination>
+          )}
+        </>
       )}
     </Wrapper>
   );
@@ -194,8 +207,14 @@ const Wrapper = styled.section`
 const SectionHeader = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: ${({ theme }) => theme.spacing.sm};
-  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.sm};
 `;
 
 const SectionTitle = styled.h3`
@@ -214,10 +233,40 @@ const TotalBadge = styled.span`
   color: ${({ theme }) => theme.colors.primary};
 `;
 
+const ToggleBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: ${({ theme }) => theme.radius.sm};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  background: transparent;
+  font-size: ${({ theme }) => theme.typography.textXs};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const Chevron = styled.span`
+  display: inline-block;
+  font-size: 14px;
+  transform: rotate(${({ $open }) => ($open ? '-90deg' : '90deg')});
+  transition: transform 0.2s;
+  line-height: 1;
+`;
+
 const SkeletonList = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.sm};
+  margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
 const SkeletonRow = styled.div`
@@ -236,6 +285,7 @@ const List = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing.sm};
+  margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
 const Row = styled.div`
@@ -275,7 +325,6 @@ const RowRight = styled.div`
 const ResultBadge = styled.span`
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   font-size: ${({ theme }) => theme.typography.textXs};
   font-weight: ${({ theme }) => theme.typography.fontBold};
   padding: 2px 8px;
@@ -338,10 +387,7 @@ const Empty = styled.div`
   align-items: center;
   gap: 6px;
   padding: ${({ theme }) => theme.spacing.xl} 0;
-`;
-
-const EmptyIcon = styled.span`
-  font-size: 36px;
+  margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
 const EmptyText = styled.p`
@@ -361,6 +407,7 @@ const ErrorRow = styled.div`
   border-radius: ${({ theme }) => theme.radius.md};
   font-size: ${({ theme }) => theme.typography.textSm};
   color: ${({ theme }) => theme.colors.error};
+  margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
 const RetryBtn = styled.button`
@@ -375,7 +422,6 @@ const RetryBtn = styled.button`
   &:hover { opacity: 0.9; }
 `;
 
-/* ── Pagination ─────────────────────────────────────── */
 const Pagination = styled.div`
   display: flex;
   justify-content: center;
