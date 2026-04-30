@@ -280,34 +280,12 @@ function resolvePersonalizedMovieTitle(entry) {
   );
 }
 
-function resolvePersonalizedMovieDirector(entry) {
+function resolvePersonalizedMovieRating(entry) {
   const movie = extractPersonalizedMovieSource(entry);
-  const directDirector = (
-    movie?.director
-    || movie?.directorName
-    || movie?.director_name
-    || entry?.director
-    || entry?.directorName
-    || null
-  );
+  const rating = movie?.rating ?? entry?.rating ?? null;
+  const parsedRating = Number(rating);
 
-  if (typeof directDirector === 'string' && directDirector.trim()) {
-    return directDirector.trim();
-  }
-
-  if (Array.isArray(movie?.directors)) {
-    const names = movie.directors
-      .map((director) => (typeof director === 'string' ? director : director?.name))
-      .map((name) => String(name || '').trim())
-      .filter(Boolean)
-      .slice(0, 2);
-
-    if (names.length > 0) {
-      return names.join(', ');
-    }
-  }
-
-  return null;
+  return Number.isFinite(parsedRating) ? parsedRating : null;
 }
 
 function resolvePersonalizedReleaseYear(entry) {
@@ -380,7 +358,7 @@ function normalizePersonalizedPreviewMovie(entry) {
   return {
     id,
     title: resolvePersonalizedMovieTitle(entry),
-    director: resolvePersonalizedMovieDirector(entry),
+    rating: resolvePersonalizedMovieRating(entry),
     releaseYear: resolvePersonalizedReleaseYear(entry),
     posterSrc: resolvePersonalizedPosterSrc(entry),
     genres: parsePersonalizedGenres(movie?.genres || entry?.genres),
@@ -2161,7 +2139,7 @@ export default function SearchPage() {
                 <S.PersonalizedPosterOverlay>
                   <S.PersonalizedPosterTitle>{movie.title}</S.PersonalizedPosterTitle>
                   <S.PersonalizedPosterMeta>
-                    {movie.director || '감독 정보 없음'}
+                    {movie.rating !== null ? `★ ${movie.rating.toFixed(1)}` : '평점 정보 없음'}
                   </S.PersonalizedPosterMeta>
                   <S.PersonalizedPosterMeta>
                     {movie.releaseYear ? `${movie.releaseYear}년` : '개봉 연도 미상'}
