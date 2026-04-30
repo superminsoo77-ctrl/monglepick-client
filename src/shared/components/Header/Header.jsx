@@ -14,6 +14,8 @@ import useAuthStore from '../../stores/useAuthStore';
 import useLoadingStore from '../../stores/useLoadingStore';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 (USER_MENU_ITEMS = 유저 드롭다운 항목) */
 import { ROUTES, NAV_ITEMS, USER_MENU_ITEMS } from '../../constants/routes';
+/* 라우트 청크 prefetch — 메뉴 hover/focus 시 lazy 청크 미리 다운로드해 fallback 제거 */
+import { prefetchRouteByPath } from '../../utils/prefetchRoute';
 import ThemeToggle from './ThemeToggle';
 import * as S from './Header.styled';
 
@@ -296,6 +298,9 @@ export default function Header({ variant = 'default' }) {
                           to={child.path}
                           role="menuitem"
                           $active={location.pathname === child.path}
+                          /* hover/focus 시 lazy 청크 prefetch — 사용자 클릭 전에 다운로드 시작 */
+                          onMouseEnter={() => prefetchRouteByPath(child.path)}
+                          onFocus={() => prefetchRouteByPath(child.path)}
                           onClick={() => {
                             /* 항목 선택 → 양쪽 드롭다운 닫고 모바일 메뉴까지 닫음 */
                             setOpenNavDropdown(null);
@@ -318,6 +323,9 @@ export default function Header({ variant = 'default' }) {
                 key={item.key || item.path}
                 to={item.path}
                 $active={location.pathname === item.path}
+                /* hover/focus 시 lazy 청크 prefetch — 클릭 전 다운로드 시작 */
+                onMouseEnter={() => prefetchRouteByPath(item.path)}
+                onFocus={() => prefetchRouteByPath(item.path)}
                 onClick={closeMobileMenu}
               >
                 {item.label}
@@ -352,6 +360,11 @@ export default function Header({ variant = 'default' }) {
                       key={item.path || `divider-${idx}`}
                       to={item.path}
                       $active={location.pathname === item.path}
+                      /* 모바일 hover 는 없지만 focus 와 햄버거 펼침 시점에 prefetch 가
+                         자동 실행됨 — onFocus 만으로도 키보드 접근성 + 일부 데스크톱
+                         축소 화면에서 hover 유효 */
+                      onMouseEnter={() => prefetchRouteByPath(item.path)}
+                      onFocus={() => prefetchRouteByPath(item.path)}
                       onClick={closeMobileMenu}
                     >
                       {item.label}
@@ -425,6 +438,11 @@ export default function Header({ variant = 'default' }) {
                         to={item.path}
                         role="menuitem"
                         $active={location.pathname === item.path}
+                        /* 드롭다운 펼침 후 메뉴 항목 hover/focus 시 prefetch.
+                           UserDropdown 의 9 항목 모두에 부착되지만, prefetched Set 으로
+                           중복 호출 차단되어 첫 hover 만 실제 다운로드 발생. */
+                        onMouseEnter={() => prefetchRouteByPath(item.path)}
+                        onFocus={() => prefetchRouteByPath(item.path)}
                         onClick={() => setIsUserMenuOpen(false)}
                       >
                         {item.label}
