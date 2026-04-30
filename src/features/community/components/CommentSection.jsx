@@ -24,6 +24,7 @@ import { useModal } from '../../../shared/components/Modal';
 import { useRewardToast } from '../../../shared/components/RewardToast';
 import Loading from '../../../shared/components/Loading/Loading';
 import { formatRelativeTime } from '../../../shared/utils/formatters';
+import { getDisplayNickname, getDisplayProfileImage } from '../../../shared/utils/userDisplay';
 import {
   getComments,
   createComment,
@@ -213,20 +214,29 @@ export default function CommentSection({ postId }) {
               isAuthenticated && currentUser?.id === comment.userId;
             /* 현재 세션에서 좋아요를 눌렀는지 여부 (낙관적 UI 상태) */
             const liked = likedIds.has(comment.commentId);
+            const authorName = getDisplayNickname(comment);
+            const authorImage = getDisplayProfileImage(comment);
 
             return (
               <S.Item key={comment.commentId} $deleted={comment.isDeleted}>
                 <S.ItemHeader>
                   <S.Author>
+                    {authorImage ? (
+                      <S.AuthorAvatar
+                        src={authorImage}
+                        alt=""
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextSibling?.style &&
+                            (e.currentTarget.nextSibling.style.display = 'inline-flex');
+                        }}
+                      />
+                    ) : null}
+                    <S.AuthorInitial style={{ display: authorImage ? 'none' : 'inline-flex' }}>
+                      {(authorName || '?')[0]}
+                    </S.AuthorInitial>
                     <S.AuthorName>
-                      {/*
-                        2026-04-08 — 작성자 표시 우선순위:
-                          1) nickname (백엔드 LEFT JOIN users 결과, 표시용)
-                          2) userId   (식별자, 폴백)
-                          3) '익명'   (최종 폴백)
-                        기존엔 userId 만 사용해 "user_001" 같은 식별자가 노출되는 이슈가 있었음.
-                      */}
-                      {comment.nickname || comment.userId || '익명'}
+                      {authorName}
                     </S.AuthorName>
                     <S.AuthorTime>
                       · {formatRelativeTime(comment.createdAt)}
