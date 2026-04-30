@@ -184,15 +184,32 @@ export const Author = styled.span`
   min-width: 0;
 `;
 
-/** 작성자 아바타 — 16x16 원형. EQUIPPED 아바타가 있을 때만 노출. */
+/** 작성자 아바타 — 20x20 원형. 프로필 이미지 또는 장착 아바타가 있을 때 노출. */
 export const AuthorAvatar = styled.img`
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid ${({ theme }) => theme.colors.borderLight};
   background: ${({ theme }) => theme.colors.bgElevated};
   flex-shrink: 0;
+`;
+
+/** 프로필 이미지 없을 때 이니셜 텍스트 fallback */
+export const AuthorInitial = styled.span`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  background: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  flex-shrink: 0;
+  text-transform: uppercase;
 `;
 
 /** 작성자 배지 — 14x14 SVG, 닉네임 우측에 살짝 겹치는 chip. */

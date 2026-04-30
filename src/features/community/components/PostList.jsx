@@ -93,15 +93,21 @@ export default function PostList({ posts = [], loading = false }) {
                   Backend PostResponse 는 author 를 string 닉네임 + authorEquippedAvatarUrl/BadgeUrl 로 분리.
                   레거시 author 객체(.nickname) 형태도 호환. */}
               <S.Author>
-                {post.authorEquippedAvatarUrl ? (
+                {(post.authorProfileImageUrl || post.authorEquippedAvatarUrl) ? (
                   <S.AuthorAvatar
-                    src={post.authorEquippedAvatarUrl}
+                    src={post.authorProfileImageUrl || post.authorEquippedAvatarUrl}
                     alt=""
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextSibling?.style && (e.currentTarget.nextSibling.style.display = 'inline-flex');
+                    }}
                   />
-                ) : (
-                  <span aria-hidden="true">👤</span>
-                )}
+                ) : null}
+                <S.AuthorInitial
+                  style={{ display: (post.authorProfileImageUrl || post.authorEquippedAvatarUrl) ? 'none' : 'inline-flex' }}
+                >
+                  {(post.author?.nickname || post.author || '?')[0]}
+                </S.AuthorInitial>
                 <span>{post.author?.nickname || post.author || '익명'}</span>
                 {post.authorEquippedBadgeUrl && (
                   <S.AuthorBadge
