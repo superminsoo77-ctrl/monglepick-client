@@ -157,6 +157,47 @@ export const AuthorBar = styled.div`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+export const AuthorIdentity = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+`;
+
+export const AuthorAvatar = styled.img`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid ${({ theme }) => theme.colors.borderLight};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  flex-shrink: 0;
+`;
+
+export const AuthorInitial = styled.span`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  background: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  flex-shrink: 0;
+  text-transform: uppercase;
+`;
+
+export const AuthorBadge = styled.img`
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  margin-left: 2px;
+`;
+
 /** 게시글 본문 — 줄바꿈 보존 */
 export const Body = styled.div`
   font-size: ${({ theme }) => theme.typography.textBase};

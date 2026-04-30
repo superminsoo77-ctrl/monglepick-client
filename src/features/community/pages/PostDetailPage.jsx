@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPostDetail, deletePost, togglePostLike, reportPost, updatePost } from '../api/communityApi';
 import { formatRelativeTime } from '../../../shared/utils/formatters';
+import { getDisplayNickname, getDisplayProfileImage } from '../../../shared/utils/userDisplay';
 import Loading from '../../../shared/components/Loading/Loading';
 import CommentSection from '../components/CommentSection';
 import ReportModal from '../components/ReportModal';
@@ -163,6 +164,14 @@ export default function PostDetailPage() {
     );
   }
 
+  const authorName = getDisplayNickname({
+    ...post,
+    ...(post.author || {}),
+  });
+  const authorImage = getDisplayProfileImage(post);
+  const authorBadgeUrl = post.authorEquippedBadgeUrl || post.author?.equippedBadgeUrl || null;
+  const authorBadgeName = post.authorEquippedBadgeName || post.author?.equippedBadgeName || '배지';
+
   return (
     <S.PageWrapper>
       <S.PageInner>
@@ -211,7 +220,31 @@ export default function PostDetailPage() {
               {/* 작성자 */}
               <S.AuthorBar>
                 <span>작성자</span>
-                <strong>{post.author?.nickname || '익명'}</strong>
+                <S.AuthorIdentity>
+                  {authorImage ? (
+                    <S.AuthorAvatar
+                      src={authorImage}
+                      alt=""
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextSibling?.style &&
+                          (e.currentTarget.nextSibling.style.display = 'inline-flex');
+                      }}
+                    />
+                  ) : null}
+                  <S.AuthorInitial style={{ display: authorImage ? 'none' : 'inline-flex' }}>
+                    {(authorName || '?')[0]}
+                  </S.AuthorInitial>
+                  <strong>{authorName}</strong>
+                  {authorBadgeUrl && (
+                    <S.AuthorBadge
+                      src={authorBadgeUrl}
+                      alt={authorBadgeName}
+                      title={authorBadgeName}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                </S.AuthorIdentity>
                 <S.ViewCount>👁 {post.viewCount ?? 0}</S.ViewCount>
               </S.AuthorBar>
 

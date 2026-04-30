@@ -163,6 +163,32 @@ export const Author = styled.div`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+export const AuthorAvatar = styled.img`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid ${({ theme }) => theme.colors.borderLight};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  flex-shrink: 0;
+`;
+
+export const AuthorInitial = styled.span`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  background: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  flex-shrink: 0;
+  text-transform: uppercase;
+`;
+
 /** 작성자 닉네임/아이디 — 굵게 강조 */
 export const AuthorName = styled.span`
   color: ${({ theme }) => theme.colors.textPrimary};

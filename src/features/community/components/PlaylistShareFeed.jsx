@@ -18,7 +18,25 @@ import { useModal } from '../../../shared/components/Modal';
 import { buildPath, ROUTES } from '../../../shared/constants/routes';
 
 import { formatRelativeTime } from '../../../shared/utils/formatters';
-import { getDisplayNickname } from '../../../shared/utils/userDisplay';
+import { getDisplayNickname, getDisplayProfileImage } from '../../../shared/utils/userDisplay';
+
+function resolveAuthorNickname(post) {
+  return getDisplayNickname({
+    ...post,
+    nickname: typeof post.author === 'string' ? post.author : post.author?.nickname,
+  });
+}
+
+function resolveAuthorImage(post) {
+  return getDisplayProfileImage(post);
+}
+
+function resolveAuthorBadge(post) {
+  return {
+    url: post.authorEquippedBadgeUrl || post.author?.equippedBadgeUrl || null,
+    name: post.authorEquippedBadgeName || post.author?.equippedBadgeName || '배지',
+  };
+}
 
 /* ── 스타일 ── */
 
@@ -99,8 +117,46 @@ const MetaChip = styled.span`
 `;
 
 const AuthorRow = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: ${({ theme }) => theme.typography.textXs};
   color: ${({ theme }) => theme.colors.textMuted};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+`;
+
+const AuthorAvatar = styled.img`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid ${({ theme }) => theme.colors.borderLight};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  flex-shrink: 0;
+`;
+
+const AuthorInitial = styled.span`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: ${({ theme }) => theme.typography.fontBold};
+  background: ${({ theme }) => theme.colors.primaryLight};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  flex-shrink: 0;
+  text-transform: uppercase;
+`;
+
+const AuthorBadge = styled.img`
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  margin-left: 2px;
 `;
 
 const Actions = styled.div`
@@ -567,6 +623,9 @@ export default function PlaylistShareFeed() {
             const info = post.playlistInfo ?? {};
             const like = likeState[post.id] ?? { liked: false, likeCount: post.likeCount ?? 0 };
             const isImporting = importing.has(post.id);
+            const authorName = resolveAuthorNickname(post);
+            const authorImage = resolveAuthorImage(post);
+            const authorBadge = resolveAuthorBadge(post);
 
             const playlistId = info.playlistId ?? post.playlistId;
             const isMyPost =
@@ -591,10 +650,31 @@ export default function PlaylistShareFeed() {
                 </Meta>
 
                 <AuthorRow>
-                  {getDisplayNickname({
-                    ...post,
-                    nickname: typeof post.author === 'string' ? post.author : post.author?.nickname,
-                  })} · {formatRelativeTime(post.createdAt)}
+                  {authorImage ? (
+                    <AuthorAvatar
+                      src={authorImage}
+                      alt=""
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextSibling?.style &&
+                          (e.currentTarget.nextSibling.style.display = 'inline-flex');
+                      }}
+                    />
+                  ) : null}
+                  <AuthorInitial style={{ display: authorImage ? 'none' : 'inline-flex' }}>
+                    {(authorName || '?')[0]}
+                  </AuthorInitial>
+                  <span>{authorName}</span>
+                  {authorBadge.url && (
+                    <AuthorBadge
+                      src={authorBadge.url}
+                      alt={authorBadge.name}
+                      title={authorBadge.name}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                  <span aria-hidden="true">·</span>
+                  <span>{formatRelativeTime(post.createdAt)}</span>
                 </AuthorRow>
 
                 <Actions>

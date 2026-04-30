@@ -39,4 +39,25 @@ export function getDisplayNickname(source, fallback = '익명') {
   return nickname || fallback;
 }
 
+export function getDisplayProfileImage(source) {
+  if (!source || isWithdrawnUser(source)) {
+    return null;
+  }
+
+  return (
+    source.profileImageUrl ||
+    source.profileImage ||
+    source.profile_image_url ||
+    source.profile_image ||
+    source.authorProfileImageUrl ||
+    source.authorProfileImage ||
+    source.author_profile_image_url ||
+    source.author?.profileImageUrl ||
+    source.author?.profileImage ||
+    source.authorEquippedAvatarUrl ||
+    source.equippedAvatarUrl ||
+    null
+  );
+}
+
 export { WITHDRAWN_ACCOUNT_LABEL };
