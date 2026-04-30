@@ -38,8 +38,8 @@ export default function QuizCard({ quiz, index = 0, onSubmitted }) {
   const [selected, setSelected] = useState(null);
   /** 제출 API 호출 중 플래그 */
   const [submitting, setSubmitting] = useState(false);
-  /** 채점 결과 — 백엔드 SubmitResponse */
-  const [result, setResult] = useState(null);
+  /** 채점 결과 — 백엔드 SubmitResponse. quiz.solved=true면 이미 참여한 상태로 초기화 */
+  const [result, setResult] = useState(quiz?.solved === true ? { _alreadySolved: true } : null);
   /** 제출 실패 에러 메시지 */
   const [error, setError] = useState(null);
 
@@ -65,25 +65,21 @@ export default function QuizCard({ quiz, index = 0, onSubmitted }) {
         onSubmitted(resp);
       }
     } catch (err) {
-      /* 로그인 필요 에러를 친절한 문구로 변환 */
-      const msg = err?.message?.includes('로그인')
-        ? '정답을 제출하려면 로그인이 필요해요.'
-        : err?.message || '제출 처리 중 오류가 발생했어요.';
-      setError(msg);
+      const status = err?.status ?? err?.response?.status;
+      if (status === 409) {
+        /* 이미 제출한 퀴즈 — 잠금 상태로 전환 */
+        setResult({ _alreadySolved: true });
+      } else {
+        const msg = err?.message?.includes('로그인')
+          ? '정답을 제출하려면 로그인이 필요해요.'
+          : err?.message || '제출 처리 중 오류가 발생했어요.';
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
   }, [quiz?.quizId, selected, onSubmitted]);
 
-  /**
-   * "다시 풀기" — 채점 결과를 초기화하고 처음부터 다시 풀 수 있게 한다.
-   * 단, 최초 정답으로 이미 리워드를 받은 경우 재제출해도 추가 포인트는 없다.
-   */
-  const handleRetry = useCallback(() => {
-    setSelected(null);
-    setResult(null);
-    setError(null);
-  }, []);
 
   /* 선택지가 string 배열이 아닐 경우(예: {text, id}) 방어적 정규화 */
   const options = Array.isArray(quiz?.options)
@@ -139,32 +135,29 @@ export default function QuizCard({ quiz, index = 0, onSubmitted }) {
 
       {/* ── 채점 결과 영역 ── */}
       {result && (
-        <S.ResultBox $correct={result.correct}>
-          <S.ResultTitle>
-            {result.correct ? '🎉 정답입니다!' : '😢 오답이에요'}
-          </S.ResultTitle>
-          {/* 해설이 있다면 표시 */}
-          {result.explanation && (
-            <S.ResultExplanation>{result.explanation}</S.ResultExplanation>
-          )}
-          {/* 리워드 포인트가 0보다 크면 획득 배너 */}
-          {result.rewardPoint > 0 && (
-            <S.RewardEarned>
-              +{result.rewardPoint}P 획득!
-            </S.RewardEarned>
-          )}
-          {/* 이미 받았거나 오답이라 0P 지급된 경우 안내 */}
-          {result.correct && result.rewardPoint === 0 && (
-            <S.RewardEarned $muted>
-              이미 리워드를 받은 문제예요.
-            </S.RewardEarned>
-          )}
-        </S.ResultBox>
+        result._alreadySolved ? (
+          <S.ResultBox $correct={false}>
+            <S.ResultTitle>이미 참여한 퀴즈입니다.</S.ResultTitle>
+            <S.ResultExplanation>이 퀴즈는 한 번만 풀 수 있어요.</S.ResultExplanation>
+          </S.ResultBox>
+        ) : (
+          <S.ResultBox $correct={result.correct}>
+            <S.ResultTitle>
+              {result.correct ? '🎉 정답입니다!' : '😢 오답이에요'}
+            </S.ResultTitle>
+            {result.explanation && (
+              <S.ResultExplanation>{result.explanation}</S.ResultExplanation>
+            )}
+            {result.rewardPoint > 0 && (
+              <S.RewardEarned>+{result.rewardPoint}P 획득!</S.RewardEarned>
+            )}
+          </S.ResultBox>
+        )
       )}
 
-      {/* ── 액션 버튼 영역 ── */}
-      <S.ActionRow>
-        {!result ? (
+      {/* ── 액션 버튼 영역 — 결과가 나오면 버튼 없음 ── */}
+      {!result && (
+        <S.ActionRow>
           <S.SubmitButton
             type="button"
             disabled={!canSubmit}
@@ -172,12 +165,8 @@ export default function QuizCard({ quiz, index = 0, onSubmitted }) {
           >
             {submitting ? '채점 중...' : '정답 제출'}
           </S.SubmitButton>
-        ) : (
-          <S.RetryButton type="button" onClick={handleRetry}>
-            다시 풀기
-          </S.RetryButton>
-        )}
-      </S.ActionRow>
+        </S.ActionRow>
+      )}
     </S.Card>
   );
 }
