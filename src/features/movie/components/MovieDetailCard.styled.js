@@ -307,6 +307,28 @@ export const WishlistBtn = styled(Btn)`
     `}
 `;
 
+/*
+ * 리뷰 작성 버튼.
+ * 미작성 상태는 기본 outline(위시리스트 추가와 동일)로 두고,
+ * 작성 완료 상태는 기존 시청 완료 버튼과 같은 primary 강조 스타일로 전환한다.
+ */
+export const ReviewWriteBtn = styled(Btn)`
+  ${({ $completed, theme }) =>
+    $completed &&
+    css`
+      background-color: ${theme.colors.primaryLight};
+      border-color: ${theme.colors.primary};
+      color: ${theme.colors.primary};
+
+      &:hover {
+        background: ${theme.gradients.primary};
+        border-color: transparent;
+        color: white;
+        box-shadow: ${theme.glows.primary};
+      }
+    `}
+`;
+
 /**
  * 영화 좋아요 버튼 — 인스타그램 스타일 하트 토글.
  *

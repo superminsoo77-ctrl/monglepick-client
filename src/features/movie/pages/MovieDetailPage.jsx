@@ -113,6 +113,8 @@ export default function MovieDetailPage() {
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
+  const hasMyReview = reviews.some((review) => review?.isMine);
+  const reviewWriteButtonLabel = hasMyReview ? '리뷰 작성 완료' : '리뷰 작성';
 
   /* Phase 2: 페이지 진입 시각 기록 (체류 시간 측정용) */
   const enterTimeRef = useRef(null);
@@ -416,14 +418,30 @@ export default function MovieDetailPage() {
   };
 
   /**
-   * Phase 5-2: "시청 완료" 버튼 핸들러.
-   * 시청 후 평점 팝업을 표시한다.
+   * 리뷰 작성 버튼 핸들러.
+   *
+   * 로그인하지 않았거나 이미 내 리뷰가 있는 경우에는 모달을 열지 않고
+   * 클라이언트에서 즉시 차단한다.
    */
-  const handleWatchComplete = () => {
+  const handleReviewWriteClick = async () => {
     if (!isAuthenticated) {
-      showAlert({ title: '로그인 필요', message: '시청 기록을 남기려면 로그인이 필요합니다.', type: 'warning' });
+      await showAlert({
+        title: '로그인 필요',
+        message: '리뷰를 작성하려면 로그인이 필요합니다.',
+        type: 'warning',
+      });
       return;
     }
+
+    if (hasMyReview) {
+      await showAlert({
+        title: '이미 리뷰를 작성했어요',
+        message: '이 영화는 이미 리뷰를 남겼습니다. 아래 리뷰 목록에서 수정하거나 삭제할 수 있습니다.',
+        type: 'warning',
+      });
+      return;
+    }
+
     setShowFeedback(true);
   };
 
@@ -437,9 +455,20 @@ export default function MovieDetailPage() {
    *  - reviewCategoryCode : 6종 분류 enum. 상세 페이지에서 직접 작성하는 경우는 AI 추천 카테고리에 속하지 않으므로
    *                        가장 가까운 분류인 'AI_RECOMMEND'로 채운다 (영화 상세는 AI 추천 결과 화면에서도 진입).
    *
-   * 중복 리뷰(이미 리뷰 작성한 영화)는 서버 409로 거부되지만 UX를 차단하지 않고 조용히 무시한다.
+   * 본문은 선택값으로 보내며, rating만 있어도 작성 가능하다.
+   * 이미 내 리뷰가 있는 경우에는 제출 직전에도 한 번 더 가드한다.
    */
   const handleFeedbackSubmit = async (rating, content, isSpoiler) => {
+    if (hasMyReview) {
+      setShowFeedback(false);
+      await showAlert({
+        title: '이미 리뷰를 작성했어요',
+        message: '이 영화는 이미 리뷰를 남겼습니다. 아래 리뷰 목록에서 수정하거나 삭제할 수 있습니다.',
+        type: 'warning',
+      });
+      return;
+    }
+
     try {
       const result = await createReview(id, {
         movieId: id,
@@ -457,10 +486,25 @@ export default function MovieDetailPage() {
       // 리뷰 작성 직후 최신 목록을 다시 받아 하단 리뷰 섹션을 즉시 갱신한다.
       const reviewData = await getReviews(id);
       setReviews(reviewData?.reviews || []);
-    } catch {
-      // 중복 리뷰(409) 포함 모든 오류: UX 차단하지 않음
+      setShowFeedback(false);
+    } catch (err) {
+      if (err?.status === 409) {
+        try {
+          const reviewData = await getReviews(id);
+          setReviews(reviewData?.reviews || []);
+        } catch {
+          // 리뷰 재동기화 실패는 무시한다.
+        }
+
+        await showAlert({
+          title: '이미 리뷰를 작성했어요',
+          message: '이 영화는 이미 리뷰를 남겼습니다. 아래 리뷰 목록에서 수정하거나 삭제할 수 있습니다.',
+          type: 'warning',
+        });
+      }
+
+      setShowFeedback(false);
     }
-    setShowFeedback(false);
   };
 
   // 로딩 중
@@ -523,7 +567,8 @@ export default function MovieDetailPage() {
           onWishlistToggle={handleWishlistToggle}
           isWishlisted={isWishlisted}
           wishlistLoading={isWishlistLoading}
-          onWatchComplete={handleWatchComplete}
+          onReviewWrite={handleReviewWriteClick}
+          hasReviewed={hasMyReview}
           likeCount={likeCount}
           isLiked={isLiked}
           onLikeToggle={handleLikeToggle}
@@ -548,9 +593,18 @@ export default function MovieDetailPage() {
 
         {/* 리뷰 섹션 */}
         <S.ReviewsSection>
-          <S.SectionTitle>
-            리뷰 {reviews.length > 0 && <span>({reviews.length})</span>}
-          </S.SectionTitle>
+          <S.ReviewsHeader>
+            <S.SectionTitle>
+              리뷰 {reviews.length > 0 && <span>({reviews.length})</span>}
+            </S.SectionTitle>
+            <S.ReviewWriteButton
+              type="button"
+              onClick={handleReviewWriteClick}
+              $completed={hasMyReview}
+            >
+              {reviewWriteButtonLabel}
+            </S.ReviewWriteButton>
+          </S.ReviewsHeader>
           {/* movieId를 전달해야 리뷰 좋아요 토글 API를 호출할 수 있다 */}
           <ReviewList reviews={reviews} movieId={id} onReviewsChange={setReviews} />
         </S.ReviewsSection>

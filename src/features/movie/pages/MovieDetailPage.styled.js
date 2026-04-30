@@ -5,7 +5,7 @@
  * 에러 상태와 리뷰 섹션 제목 스타일을 포함한다.
  */
 
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { fadeInUp } from '../../../shared/styles/animations';
 
 /** 페이지 전체 컨테이너 — fadeInUp 등장 애니메이션 */
@@ -73,6 +73,14 @@ export const ReviewsSection = styled.section`
   gap: ${({ theme }) => theme.spacing.lg};
 `;
 
+export const ReviewsHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.md};
+  flex-wrap: wrap;
+`;
+
 /** 섹션 제목 */
 export const SectionTitle = styled.h2`
   font-size: ${({ theme }) => theme.typography.textXl};
@@ -86,6 +94,42 @@ export const SectionTitle = styled.h2`
     color: ${({ theme }) => theme.colors.textMuted};
     font-size: ${({ theme }) => theme.typography.textBase};
   }
+`;
+
+export const ReviewWriteButton = styled.button`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
+  border-radius: ${({ theme }) => theme.radius.md};
+  font-size: ${({ theme }) => theme.typography.textSm};
+  font-weight: ${({ theme }) => theme.typography.fontMedium};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  border: 1px solid ${({ theme }) => theme.colors.borderDefault};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background-color: transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: ${({ theme }) => theme.gradients.primary};
+    border-color: transparent;
+    color: white;
+    box-shadow: ${({ theme }) => theme.glows.primary};
+  }
+
+  ${({ $completed, theme }) =>
+    $completed &&
+    css`
+      background-color: ${theme.colors.primaryLight};
+      border-color: ${theme.colors.primary};
+      color: ${theme.colors.primary};
+
+      &:hover {
+        background: ${theme.gradients.primary};
+        border-color: transparent;
+        color: white;
+        box-shadow: ${theme.glows.primary};
+      }
+    `}
 `;
 
 /** 에러 상태 컨테이너 — 중앙 정렬 */

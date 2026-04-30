@@ -26,6 +26,8 @@
  * @param {boolean} [props.collectionMoviesLoading=false] - 컬렉션 작품 로딩 여부
  * @param {Array} [props.relatedMovies=[]] - 컬렉션을 제외한 연관 영화 목록
  * @param {boolean} [props.relatedMoviesLoading=false] - 일반 연관 영화 로딩 여부
+ * @param {function} [props.onReviewWrite] - 리뷰 작성 버튼 클릭 콜백
+ * @param {boolean} [props.hasReviewed=false] - 현재 사용자의 리뷰 작성 여부
  */
 
 import { useState } from 'react';
@@ -46,7 +48,8 @@ export default function MovieDetailCard({
   onWishlistToggle,
   isWishlisted = false,
   wishlistLoading = false,
-  onWatchComplete,
+  onReviewWrite,
+  hasReviewed = false,
   likeCount = 0,
   isLiked = false,
   onLikeToggle,
@@ -400,11 +403,15 @@ export default function MovieDetailCard({
               </S.LikeBtn>
             )}
 
-            {/* Phase 5-2: 시청 완료 버튼 */}
-            {onWatchComplete && (
-              <S.TrailerBtn onClick={onWatchComplete}>
-                ✓ 시청 완료
-              </S.TrailerBtn>
+            {/* 리뷰 작성 버튼 */}
+            {onReviewWrite && (
+              <S.ReviewWriteBtn
+                type="button"
+                onClick={onReviewWrite}
+                $completed={hasReviewed}
+              >
+                {hasReviewed ? '리뷰 작성 완료' : '리뷰 작성'}
+              </S.ReviewWriteBtn>
             )}
 
             {/* 트레일러 버튼 */}
