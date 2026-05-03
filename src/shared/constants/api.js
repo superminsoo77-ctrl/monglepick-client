@@ -265,6 +265,8 @@ export const SEARCH_ENDPOINTS = {
   GENRES: `${API_VERSION}/search/genres`,
   /** 자동완성 - GET (query 파라미터 필요) */
   AUTOCOMPLETE: `${API_VERSION}/search/autocomplete`,
+  /** 인기 검색어 - GET */
+  TRENDING: `${API_VERSION}/search/trending`,
   /** 최근 검색어 조회 - GET (JWT 필요) */
   RECENT: `${API_VERSION}/search/recent`,
   /** 최근 검색어 개별 삭제 - DELETE (keyword 파라미터 필요, JWT 필요) */

@@ -39,10 +39,12 @@ import { buildPath, ROUTES } from '../../../shared/constants/routes';
 import useAuthStore from '../../../shared/stores/useAuthStore';
 /* 영화 목록 컴포넌트 — shared/components에서 가져옴 */
 import MovieList from '../../../shared/components/MovieList/MovieList';
+import PopularSearchPanel from '../../../shared/components/PopularSearchPanel/PopularSearchPanel';
 /* 스켈레톤 로더 — shared/components에서 가져옴 */
 import Skeleton from '../../../shared/components/Skeleton/Skeleton';
 /* 빈 상태 컴포넌트 — shared/components에서 가져옴 */
 import EmptyState from '../../../shared/components/EmptyState/EmptyState';
+import usePopularSearchKeywords from '../../../shared/hooks/usePopularSearchKeywords';
 import * as S from './SearchPage.styled';
 
 const PAGE_SIZE = 20;
@@ -650,6 +652,7 @@ export default function SearchPage() {
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
   const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [isPopularSearchOpen, setIsPopularSearchOpen] = useState(false);
   const [activeAutocompleteIndex, setActiveAutocompleteIndex] = useState(-1);
   const [autocompleteDidYouMean, setAutocompleteDidYouMean] = useState(null);
   const [searchDidYouMean, setSearchDidYouMean] = useState(null);
@@ -660,6 +663,9 @@ export default function SearchPage() {
   const loadMoreRef = useRef(null);
   const autocompleteRef = useRef(null);
   const searchInputRef = useRef(null);
+  const { keywords: popularSearchKeywords, isLoading: isPopularSearchLoading } = (
+    usePopularSearchKeywords()
+  );
   const currentUser = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const { primaryOptions: primarySearchGenreOptions, detailOptions: detailSearchGenreOptions } = (
@@ -707,6 +713,13 @@ export default function SearchPage() {
   const closeAutocomplete = useCallback(() => {
     setIsAutocompleteOpen(false);
     setActiveAutocompleteIndex(-1);
+  }, []);
+
+  /**
+   * 빈 검색 입력 상태에서만 사용하는 인기 검색어 패널을 닫습니다.
+   */
+  const closePopularSearch = useCallback(() => {
+    setIsPopularSearchOpen(false);
   }, []);
 
   const restoreSearchSnapshot = useCallback((snapshot) => {
@@ -1545,13 +1558,14 @@ export default function SearchPage() {
       }
 
       closeAutocomplete();
+      closePopularSearch();
     };
 
     window.addEventListener('mousedown', handlePointerDown);
     return () => {
       window.removeEventListener('mousedown', handlePointerDown);
     };
-  }, [closeAutocomplete]);
+  }, [closeAutocomplete, closePopularSearch]);
 
   /**
    * 자동완성 후보를 선택한다.
@@ -1566,6 +1580,7 @@ export default function SearchPage() {
     setAutocompleteSuggestions([]);
     setAutocompleteDidYouMean(null);
     closeAutocomplete();
+    closePopularSearch();
     executeSearch({
       query: suggestion,
       searchType,
@@ -1575,7 +1590,7 @@ export default function SearchPage() {
       append: false,
       discoveryGenres: selectedSearchGenres,
     });
-  }, [closeAutocomplete, executeSearch, genre, searchType, selectedSearchGenres, sort]);
+  }, [closeAutocomplete, closePopularSearch, executeSearch, genre, searchType, selectedSearchGenres, sort]);
 
   /**
    * 검색 폼 제출 핸들러.
@@ -1585,6 +1600,7 @@ export default function SearchPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     closeAutocomplete();
+    closePopularSearch();
     if (hasInvalidAdvancedFilters) {
       return;
     }
@@ -1612,14 +1628,24 @@ export default function SearchPage() {
       setAutocompleteSuggestions([]);
       setAutocompleteDidYouMean(null);
       closeAutocomplete();
+      setIsPopularSearchOpen(document.activeElement === searchInputRef.current);
+      return;
     }
-  }, [closeAutocomplete]);
+
+    closePopularSearch();
+  }, [closeAutocomplete, closePopularSearch]);
 
   /**
    * 검색 입력 키보드 조작을 처리한다.
    * 위/아래 화살표로 추천어 이동, Enter로 선택, Escape로 닫기를 지원한다.
    */
   const handleQueryKeyDown = useCallback((event) => {
+    if (event.key === 'Escape') {
+      closeAutocomplete();
+      closePopularSearch();
+      return;
+    }
+
     if (!isAutocompleteOpen || autocompleteSuggestions.length === 0) {
       return;
     }
@@ -1645,14 +1671,11 @@ export default function SearchPage() {
       handleSelectAutocomplete(autocompleteSuggestions[activeAutocompleteIndex]);
       return;
     }
-
-    if (event.key === 'Escape') {
-      closeAutocomplete();
-    }
   }, [
     activeAutocompleteIndex,
     autocompleteSuggestions,
     closeAutocomplete,
+    closePopularSearch,
     handleSelectAutocomplete,
     isAutocompleteOpen,
   ]);
@@ -1679,8 +1702,9 @@ export default function SearchPage() {
 
   const handleOpenFilterModal = useCallback(() => {
     closeAutocomplete();
+    closePopularSearch();
     setIsFilterModalOpen(true);
-  }, [closeAutocomplete]);
+  }, [closeAutocomplete, closePopularSearch]);
 
   const handleCloseFilterModal = useCallback(() => {
     setIsFilterModalOpen(false);
@@ -1697,7 +1721,8 @@ export default function SearchPage() {
     setSelectedSearchGenres(nextSelectedGenres);
     setIsDetailGenresExpanded(hasSelectedDetailGenres(nextSelectedGenres));
     closeAutocomplete();
-  }, [closeAutocomplete, genre]);
+    closePopularSearch();
+  }, [closeAutocomplete, closePopularSearch, genre]);
 
   /**
    * 전체 검색 기록 모달을 연다.
@@ -1890,6 +1915,7 @@ export default function SearchPage() {
   const handleSearchTypeChange = (selectedType) => {
     setSearchType(selectedType);
     closeAutocomplete();
+    closePopularSearch();
     if (query.trim()) {
       executeSearch({
         query,
@@ -2211,15 +2237,40 @@ export default function SearchPage() {
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onKeyDown={handleQueryKeyDown}
                 onFocus={() => {
+                  if (!query.trim()) {
+                    setIsPopularSearchOpen(true);
+                    return;
+                  }
+
                   if (autocompleteSuggestions.length > 0 || autocompleteDidYouMean) {
                     setIsAutocompleteOpen(true);
                   }
                 }}
                 placeholder="영화 제목, 배우, 감독을 검색하세요..."
                 aria-autocomplete="list"
-                aria-expanded={isAutocompleteOpen}
+                aria-expanded={isAutocompleteOpen || (query.trim() === '' && isPopularSearchOpen)}
                 autoFocus
               />
+
+              {query.trim() === '' && isPopularSearchOpen && (
+                <PopularSearchPanel
+                  keywords={popularSearchKeywords}
+                  isLoading={isPopularSearchLoading}
+                  onSelect={(keyword) => {
+                    setQuery(keyword);
+                    closePopularSearch();
+                    executeSearch({
+                      query: keyword,
+                      searchType,
+                      genre,
+                      sort,
+                      page: 1,
+                      append: false,
+                      discoveryGenres: selectedSearchGenres,
+                    });
+                  }}
+                />
+              )}
 
               {(isAutocompleteLoading || isAutocompleteOpen) && (
                 <S.AutocompletePanel>

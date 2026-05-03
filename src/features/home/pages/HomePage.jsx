@@ -7,12 +7,14 @@
  * - 빠른 채팅 진입: 추천 질문 카드
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 /* 라우트 경로 상수 — shared/constants에서 가져옴 */
 import { ROUTES } from '../../../shared/constants/routes';
 /* 영화 목록 컴포넌트 — shared/components에서 가져옴 */
 import MovieList from '../../../shared/components/MovieList/MovieList';
+import PopularSearchPanel from '../../../shared/components/PopularSearchPanel/PopularSearchPanel';
+import usePopularSearchKeywords from '../../../shared/hooks/usePopularSearchKeywords';
 /* 홈 인기/최신 영화 API — features/movie에서 가져옴 */
 import { getHomeBoxOfficeMovies, getLatestMovies } from '../../movie/api/movieApi';
 /* 공지사항 API — shared/api에서 가져옴 */
@@ -67,6 +69,7 @@ export default function HomePage() {
    * 제출 시 `/search?q=...` 로 이동해 SearchPage 가 결과를 렌더.
    */
   const [searchQuery, setSearchQuery] = useState('');
+  const [isPopularSearchOpen, setIsPopularSearchOpen] = useState(false);
   /** 인기 영화 목록 (recommend /search/home/box-office) */
   const [popularMovies, setPopularMovies] = useState([]);
   /** 인기 영화 로딩 상태 */
@@ -93,6 +96,10 @@ export default function HomePage() {
   const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState([]);
 
   const navigate = useNavigate();
+  const homeSearchRef = useRef(null);
+  const { keywords: popularSearchKeywords, isLoading: isPopularSearchLoading } = (
+    usePopularSearchKeywords()
+  );
 
   /**
    * 인기/최신 영화 + 공지사항 목록을 병렬로 로드한다.
@@ -235,10 +242,29 @@ export default function HomePage() {
    */
   const handleHomeSearchSubmit = (e) => {
     e.preventDefault();
+    setIsPopularSearchOpen(false);
     const q = searchQuery.trim();
     if (!q) return;
     navigate(`${ROUTES.SEARCH}?q=${encodeURIComponent(q)}`);
   };
+
+  /**
+   * 홈 검색창 외부 클릭 시 인기 검색어 패널을 닫습니다.
+   */
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (homeSearchRef.current?.contains(event.target)) {
+        return;
+      }
+
+      setIsPopularSearchOpen(false);
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, []);
 
   return (
     <S.Wrapper>
@@ -249,18 +275,44 @@ export default function HomePage() {
         엔터 또는 "검색" 버튼 클릭 시 /search?q=... 로 이동 — SearchPage 의 useSearchParams 로 수신.
       */}
       <S.HomeSearch>
-        <S.HomeSearchForm onSubmit={handleHomeSearchSubmit} role="search">
-          <S.HomeSearchInput
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="보고 싶은 영화·감독·배우를 검색해보세요"
-            aria-label="영화 검색"
-          />
-          <S.HomeSearchBtn type="submit">
-            검색
-          </S.HomeSearchBtn>
-        </S.HomeSearchForm>
+        <S.HomeSearchBox ref={homeSearchRef}>
+          <S.HomeSearchForm onSubmit={handleHomeSearchSubmit} role="search">
+            <S.HomeSearchInput
+              type="search"
+              value={searchQuery}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setSearchQuery(nextValue);
+                setIsPopularSearchOpen(
+                  !nextValue.trim() && document.activeElement === e.target
+                );
+              }}
+              onFocus={(e) => {
+                if (!e.target.value.trim()) {
+                  setIsPopularSearchOpen(true);
+                }
+              }}
+              placeholder="보고 싶은 영화·감독·배우를 검색해보세요"
+              aria-label="영화 검색"
+              aria-expanded={isPopularSearchOpen && !searchQuery.trim()}
+            />
+            <S.HomeSearchBtn type="submit">
+              검색
+            </S.HomeSearchBtn>
+          </S.HomeSearchForm>
+
+          {isPopularSearchOpen && !searchQuery.trim() && (
+            <PopularSearchPanel
+              keywords={popularSearchKeywords}
+              isLoading={isPopularSearchLoading}
+              onSelect={(keyword) => {
+                setSearchQuery(keyword);
+                setIsPopularSearchOpen(false);
+                navigate(`${ROUTES.SEARCH}?q=${encodeURIComponent(keyword)}`);
+              }}
+            />
+          )}
+        </S.HomeSearchBox>
       </S.HomeSearch>
 
       {/* ── 히어로 섹션 ── */}

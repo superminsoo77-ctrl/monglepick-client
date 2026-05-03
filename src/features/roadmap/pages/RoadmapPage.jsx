@@ -125,7 +125,6 @@ export default function RoadmapPage() {
       const data = await getCourses({
         theme: activeTab === 'all' ? (selectedCategory || undefined) : undefined,
       });
-      console.log('[DEBUG] getCourses response:', data);
       setCourses(Array.isArray(data) ? data : data?.content || []);
     } catch (err) {
       console.error('[Roadmap] 코스 로드 실패:', err.message);
@@ -142,7 +141,6 @@ export default function RoadmapPage() {
     setIsDetailLoading(true);
     try {
       const data = await getCourseDetail(courseId);
-      console.log('[DEBUG] getCourseDetail response:', data);
       setDetail(data);
       /* 완료된 영화 ID 세트 생성 — 백엔드 completedMovieIds 배열 (문자열 ID) */
       const completed = new Set((data.completedMovieIds || []).map(String));

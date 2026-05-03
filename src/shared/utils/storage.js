@@ -14,11 +14,17 @@
  *   단, 만료 시 axiosInstance의 인터셉터가 자동으로 제거한다.
  */
 
-/** 인증 토큰(액세스 토큰) 저장 키 */
-const TOKEN_KEY = 'monglepick_auth_token';
+/** 사용자 페이지 전용 Access Token 저장 키. 관리자 key(adminAccessToken)와 절대 공유하지 않는다. */
+const TOKEN_KEY = 'userAccessToken';
 
-/** 사용자 정보 저장 키 */
-const USER_KEY = 'monglepick_user';
+/** 2026-05-01 이전 사용자 토큰 key. 읽을 때만 userAccessToken으로 이관한다. */
+const LEGACY_TOKEN_KEY = 'monglepick_auth_token';
+
+/** 사용자 페이지 전용 user 저장 키. 관리자 user 상태와 분리한다. */
+const USER_KEY = 'userAuthUser';
+
+/** 2026-05-01 이전 사용자 정보 key. 읽을 때만 userAuthUser로 이관한다. */
+const LEGACY_USER_KEY = 'monglepick_user';
 
 // [REMOVED] 채팅 세션 ID 키는 삭제되었다.
 // 채팅 세션 ID 의 단일 진실 원본(SSOT)은 URL(`/chat/:sessionId`) 이며,
@@ -82,7 +88,15 @@ function safeRemoveItem(key) {
  * @returns {string|null} JWT 액세스 토큰 또는 null
  */
 export function getToken() {
-  return safeGetItem(TOKEN_KEY);
+  const token = safeGetItem(TOKEN_KEY);
+  if (token) return token;
+
+  const legacyToken = safeGetItem(LEGACY_TOKEN_KEY);
+  if (legacyToken) {
+    safeSetItem(TOKEN_KEY, legacyToken);
+    safeRemoveItem(LEGACY_TOKEN_KEY);
+  }
+  return legacyToken;
 }
 
 /**
@@ -93,6 +107,7 @@ export function getToken() {
  * @returns {boolean} 저장 성공 여부
  */
 export function setToken(token) {
+  safeRemoveItem(LEGACY_TOKEN_KEY);
   return safeSetItem(TOKEN_KEY, token);
 }
 
@@ -103,7 +118,9 @@ export function setToken(token) {
  * @returns {boolean} 삭제 성공 여부
  */
 export function removeToken() {
-  return safeRemoveItem(TOKEN_KEY);
+  const removedCurrent = safeRemoveItem(TOKEN_KEY);
+  safeRemoveItem(LEGACY_TOKEN_KEY);
+  return removedCurrent;
 }
 
 // ── 리프레시 토큰 관련 (no-op — 서버 HttpOnly 쿠키로 관리) ──
@@ -159,7 +176,14 @@ export function removeRefreshToken() {
  * @returns {Object|null} 사용자 정보 객체 또는 null
  */
 export function getUser() {
-  const userJson = safeGetItem(USER_KEY);
+  let userJson = safeGetItem(USER_KEY);
+  if (!userJson) {
+    userJson = safeGetItem(LEGACY_USER_KEY);
+    if (userJson) {
+      safeSetItem(USER_KEY, userJson);
+      safeRemoveItem(LEGACY_USER_KEY);
+    }
+  }
   if (!userJson) return null;
 
   try {
@@ -178,6 +202,7 @@ export function getUser() {
  */
 export function setUser(user) {
   try {
+    safeRemoveItem(LEGACY_USER_KEY);
     return safeSetItem(USER_KEY, JSON.stringify(user));
   } catch {
     console.warn('[storage] 사용자 정보 직렬화 실패');
@@ -191,7 +216,9 @@ export function setUser(user) {
  * @returns {boolean} 삭제 성공 여부
  */
 export function removeUser() {
-  return safeRemoveItem(USER_KEY);
+  const removedCurrent = safeRemoveItem(USER_KEY);
+  safeRemoveItem(LEGACY_USER_KEY);
+  return removedCurrent;
 }
 
 // ── 계정 정지 사유 관련 (sessionStorage — 브라우저 탭 닫으면 자동 소멸) ──
@@ -229,11 +256,13 @@ export function clearSuspendedReason() {
 }
 
 /**
- * 모든 몽글픽 관련 localStorage 데이터를 삭제한다.
- * 로그아웃 시 호출하여 완전한 상태 초기화를 수행한다.
+ * 사용자 페이지 인증 localStorage 데이터만 삭제한다.
+ * 로그아웃 시 호출하여 사용자 인증 상태를 초기화한다.
  *
  * [이슈6] Refresh Token은 서버 HttpOnly 쿠키로 관리하므로 여기서 삭제하지 않는다.
  * 쿠키 삭제는 서버 로그아웃 API(/auth/logout)가 담당한다.
+ *
+ * 관리자 인증 key(adminAccessToken 등)는 의도적으로 건드리지 않는다.
  */
 export function clearAll() {
   removeToken();

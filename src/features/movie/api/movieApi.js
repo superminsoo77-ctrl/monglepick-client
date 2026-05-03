@@ -164,6 +164,23 @@ export async function getAutocompleteSuggestions({ query, limit = 8 }) {
 }
 
 /**
+ * 검색창 하단에 노출할 인기 검색어 TOP N을 조회합니다.
+ *
+ * 운영 메타(displayRank/manualPriority/isExcluded)는 Recommend 서버에서 이미
+ * 반영한 뒤 순위 형태로 반환하므로, 프런트는 그대로 렌더링만 수행합니다.
+ *
+ * @returns {Promise<Array<{rank: number, keyword: string, searchCount: number}>>}
+ */
+export async function getTrendingKeywords() {
+  const data = await recommendApi.get(SEARCH_ENDPOINTS.TRENDING);
+  return (data?.keywords || []).map((item) => ({
+    rank: item.rank,
+    keyword: item.keyword,
+    searchCount: item.search_count ?? item.searchCount ?? 0,
+  }));
+}
+
+/**
  * 영화를 검색한다.
  * 키워드, 장르, 정렬 등의 필터를 지원한다.
  *

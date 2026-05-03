@@ -226,6 +226,11 @@ export const HomeSearch = styled.section`
   padding: ${({ theme }) => theme.spacing.lg};
 `;
 
+/** 검색 form + 인기 검색어 패널을 함께 감싸는 relative 래퍼 */
+export const HomeSearchBox = styled.div`
+  position: relative;
+`;
+
 /** 검색 form — input + 버튼 수평 정렬, 테두리 + 그림자로 카드 느낌 */
 export const HomeSearchForm = styled.form`
   display: flex;

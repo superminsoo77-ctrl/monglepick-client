@@ -26,6 +26,22 @@ import { getOAuth2AuthorizationUrl } from '../../../shared/constants/oauth';
 import useReturnTo, { rememberReturnTo } from '../../../shared/hooks/useReturnTo';
 import * as S from './LoginForm.styled';
 
+const ADMIN_LOGIN_ERROR_CODES = new Set([
+  'A014',
+  'ADMIN_ACCOUNT',
+  'ADMIN_LOGIN_REQUIRED',
+  'ADMIN_ACCOUNT_LOGIN_NOT_ALLOWED',
+]);
+
+function isAdminLoginError(err) {
+  const code = String(err?.code || '').toUpperCase();
+  const message = String(err?.message || '').toLowerCase();
+
+  return ADMIN_LOGIN_ERROR_CODES.has(code) ||
+    message.includes('관리자') ||
+    message.includes('admin');
+}
+
 export default function LoginForm() {
   /* ── 로그인 상태 ── */
   const [email, setEmail]       = useState('');
@@ -85,7 +101,9 @@ export default function LoginForm() {
       /* PR-5: state.returnTo 있으면 원래 페이지로, 없으면 ROUTES.HOME 으로 */
       goAfterLogin();
     } catch (err) {
-      if (err.code === 'A003') {
+      if (isAdminLoginError(err)) {
+        setServerError('관리자 계정은 관리자 페이지에서 로그인해주세요.');
+      } else if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
       } else if (err.code === 'A007') {
         setServerError('해당 이메일은 소셜 로그인으로 가입되어 있습니다. 소셜 로그인을 이용해주세요.');
@@ -116,7 +134,9 @@ export default function LoginForm() {
       /* PR-5: state.returnTo 있으면 원래 페이지로, 없으면 ROUTES.HOME 으로 */
       goAfterLogin();
     } catch (err) {
-      if (err.code === 'A003') {
+      if (isAdminLoginError(err)) {
+        setServerError('관리자 계정은 관리자 페이지에서 로그인해주세요.');
+      } else if (err.code === 'A003') {
         setServerError('이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 경우 회원가입을 진행해주세요.');
       } else if (err.code === 'A012') {
         setServerError('탈퇴한 계정입니다.');
