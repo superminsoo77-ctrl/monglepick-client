@@ -21,7 +21,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { submitQuizAnswer, useQuizHint } from '../api/quizApi';
+import { submitQuizAnswer, requestQuizHint } from '../api/quizApi';
 import * as S from './QuizCard.styled';
 
 /**
@@ -90,7 +90,7 @@ export default function QuizCard({ quiz, index = 0, onSubmitted }) {
     setHintLoading(true);
     setError(null);
     try {
-      const resp = await useQuizHint(quiz.quizId);
+      const resp = await requestQuizHint(quiz.quizId);
       setHint(resp?.hint ?? '');
     } catch (err) {
       const status = err?.status ?? err?.response?.status;

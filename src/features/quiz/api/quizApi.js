@@ -140,7 +140,7 @@ export async function getMyQuizHistory({ page = 0, size = 10 } = {}) {
  * @throws {Error} 보유 QUIZ_HINT 아이템이 없는 경우 (404)
  * @throws {Error} 퀴즈에 힌트가 없는 경우 (404)
  */
-export async function useQuizHint(quizId) {
+export async function requestQuizHint(quizId) {
   requireAuth();
   return backendApi.post(QUIZ_ENDPOINTS.HINT(quizId));
 }
